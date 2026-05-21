@@ -1,0 +1,168 @@
+{% extends 'base.html' %}
+{% block title %}Terminate Employee — HRMIS{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-7">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h4 class="mb-0"><i class="bi bi-exclamation-triangle-fill text-danger"></i> Terminate Employee</h4>
+      <a href="{% url 'employee_detail' employee.pk %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i> Back
+      </a>
+    </div>
+
+    <!-- Warning Alert -->
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+      <i class="bi bi-exclamation-circle-fill"></i>
+      <strong>⚠️ Warning: Irreversible Action</strong>
+      <p class="mb-0 mt-2">
+        Employee termination is <strong>irreversible</strong>. This action will:
+      </p>
+      <ul class="mb-0 mt-2">
+        <li>Mark the employee as inactive</li>
+        <li>Record the termination date and reason</li>
+        <li>Cannot be undone without administrative intervention</li>
+      </ul>
+    </div>
+
+    <!-- Employee Details Card -->
+    <div class="card mb-4 bg-light">
+      <div class="card-header bg-white fw-semibold">
+        <i class="bi bi-person-badge text-primary"></i> Employee Information
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-sm-6">
+            <span class="text-muted small d-block">Full Name</span>
+            <strong>{{ employee.full_name }}</strong>
+          </div>
+          <div class="col-sm-6">
+            <span class="text-muted small d-block">Job Title</span>
+            <strong>{{ employee.job_title }}</strong>
+          </div>
+          <div class="col-sm-6">
+            <span class="text-muted small d-block">Department</span>
+            <strong>{{ employee.department|default:"—" }}</strong>
+          </div>
+          <div class="col-sm-6">
+            <span class="text-muted small d-block">Date Joined</span>
+            <strong>{{ employee.date_joined }}</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Termination Form -->
+    <form method="post" class="card">
+      {% csrf_token %}
+      <div class="card-header bg-white fw-semibold">
+        <i class="bi bi-form-checkbox text-warning"></i> Termination Details
+      </div>
+      <div class="card-body">
+        <!-- Termination Date -->
+        <div class="mb-3">
+          <label for="id_termination_date" class="form-label">
+            <span class="text-danger">*</span> Termination Date
+          </label>
+          <input
+            type="date"
+            id="id_termination_date"
+            name="termination_date"
+            class="form-control {% if form.termination_date.errors %}is-invalid{% endif %}"
+            required
+          >
+          {% if form.termination_date.errors %}
+            <div class="invalid-feedback d-block">
+              {{ form.termination_date.errors|first }}
+            </div>
+          {% endif %}
+        </div>
+
+        <!-- Exit Reason -->
+        <div class="mb-3">
+          <label for="id_exit_reason" class="form-label">
+            <span class="text-danger">*</span> Exit Reason
+          </label>
+          <select
+            id="id_exit_reason"
+            name="exit_reason"
+            class="form-select {% if form.exit_reason.errors %}is-invalid{% endif %}"
+            required
+          >
+            <option value="">Select an exit reason...</option>
+            <option value="resignation">Resignation</option>
+            <option value="termination">Termination</option>
+            <option value="retirement">Retirement</option>
+            <option value="contract_end">Contract End</option>
+            <option value="medical">Medical Grounds</option>
+            <option value="redundancy">Redundancy</option>
+            <option value="other">Other</option>
+          </select>
+          {% if form.exit_reason.errors %}
+            <div class="invalid-feedback d-block">
+              {{ form.exit_reason.errors|first }}
+            </div>
+          {% endif %}
+        </div>
+
+        <!-- Exit Notes -->
+        <div class="mb-3">
+          <label for="id_exit_notes" class="form-label">Additional Notes</label>
+          <textarea
+            id="id_exit_notes"
+            name="exit_notes"
+            class="form-control {% if form.exit_notes.errors %}is-invalid{% endif %}"
+            rows="4"
+            placeholder="Enter any additional notes about the termination..."
+          ></textarea>
+          {% if form.exit_notes.errors %}
+            <div class="invalid-feedback d-block">
+              {{ form.exit_notes.errors|first }}
+            </div>
+          {% endif %}
+        </div>
+
+        <!-- Confirmation Checkbox -->
+        <div class="mb-3">
+          <div class="form-check">
+            <input
+              class="form-check-input {% if form.confirm.errors %}is-invalid{% endif %}"
+              type="checkbox"
+              id="id_confirm"
+              name="confirm"
+              required
+            >
+            <label class="form-check-label" for="id_confirm">
+              I confirm that I want to terminate <strong>{{ employee.full_name }}</strong> as an employee.
+              <span class="text-danger">This action cannot be undone.</span>
+            </label>
+          </div>
+          {% if form.confirm.errors %}
+            <div class="invalid-feedback d-block">
+              {{ form.confirm.errors|first }}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Form Actions -->
+      <div class="card-footer bg-light d-flex gap-2">
+        <button type="submit" class="btn btn-danger">
+          <i class="bi bi-exclamation-octagon-fill"></i> Terminate Employee
+        </button>
+        <a href="{% url 'employee_detail' employee.pk %}" class="btn btn-outline-secondary">
+          Cancel
+        </a>
+      </div>
+    </form>
+
+    <!-- Info Box -->
+    <div class="alert alert-info mt-4" role="alert">
+      <i class="bi bi-info-circle"></i>
+      <strong>Note:</strong> Terminating an employee will deactivate their account and record the exit information.
+      Final settlements, benefits processing, and other administrative tasks should be handled separately.
+    </div>
+  </div>
+</div>
+{% endblock %}

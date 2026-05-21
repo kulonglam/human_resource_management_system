@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% block title %}Attendance Report — HRMIS{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="mb-0"><i class="bi bi-bar-chart-line text-success"></i> Attendance Report</h4>
+  <a href="{% url 'attendance_list' %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left"></i> Back
+  </a>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+  <div class="card-body">
+    <form method="get" class="row g-3 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">Employee</label>
+        <select name="employee" class="form-select form-select-sm">
+          <option value="">All Employees</option>
+          {% for emp in employees %}
+            <option value="{{ emp.pk }}" {% if request.GET.employee == emp.pk|stringformat:"s" %}selected{% endif %}>
+              {{ emp.full_name }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">Month</label>
+        <select name="month" class="form-select form-select-sm">
+          <option value="">All Months</option>
+          {% for i in "123456789101112"|make_list %}{% endfor %}
+          <option value="1"  {% if request.GET.month == "1"  %}selected{% endif %}>January</option>
+          <option value="2"  {% if request.GET.month == "2"  %}selected{% endif %}>February</option>
+          <option value="3"  {% if request.GET.month == "3"  %}selected{% endif %}>March</option>
+          <option value="4"  {% if request.GET.month == "4"  %}selected{% endif %}>April</option>
+          <option value="5"  {% if request.GET.month == "5"  %}selected{% endif %}>May</option>
+          <option value="6"  {% if request.GET.month == "6"  %}selected{% endif %}>June</option>
+          <option value="7"  {% if request.GET.month == "7"  %}selected{% endif %}>July</option>
+          <option value="8"  {% if request.GET.month == "8"  %}selected{% endif %}>August</option>
+          <option value="9"  {% if request.GET.month == "9"  %}selected{% endif %}>September</option>
+          <option value="10" {% if request.GET.month == "10" %}selected{% endif %}>October</option>
+          <option value="11" {% if request.GET.month == "11" %}selected{% endif %}>November</option>
+          <option value="12" {% if request.GET.month == "12" %}selected{% endif %}>December</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-success btn-sm w-100">
+          <i class="bi bi-funnel"></i> Filter
+        </button>
+      </div>
+      <div class="col-md-2">
+        <a href="{% url 'attendance_report' %}" class="btn btn-outline-secondary btn-sm w-100">Clear</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Employee</th>
+          <th>Department</th>
+          <th>Time In</th>
+          <th>Time Out</th>
+          <th>Status</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for record in records %}
+        <tr>
+          <td>{{ record.date }}</td>
+          <td class="fw-semibold">{{ record.employee.full_name }}</td>
+          <td>{{ record.employee.department|default:"—" }}</td>
+          <td>{{ record.time_in|default:"—" }}</td>
+          <td>{{ record.time_out|default:"—" }}</td>
+          <td>
+            <span class="badge badge-{{ record.status }} px-2 py-1">
+              {{ record.get_status_display }}
+            </span>
+          </td>
+          <td><small>{{ record.notes|default:"—" }}</small></td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" class="text-center py-4 text-muted">No records found for the selected filters.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

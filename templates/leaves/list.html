@@ -1,0 +1,116 @@
+{% extends 'base.html' %}
+{% block title %}Leave Requests — HRMIS{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="mb-0"><i class="bi bi-calendar2-x-fill text-warning"></i> Leave Requests</h4>
+  <a href="{% url 'leave_apply' %}" class="btn btn-warning btn-sm text-dark">
+    <i class="bi bi-plus-lg"></i> Apply Leave
+  </a>
+</div>
+
+{% if messages %}
+  {% for message in messages %}
+    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+  {% endfor %}
+{% endif %}
+
+<!-- Leave Balance Overview -->
+{% if balances %}
+<div class="card mb-4">
+  <div class="card-header bg-light">
+    <h6 class="mb-0"><i class="bi bi-graph-up text-success"></i> Leave Balance Overview ({{ current_year }})</h6>
+  </div>
+  <div class="card-body">
+    <div class="row">
+      {% regroup balances by employee as balances_by_employee %}
+      {% for employee_group in balances_by_employee %}
+        <div class="col-lg-6 mb-3">
+          <div class="border rounded p-3" style="background-color: #f8f9fa;">
+            <h6 class="mb-3 fw-semibold text-primary">{{ employee_group.grouper.full_name }}</h6>
+            <div class="row g-2">
+              {% for balance in employee_group.list %}
+              <div class="col-sm-6 mb-2">
+                <div style="font-size: 0.9rem;">
+                  <div class="mb-1">
+                    <span class="fw-semibold d-block">{{ balance.get_leave_type_display }}</span>
+                    <small class="text-muted">{{ balance.total_days }} total</small>
+                  </div>
+                  <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                      <small class="d-block"><span class="text-muted">Used:</span> <strong class="text-danger">{{ balance.used_days|floatformat:1 }}</strong></small>
+                      <small class="d-block"><span class="text-muted">Pending:</span> <strong class="text-warning">{{ balance.pending_days|floatformat:1 }}</strong></small>
+                    </div>
+                    <span class="badge {% if balance.available_days > 5 %}bg-success{% elif balance.available_days > 0 %}bg-warning{% else %}bg-danger{% endif %}">
+                      {{ balance.available_days|floatformat:1 }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Leave Requests Table -->
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Employee</th>
+          <th>Type</th>
+          <th>From</th>
+          <th>To</th>
+          <th>Days</th>
+          <th>Status</th>
+          <th>Applied On</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for leave in leaves %}
+        <tr>
+          <td>{{ forloop.counter }}</td>
+          <td class="fw-semibold">{{ leave.employee.full_name }}</td>
+          <td>{{ leave.get_leave_type_display }}</td>
+          <td>{{ leave.start_date }}</td>
+          <td>{{ leave.end_date }}</td>
+          <td><span class="badge bg-secondary">{{ leave.duration }} day{{ leave.duration|pluralize }}</span></td>
+          <td>
+            <span class="badge badge-{{ leave.status }} px-2 py-1">
+              {{ leave.get_status_display }}
+            </span>
+          </td>
+          <td><small>{{ leave.applied_on|date:"d M Y" }}</small></td>
+          <td>
+            {% if leave.status == 'pending' %}
+              <a href="{% url 'leave_approve' leave.pk %}" class="btn btn-outline-success btn-sm">
+                <i class="bi bi-check2-square"></i> Review
+              </a>
+            {% else %}
+              <small class="text-muted">{{ leave.reviewed_by|default:"" }}</small>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="9" class="text-center py-4 text-muted">
+            No leave requests found. <a href="{% url 'leave_apply' %}">Apply one</a>.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

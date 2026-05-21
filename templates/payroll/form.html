@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+{% block title %}{{ title }} — HRMIS{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="mb-0"><i class="bi bi-cash-stack text-dark"></i> {{ title }}</h4>
+  <a href="{% url 'salary_list' %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left"></i> Back
+  </a>
+</div>
+
+<div class="card" style="max-width:680px;">
+  <div class="card-body p-4">
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      <div class="row">
+        <div class="col-12 mb-3">
+          <h6 class="text-muted fw-semibold border-bottom pb-2">
+            <i class="bi bi-person-fill"></i> Employee & Period
+          </h6>
+        </div>
+        <div class="col-md-6 mb-3">
+          <label class="form-label fw-semibold">{{ form.employee.label }}</label>
+          {{ form.employee }}
+          {% for e in form.employee.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-md-3 mb-3">
+          <label class="form-label fw-semibold">{{ form.month.label }}</label>
+          {{ form.month }}
+          {% for e in form.month.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-md-3 mb-3">
+          <label class="form-label fw-semibold">{{ form.year.label }}</label>
+          {{ form.year }}
+          {% for e in form.year.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+
+        <div class="col-12 mb-3 mt-1">
+          <h6 class="text-muted fw-semibold border-bottom pb-2">
+            <i class="bi bi-calculator"></i> Salary Breakdown
+          </h6>
+        </div>
+        <div class="col-md-3 mb-3">
+          <label class="form-label fw-semibold">{{ form.basic_salary.label }}</label>
+          {{ form.basic_salary }}
+          {% for e in form.basic_salary.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-md-3 mb-3">
+          <label class="form-label fw-semibold">{{ form.allowances.label }}</label>
+          {{ form.allowances }}
+          {% for e in form.allowances.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-md-3 mb-3">
+          <label class="form-label fw-semibold">{{ form.deductions.label }}</label>
+          {{ form.deductions }}
+          {% for e in form.deductions.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-md-3 mb-3">
+          <label class="form-label fw-semibold">{{ form.tax.label }}</label>
+          {{ form.tax }}
+          {% for e in form.tax.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+
+        <div class="col-12 mb-3 mt-1">
+          <h6 class="text-muted fw-semibold border-bottom pb-2">
+            <i class="bi bi-bank2"></i> Payment Info
+          </h6>
+        </div>
+        <div class="col-md-4 mb-3">
+          <label class="form-label fw-semibold">{{ form.payment_frequency.label }}</label>
+          {{ form.payment_frequency }}
+          {% for e in form.payment_frequency.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-md-4 mb-3">
+          <label class="form-label fw-semibold">{{ form.payment_method.label }}</label>
+          {{ form.payment_method }}
+          {% for e in form.payment_method.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-md-4 mb-3">
+          <label class="form-label fw-semibold">{{ form.paid_on.label }}</label>
+          {{ form.paid_on }}
+          {% for e in form.paid_on.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-md-4 mb-3 d-flex align-items-center gap-2 mt-1">
+          {{ form.is_paid }}
+          <label class="form-label mb-0 fw-semibold">{{ form.is_paid.label }}</label>
+        </div>
+      </div>
+
+      <div class="alert alert-info py-2 small mt-1">
+        <i class="bi bi-info-circle"></i>
+        Net salary is calculated automatically: Basic + Allowances − Deductions − Tax.
+      </div>
+
+      <div class="d-flex gap-2 mt-2">
+        <button type="submit" class="btn btn-dark">
+          <i class="bi bi-check-lg"></i> Save Record
+        </button>
+        <a href="{% url 'salary_list' %}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

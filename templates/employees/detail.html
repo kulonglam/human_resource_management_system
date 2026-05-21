@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+{% block title %}{{ employee.full_name }} — HRMIS{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="mb-0"><i class="bi bi-person-badge text-primary"></i> Employee Profile</h4>
+  <div class="d-flex gap-2">
+    <a href="{% url 'employee_edit' employee.pk %}" class="btn btn-primary btn-sm">
+      <i class="bi bi-pencil"></i> Edit
+    </a>
+    <a href="{% url 'kin_create_or_edit' employee.pk %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-people"></i> Next of Kin
+    </a>
+    {% if user.is_staff %}
+      <a href="{% url 'employee_terminate' employee.pk %}" class="btn btn-danger btn-sm">
+        <i class="bi bi-exclamation-octagon-fill"></i> Terminate
+      </a>
+    {% endif %}
+    <a href="{% url 'employee_list' %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Left: Photo + summary -->
+  <div class="col-md-3 text-center">
+    <div class="card p-3">
+      {% if employee.photo %}
+        <img src="{{ employee.photo.url }}" class="rounded-circle mx-auto d-block mb-3"
+             width="120" height="120" style="object-fit:cover;">
+      {% else %}
+        <div class="mx-auto d-flex align-items-center justify-content-center bg-secondary text-white rounded-circle mb-3"
+             style="width:120px;height:120px;font-size:2.5rem;">
+          {{ employee.first_name|first }}{{ employee.last_name|first }}
+        </div>
+      {% endif %}
+      <h5 class="mb-1">{{ employee.full_name }}</h5>
+      <p class="text-muted small mb-1">{{ employee.job_title }}</p>
+      <p class="text-muted small">{{ employee.department|default:"No Department" }}</p>
+      {% if employee.is_active %}
+        <span class="badge bg-success">Active</span>
+      {% else %}
+        <span class="badge bg-secondary">Inactive</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Right: Details -->
+  <div class="col-md-9">
+    <!-- Personal Info -->
+    <div class="card mb-3">
+      <div class="card-header bg-white fw-semibold">
+        <i class="bi bi-person-lines-fill text-primary"></i> Personal Information
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-sm-6"><span class="text-muted small d-block">Date of Birth</span> {{ employee.date_of_birth }}</div>
+          <div class="col-sm-6"><span class="text-muted small d-block">Gender</span> {{ employee.gender }}</div>
+          <div class="col-sm-6"><span class="text-muted small d-block">Email</span> <a href="mailto:{{ employee.email }}">{{ employee.email }}</a></div>
+          <div class="col-sm-6"><span class="text-muted small d-block">Mobile</span> {{ employee.mobile }}</div>
+          <div class="col-sm-6"><span class="text-muted small d-block">Address</span> {{ employee.address }}</div>
+          <div class="col-sm-6"><span class="text-muted small d-block">Emergency Contact</span> {{ employee.emergency_contact }}</div>
+          <div class="col-sm-6"><span class="text-muted small d-block">Language</span> {{ employee.language }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Employment Info -->
+    <div class="card mb-3">
+      <div class="card-header bg-white fw-semibold">
+        <i class="bi bi-briefcase-fill text-success"></i> Employment Information
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-sm-6"><span class="text-muted small d-block">Job Title</span> {{ employee.job_title }}</div>
+          <div class="col-sm-6"><span class="text-muted small d-block">Department</span> {{ employee.department|default:"—" }}</div>
+          <div class="col-sm-6"><span class="text-muted small d-block">Date Joined</span> {{ employee.date_joined }}</div>
+          <div class="col-sm-6"><span class="text-muted small d-block">Status</span>
+            {% if employee.is_active %}<span class="badge bg-success">Active</span>{% else %}<span class="badge bg-secondary">Inactive</span>{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Payroll / Banking -->
+    <div class="card mb-3">
+      <div class="card-header bg-white fw-semibold">
+        <i class="bi bi-bank2 text-warning"></i> Banking & Payroll
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-sm-4"><span class="text-muted small d-block">Bank</span> {{ employee.bank }}</div>
+          <div class="col-sm-4"><span class="text-muted small d-block">Account Number</span> {{ employee.account_number }}</div>
+          <div class="col-sm-4"><span class="text-muted small d-block">Salary</span> GH₵ {{ employee.salary }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Next of Kin -->
+    {% if employee.kin %}
+    <div class="card">
+      <div class="card-header bg-white fw-semibold">
+        <i class="bi bi-people-fill text-info"></i> Next of Kin
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-sm-4"><span class="text-muted small d-block">Name</span> {{ employee.kin.first_name }} {{ employee.kin.last_name }}</div>
+          <div class="col-sm-4"><span class="text-muted small d-block">Relationship</span> {{ employee.kin.relationship }}</div>
+          <div class="col-sm-4"><span class="text-muted small d-block">Mobile</span> {{ employee.kin.mobile }}</div>
+          <div class="col-sm-4"><span class="text-muted small d-block">Occupation</span> {{ employee.kin.occupation }}</div>
+          <div class="col-sm-8"><span class="text-muted small d-block">Address</span> {{ employee.kin.address }}</div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

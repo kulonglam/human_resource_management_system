@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+{% block title %}Apply Leave — HRMIS{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="mb-0"><i class="bi bi-calendar2-x text-warning"></i> Apply for Leave</h4>
+  <a href="{% url 'leave_list' %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left"></i> Back
+  </a>
+</div>
+
+{% if messages %}
+  {% for message in messages %}
+    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+  {% endfor %}
+{% endif %}
+
+<!-- Leave Balance Section -->
+{% if balances %}
+<div class="card mb-4">
+  <div class="card-header bg-light">
+    <h6 class="mb-0"><i class="bi bi-graph-up text-info"></i> Your Leave Balance ({{ current_year }})</h6>
+  </div>
+  <div class="card-body">
+    <div class="row">
+      {% for balance in balances %}
+      <div class="col-md-6 mb-3">
+        <div class="border rounded p-3" style="background-color: #f8f9fa;">
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            <h6 class="mb-0 fw-semibold">{{ balance.get_leave_type_display }}</h6>
+            <span class="badge bg-info">{{ balance.available_days|floatformat:1 }} Available</span>
+          </div>
+          <div class="row g-2 small">
+            <div class="col-6">
+              <div><span class="text-muted">Total:</span> <strong>{{ balance.total_days }}</strong></div>
+              <div><span class="text-muted">Used:</span> <strong class="text-danger">{{ balance.used_days|floatformat:1 }}</strong></div>
+            </div>
+            <div class="col-6">
+              <div><span class="text-muted">Pending:</span> <strong class="text-warning">{{ balance.pending_days|floatformat:1 }}</strong></div>
+              {% if balance.available_days <= 0 %}
+                <div class="text-danger fw-semibold mt-1"><i class="bi bi-exclamation-circle"></i> No balance</div>
+              {% elif balance.available_days < 2 %}
+                <div class="text-warning fw-semibold mt-1"><i class="bi bi-exclamation-triangle"></i> Low balance</div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="card" style="max-width:620px;">
+  <div class="card-body p-4">
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      {% for field in form %}
+        <div class="mb-3">
+          <label class="form-label fw-semibold">{{ field.label }}</label>
+          {{ field }}
+          {% if field.help_text %}
+            <div class="form-text">{{ field.help_text }}</div>
+          {% endif %}
+          {% for error in field.errors %}
+            <div class="text-danger small">{{ error }}</div>
+          {% endfor %}
+        </div>
+      {% endfor %}
+
+      <div class="d-flex gap-2 mt-3">
+        <button type="submit" class="btn btn-warning text-dark">
+          <i class="bi bi-send"></i> Submit Request
+        </button>
+        <a href="{% url 'leave_list' %}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

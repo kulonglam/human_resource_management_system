@@ -1,0 +1,185 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Welcome, {{ user.get_full_name|default:user.username }} 👋</h2>
+<p class="text-muted">Role: {{ user.role }}</p>
+
+<!-- Quick Stats Row -->
+<div class="row mt-4">
+  <div class="col-md-3">
+    <div class="card text-white bg-primary mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Employees</h5>
+        <p class="card-text fs-5">{{ total_employees }}</p>
+        <a href="{% url 'employee_list' %}" class="btn btn-light btn-sm">View All</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-white bg-success mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Departments</h5>
+        <p class="card-text fs-5">{{ total_departments }}</p>
+        <a href="{% url 'department_list' %}" class="btn btn-light btn-sm">View All</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-white bg-info mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Recruitment</h5>
+        <p class="card-text fs-5">{{ open_jobs }}</p>
+        <a href="{% url 'job_list' %}" class="btn btn-light btn-sm">View All</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-white bg-warning mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Pending Leaves</h5>
+        <p class="card-text fs-5">{{ pending_leaves }}</p>
+        <a href="{% url 'leave_list' %}" class="btn btn-light btn-sm">View All</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Leave Balance Section -->
+{% if user_leave_balances %}
+<div class="row mt-4">
+  <div class="col-12">
+    <h4 class="mb-3">
+      <i class="bi bi-calendar-check"></i> Your Leave Balance - 2024
+    </h4>
+  </div>
+  {% for balance in user_leave_balances %}
+  <div class="col-md-6 col-lg-4">
+    <div class="card border-left-4 mb-3" style="border-left: 4px solid {% if balance.available_days > 0 %}#28a745{% elif balance.available_days == 0 %}#ffc107{% else %}#dc3545{% endif %};">
+      <div class="card-body">
+        <h5 class="card-title">{{ balance.get_leave_type_display }}</h5>
+        <div class="row g-3">
+          <div class="col-6">
+            <div class="text-center p-2 bg-light rounded">
+              <small class="text-muted d-block">Used</small>
+              <strong class="fs-5">{{ balance.used_days|floatformat:1 }}</strong>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="text-center p-2 bg-light rounded">
+              <small class="text-muted d-block">Pending</small>
+              <strong class="fs-5">{{ balance.pending_days|floatformat:1 }}</strong>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="text-center p-2 bg-light rounded">
+              <small class="text-muted d-block">Available</small>
+              <strong class="fs-5 {% if balance.available_days <= 0 %}text-danger{% elif balance.available_days <= 3 %}text-warning{% else %}text-success{% endif %}">{{ balance.available_days|floatformat:1 }}</strong>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="text-center p-2 bg-light rounded">
+              <small class="text-muted d-block">Total</small>
+              <strong class="fs-5">{{ balance.total_days }}</strong>
+            </div>
+          </div>
+        </div>
+        <div class="mt-3">
+          <div class="progress" style="height: 5px;">
+            <div class="progress-bar bg-success" role="progressbar" style="width: {% widthratio balance.used_days|add:balance.pending_days balance.total_days 100 %}%" aria-valuenow="{{ balance.used_days|add:balance.pending_days }}" aria-valuemin="0" aria-valuemax="{{ balance.total_days }}"></div>
+          </div>
+          <small class="text-muted d-block mt-1">{{ balance.used_days|add:balance.pending_days|floatformat:1 }} of {{ balance.total_days }} days used</small>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Manager: Department Leave Summary -->
+{% if user.is_manager and dept_leave_summary %}
+<div class="row mt-4">
+  <div class="col-12">
+    <h4 class="mb-3">
+      <i class="bi bi-building"></i> Department Leave Summary
+    </h4>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-white bg-primary mb-3">
+      <div class="card-body">
+        <h6 class="card-title">Total Used</h6>
+        <p class="card-text fs-4">{{ dept_leave_summary.total_used|floatformat:1 }} days</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-white bg-warning mb-3">
+      <div class="card-body">
+        <h6 class="card-title">Pending Approval</h6>
+        <p class="card-text fs-4">{{ dept_leave_summary.total_pending|floatformat:1 }} days</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-white bg-success mb-3">
+      <div class="card-body">
+        <h6 class="card-title">Available</h6>
+        <p class="card-text fs-4">{{ dept_leave_summary.total_available|floatformat:1 }} days</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-white bg-info mb-3">
+      <div class="card-body">
+        <h6 class="card-title">Employees</h6>
+        <p class="card-text fs-4">{{ dept_leave_summary.employee_count }}</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Admin: Organization-wide Leave Summary -->
+{% if user.is_admin and all_leave_summary %}
+<div class="row mt-4">
+  <div class="col-12">
+    <h4 class="mb-3">
+      <i class="bi bi-graph-up"></i> Organization Leave Summary
+    </h4>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-white bg-primary mb-3">
+      <div class="card-body">
+        <h6 class="card-title">Total Allocated</h6>
+        <p class="card-text fs-4">{{ all_leave_summary.total_allocated|floatformat:1 }} days</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-white bg-danger mb-3">
+      <div class="card-body">
+        <h6 class="card-title">Total Used</h6>
+        <p class="card-text fs-4">{{ all_leave_summary.total_used|floatformat:1 }} days</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-white bg-warning mb-3">
+      <div class="card-body">
+        <h6 class="card-title">Pending Approval</h6>
+        <p class="card-text fs-4">{{ all_leave_summary.total_pending|floatformat:1 }} days</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-white bg-success mb-3">
+      <div class="card-body">
+        <h6 class="card-title">Available</h6>
+        <p class="card-text fs-4">{{ all_leave_summary.total_available|floatformat:1 }} days</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

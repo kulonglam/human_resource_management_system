@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% block title %}Update Application — HRMIS{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="mb-0"><i class="bi bi-pencil text-info"></i> Update Application</h4>
+  <a href="{% url 'application_list' application.job.pk %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left"></i> Back
+  </a>
+</div>
+
+<div class="row g-4">
+  <div class="col-md-5">
+    <div class="card">
+      <div class="card-header bg-white fw-semibold">Applicant Info</div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-sm-5 text-muted">Name</dt>
+          <dd class="col-sm-7 fw-semibold">{{ application.first_name }} {{ application.last_name }}</dd>
+          <dt class="col-sm-5 text-muted">Email</dt>
+          <dd class="col-sm-7"><a href="mailto:{{ application.email }}">{{ application.email }}</a></dd>
+          <dt class="col-sm-5 text-muted">Phone</dt>
+          <dd class="col-sm-7">{{ application.phone }}</dd>
+          <dt class="col-sm-5 text-muted">Job</dt>
+          <dd class="col-sm-7">{{ application.job.title }}</dd>
+          <dt class="col-sm-5 text-muted">Applied</dt>
+          <dd class="col-sm-7">{{ application.applied_on|date:"d M Y" }}</dd>
+          {% if application.cover_letter %}
+          <dt class="col-sm-5 text-muted">Cover Letter</dt>
+          <dd class="col-sm-7 small">{{ application.cover_letter }}</dd>
+          {% endif %}
+          {% if application.resume %}
+          <dt class="col-sm-5 text-muted">Resume</dt>
+          <dd class="col-sm-7">
+            <a href="{{ application.resume.url }}" target="_blank" class="btn btn-sm btn-outline-info">
+              <i class="bi bi-file-earmark-person"></i> View
+            </a>
+          </dd>
+          {% endif %}
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-header bg-white fw-semibold">Update Status</div>
+      <div class="card-body">
+        <form method="post" novalidate>
+          {% csrf_token %}
+          {% for field in form %}
+            <div class="mb-3">
+              <label class="form-label fw-semibold">{{ field.label }}</label>
+              {{ field }}
+              {% for error in field.errors %}
+                <div class="text-danger small">{{ error }}</div>
+              {% endfor %}
+            </div>
+          {% endfor %}
+          <button type="submit" class="btn btn-info text-white w-100">
+            <i class="bi bi-check-lg"></i> Save Status
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

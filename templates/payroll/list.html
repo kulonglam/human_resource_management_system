@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+{% block title %}Payroll — HRMIS{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="mb-0"><i class="bi bi-cash-stack text-dark"></i> Payroll</h4>
+  <a href="{% url 'salary_create' %}" class="btn btn-dark btn-sm">
+    <i class="bi bi-plus-lg"></i> Add Salary Record
+  </a>
+</div>
+
+<!-- Filter -->
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label fw-semibold small">Month</label>
+        <select name="month" class="form-select form-select-sm">
+          <option value="">All Months</option>
+          {% for m,label in months %}
+          <option value="{{ m }}" {% if request.GET.month == m|stringformat:"s" %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold small">Year</label>
+        <input type="number" name="year" value="{{ request.GET.year }}" class="form-control form-control-sm" placeholder="e.g. 2026">
+      </div>
+      <div class="col-md-2">
+        <button class="btn btn-dark btn-sm w-100"><i class="bi bi-funnel"></i> Filter</button>
+      </div>
+      <div class="col-md-2">
+        <a href="{% url 'salary_list' %}" class="btn btn-outline-secondary btn-sm w-100">Clear</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th>Employee</th>
+          <th>Period</th>
+          <th>Basic</th>
+          <th>Allowances</th>
+          <th>Deductions</th>
+          <th>Tax</th>
+          <th class="fw-bold">Net Salary</th>
+          <th>Method</th>
+          <th>Paid</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for salary in salaries %}
+        <tr>
+          <td class="fw-semibold">{{ salary.employee.full_name }}</td>
+          <td>{{ salary.month_name }} {{ salary.year }}</td>
+          <td>{{ salary.basic_salary }}</td>
+          <td class="text-success">+{{ salary.allowances }}</td>
+          <td class="text-danger">-{{ salary.deductions }}</td>
+          <td class="text-danger">-{{ salary.tax }}</td>
+          <td class="fw-bold">GH₵ {{ salary.net_salary }}</td>
+          <td><small>{{ salary.get_payment_method_display }}</small></td>
+          <td>
+            {% if salary.is_paid %}
+              <span class="badge bg-success">Paid</span>
+              <div class="text-muted" style="font-size:0.7rem;">{{ salary.paid_on }}</div>
+            {% else %}
+              <span class="badge bg-warning text-dark">Pending</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="btn-group btn-group-sm" role="group">
+              <a href="{% url 'salary_slip_pdf' salary.pk %}" class="btn btn-outline-info" title="Download Salary Slip">
+                <i class="bi bi-file-pdf"></i>
+              </a>
+              <a href="{% url 'salary_edit' salary.pk %}" class="btn btn-outline-primary" title="Edit">
+                <i class="bi bi-pencil"></i>
+              </a>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="10" class="text-center py-4 text-muted">
+            No payroll records found. <a href="{% url 'salary_create' %}">Add one</a>.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
