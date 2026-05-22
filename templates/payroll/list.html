@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block title %}Payroll — HRMIS{% endblock %}
 
-{% block content %}
+{% block page_content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
   <h4 class="mb-0"><i class="bi bi-cash-stack text-dark"></i> Payroll</h4>
   <a href="{% url 'salary_create' %}" class="btn btn-dark btn-sm">
@@ -62,7 +62,7 @@
           <td class="text-success">+{{ salary.allowances }}</td>
           <td class="text-danger">-{{ salary.deductions }}</td>
           <td class="text-danger">-{{ salary.tax }}</td>
-          <td class="fw-bold">GH₵ {{ salary.net_salary }}</td>
+          <td class="fw-bold">UGX {{ salary.net_salary }}</td>
           <td><small>{{ salary.get_payment_method_display }}</small></td>
           <td>
             {% if salary.is_paid %}

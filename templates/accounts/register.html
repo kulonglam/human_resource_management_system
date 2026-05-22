@@ -1,15 +1,105 @@
-{% extends 'base.html' %}
+{% extends 'base_auth.html' %}
 
-{% block content %}
-<div class="auth-container">
-  <h2>Create an Account</h2>
+{% block page_content %}
+<div class="row justify-content-center mt-4">
+  <div class="col-md-8">
+    <div class="card shadow">
+      <div class="card-body p-4">
+        <h4 class="card-title text-center mb-4">
+          <i class="bi bi-person-plus"></i> Create Account
+        </h4>
 
-  <form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit">Register</button>
-  </form>
+        <form method="post" novalidate>
+          {% csrf_token %}
 
-  <p>Already have an account? <a href="{% url 'login' %}">Sign in</a></p>
+          {% for field in form %}
+            {% if field.name == 'password' or field.name == 'password1' or field.name == 'password2' %}
+              <div class="mb-3">
+                <label class="form-label">{{ field.label }}</label>
+                <div class="position-relative">
+                  {{ field }}
+                  {% if field.name in 'password,password1' %}
+                    <button type="button" class="btn btn-link position-absolute end-0 top-50 translate-middle-y password-toggle" style="z-index: 10; padding: 0.5rem;">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                  {% endif %}
+                </div>
+                {% if field.help_text %}
+                  <small class="form-text text-muted d-block mt-1">{{ field.help_text|safe }}</small>
+                {% endif %}
+                {% if field.errors %}
+                  <div class="text-danger small mt-1">{{ field.errors }}</div>
+                {% endif %}
+              </div>
+            {% else %}
+              <div class="mb-3">
+                <label class="form-label">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}
+                  <small class="form-text text-muted d-block mt-1">{{ field.help_text|safe }}</small>
+                {% endif %}
+                {% if field.errors %}
+                  <div class="text-danger small mt-1">{{ field.errors }}</div>
+                {% endif %}
+              </div>
+            {% endif %}
+          {% endfor %}
+
+          <div class="d-grid">
+            <button type="submit" class="btn btn-success">
+              <i class="bi bi-check-lg"></i> Register
+            </button>
+          </div>
+
+          <div class="text-center mt-3">
+            <p class="text-muted">Already have an account? <a href="{% url 'login' %}">Sign in</a></p>
+          </div>
+        </form>
+
+      </div>
+    </div>
+  </div>
 </div>
+
+<style>
+  .password-toggle {
+    border: none !important;
+    background-color: transparent !important;
+    color: #6c757d;
+    cursor: pointer;
+    transition: color 0.2s;
+    box-shadow: none !important;
+    padding-right: 1rem !important;
+  }
+
+  .password-toggle:hover {
+    color: #0d6efd;
+  }
+
+  .password-toggle:focus {
+    box-shadow: none !important;
+    outline: none;
+  }
+
+  input[type="password"],
+  input[type="text"] {
+    padding-right: 2.5rem;
+  }
+</style>
+
+<script>
+  document.querySelectorAll('.password-toggle').forEach(button => {
+    button.addEventListener('click', function(e) {
+      e.preventDefault();
+      const input = this.parentElement.querySelector('input');
+      const isPassword = input.type === 'password';
+      input.type = isPassword ? 'text' : 'password';
+      
+      // Toggle icon
+      const icon = this.querySelector('i');
+      icon.classList.toggle('bi-eye');
+      icon.classList.toggle('bi-eye-slash');
+    });
+  });
+</script>
 {% endblock %}

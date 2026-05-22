@@ -1,8 +1,8 @@
-{% extends 'base.html' %}
+{% extends 'base_auth.html' %}
 
-{% block content %}
+{% block page_content %}
 <div class="row justify-content-center mt-5">
-  <div class="col-md-4">
+  <div class="col-md-8">
     <div class="card shadow">
       <div class="card-body p-4">
         <h4 class="card-title text-center mb-4">
@@ -22,7 +22,12 @@
 
           <div class="mb-3">
             <label class="form-label">Password</label>
-            {{ form.password }}
+            <div class="position-relative">
+              {{ form.password }}
+              <button type="button" class="btn btn-link position-absolute end-0 top-50 translate-middle-y password-toggle" style="z-index: 10; padding: 0.5rem;">
+                <i class="bi bi-eye"></i>
+              </button>
+            </div>
             {% if form.password.errors %}
               <div class="text-danger small">{{ form.password.errors }}</div>
             {% endif %}
@@ -43,4 +48,46 @@
     </div>
   </div>
 </div>
+
+<style>
+  .password-toggle {
+    border: none !important;
+    background-color: transparent !important;
+    color: #6c757d;
+    cursor: pointer;
+    transition: color 0.2s;
+    box-shadow: none !important;
+    padding-right: 1rem !important;
+  }
+
+  .password-toggle:hover {
+    color: #0d6efd;
+  }
+
+  .password-toggle:focus {
+    box-shadow: none !important;
+    outline: none;
+  }
+
+  input[type="password"],
+  input[type="text"] {
+    padding-right: 2.5rem;
+  }
+</style>
+
+<script>
+  document.querySelectorAll('.password-toggle').forEach(button => {
+    button.addEventListener('click', function(e) {
+      e.preventDefault();
+      const input = this.parentElement.querySelector('input');
+      const isPassword = input.type === 'password';
+      input.type = isPassword ? 'text' : 'password';
+      
+      // Toggle icon
+      const icon = this.querySelector('i');
+      icon.classList.toggle('bi-eye');
+      icon.classList.toggle('bi-eye-slash');
+    });
+  });
+</script>
 {% endblock %}

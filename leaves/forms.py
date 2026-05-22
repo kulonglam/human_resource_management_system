@@ -1,4 +1,3 @@
-# leaves/forms.py
 from django import forms
 
 from attendance.models import Attendance

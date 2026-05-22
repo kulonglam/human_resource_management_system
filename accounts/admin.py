@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from .models import Role, CustomUser, AuditLog
 
 
@@ -8,10 +9,13 @@ class RoleAdmin(admin.ModelAdmin):
     search_fields = ('name',)
 
 @admin.register(CustomUser)
-class CustomUserAdmin(admin.ModelAdmin):
+class CustomUserAdmin(BaseUserAdmin):
     list_display = ('username', 'email', 'first_name', 'last_name', 'role')
-    list_filter = ('role',)
+    list_filter = ('role',) + BaseUserAdmin.list_filter
     search_fields = ('username', 'email', 'first_name', 'last_name')
+    fieldsets = BaseUserAdmin.fieldsets + (
+        ('Custom Fields', {'fields': ('role',)}),
+    )
 
 @admin.register(AuditLog)
 class AuditLogAdmin(admin.ModelAdmin):
