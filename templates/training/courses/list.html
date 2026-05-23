@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Training Courses{% endblock %}
+
+{% block page_content %}
+<div class="container-fluid mt-5">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1>Training Courses</h1>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'course_create' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Create Course
+            </a>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <select name="status" class="form-select">
+                        <option value="">All Status</option>
+                        <option value="planned" {% if selected_status == 'planned' %}selected{% endif %}>Planned</option>
+                        <option value="active" {% if selected_status == 'active' %}selected{% endif %}>Active</option>
+                        <option value="completed" {% if selected_status == 'completed' %}selected{% endif %}>Completed</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <select name="category" class="form-select">
+                        <option value="">All Categories</option>
+                        <option value="technical" {% if selected_category == 'technical' %}selected{% endif %}>Technical</option>
+                        <option value="soft_skills" {% if selected_category == 'soft_skills' %}selected{% endif %}>Soft Skills</option>
+                        <option value="compliance" {% if selected_category == 'compliance' %}selected{% endif %}>Compliance</option>
+                        <option value="leadership" {% if selected_category == 'leadership' %}selected{% endif %}>Leadership</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-secondary w-100">Filter</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Courses Table -->
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Course Title</th>
+                        <th>Category</th>
+                        <th>Duration</th>
+                        <th>Participants</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for course in courses %}
+                        <tr>
+                            <td><strong>{{ course.title }}</strong></td>
+                            <td>
+                                <span class="badge bg-secondary">{{ course.get_category_display }}</span>
+                            </td>
+                            <td>{{ course.duration_hours }} hrs</td>
+                            <td>{{ course.participants_count }}</td>
+                            <td>{{ course.start_date|date:"M d, Y" }}</td>
+                            <td>
+                                <span class="badge bg-{{ course.status|lower|default:'secondary' }}">
+                                    {{ course.get_status_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <a href="{% url 'course_detail' course.pk %}" class="btn btn-sm btn-info" title="View">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="{% url 'course_edit' course.pk %}" class="btn btn-sm btn-warning" title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted">No courses found</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

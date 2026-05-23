@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Delete Goal{% endblock %}
+
+{% block page_content %}
+<div class="container-fluid mt-5">
+    <div class="row">
+        <div class="col-md-6 offset-md-3">
+            <div class="card border-danger">
+                <div class="card-body">
+                    <h5 class="card-title text-danger">Delete Performance Goal?</h5>
+                    <p>Are you sure you want to delete the goal "<strong>{{ goal.goal_title }}</strong>"?</p>
+                    <p class="text-muted">This action cannot be undone.</p>
+
+                    <form method="post" class="mt-4">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-trash"></i> Yes, Delete
+                        </button>
+                        <a href="{% url 'goal_list' %}" class="btn btn-secondary">Cancel</a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

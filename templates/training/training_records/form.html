@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block page_content %}
+<div class="container-fluid mt-5">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1>{{ title }}</h1>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'training_record_list' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+        </div>
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="card">
+            <div class="card-body">
+                {{ form.employee|as_crispy_field }}
+                {{ form.course|as_crispy_field }}
+                {{ form.status|as_crispy_field }}
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-body">
+                <h5 class="card-title">Assessment & Certificate</h5>
+                {{ form.completion_date|as_crispy_field }}
+                {{ form.score|as_crispy_field }}
+                {{ form.feedback|as_crispy_field }}
+                {{ form.certificate_issued|as_crispy_field }}
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i> Save Record
+            </button>
+            <a href="{% url 'training_record_list' %}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

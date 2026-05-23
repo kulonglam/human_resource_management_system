@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block page_content %}
+<div class="container-fluid mt-5">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1>{{ title }}</h1>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'appraisal_list' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+        </div>
+    </div>
+
+    <form method="post" class="needs-validation">
+        {% csrf_token %}
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Appraisal Details</h5>
+                        {{ form.employee|as_crispy_field }}
+                        {{ form.appraiser|as_crispy_field }}
+                        {{ form.appraisal_period_start|as_crispy_field }}
+                        {{ form.appraisal_period_end|as_crispy_field }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Performance Ratings (1-5)</h5>
+                        {{ form.job_knowledge|as_crispy_field }}
+                        {{ form.work_quality|as_crispy_field }}
+                        {{ form.productivity|as_crispy_field }}
+                        {{ form.communication|as_crispy_field }}
+                        {{ form.teamwork|as_crispy_field }}
+                        {{ form.initiative|as_crispy_field }}
+                        {{ form.reliability|as_crispy_field }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-body">
+                <h5 class="card-title">Feedback & Comments</h5>
+                {{ form.strengths|as_crispy_field }}
+                {{ form.areas_for_improvement|as_crispy_field }}
+                {{ form.reviewer_comments|as_crispy_field }}
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-body">
+                <h5 class="card-title">Development & Goals</h5>
+                {{ form.next_goals|as_crispy_field }}
+                {{ form.training_needs|as_crispy_field }}
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-body">
+                <h5 class="card-title">Status</h5>
+                {{ form.status|as_crispy_field }}
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <button type="submit" name="action" value="save" class="btn btn-primary">
+                <i class="fas fa-save"></i> Save
+            </button>
+            {% if appraisal.status == 'draft' %}
+                <button type="submit" name="action" value="submit" class="btn btn-success">
+                    <i class="fas fa-paper-plane"></i> Submit for Review
+                </button>
+            {% endif %}
+            <a href="{% url 'appraisal_list' %}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

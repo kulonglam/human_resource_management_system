@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block page_content %}
+<div class="container-fluid mt-5">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1>{{ title }}</h1>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'goal_list' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+        </div>
+    </div>
+
+    <form method="post" class="needs-validation">
+        {% csrf_token %}
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Goal Information</h5>
+                        {{ form.employee|as_crispy_field }}
+                        {{ form.goal_title|as_crispy_field }}
+                        {{ form.goal_description|as_crispy_field }}
+                        {{ form.target_metric|as_crispy_field }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Timeline & Progress</h5>
+                        {{ form.start_date|as_crispy_field }}
+                        {{ form.end_date|as_crispy_field }}
+                        {{ form.priority|as_crispy_field }}
+                        {{ form.status|as_crispy_field }}
+                        {{ form.progress|as_crispy_field }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-body">
+                <h5 class="card-title">Additional Notes</h5>
+                {{ form.notes|as_crispy_field }}
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i> Save Goal
+            </button>
+            <a href="{% url 'goal_list' %}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

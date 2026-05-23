@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block title %}Leave Report{% endblock %}
+
+{% block page_content %}
+<div class="container-fluid mt-5">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1>Leave Report</h1>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'analytics_dashboard' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Report Filters -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Report Filters</h5>
+        </div>
+        <div class="card-body">
+            <form method="get" class="needs-validation">
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Report Type</label>
+                        {% for value, label in form.report_type %}
+                            <div class="form-check">
+                                {{ form.report_type|safe }}
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <div class="col-md-4">
+                        <label for="{{ form.year.id_for_label }}" class="form-label">Year</label>
+                        {{ form.year }}
+                    </div>
+                    <div class="col-md-4">
+                        <label for="{{ form.department.id_for_label }}" class="form-label">Department</label>
+                        {{ form.department }}
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Leave Types</label>
+                        <div>
+                            {% for value, label in form.leave_type %}
+                                <div class="form-check">
+                                    {{ form.leave_type|safe }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Status</label>
+                        <div>
+                            {% for value, label in form.status %}
+                                <div class="form-check">
+                                    {{ form.status|safe }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-search"></i> Generate Report
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Report Results -->
+    {% if report_data %}
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">{{ report_data.type }} - Year {{ report_data.year }}</h5>
+            </div>
+            <div class="card-body">
+                {% if report_data.type == 'Summary' %}
+                    <div class="row">
+                        {% for item in report_data.summary %}
+                            <div class="col-md-4">
+                                <div class="text-center p-3 bg-light rounded mb-3">
+                                    <h4 class="text-primary">{{ item.total_days }}</h4>
+                                    <p class="text-muted">{{ item.leave_type }} Days</p>
+                                    <small>{{ item.count }} applications</small>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                {% elif report_data.type == 'Balance' %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Employee</th>
+                                    <th>Leave Type</th>
+                                    <th>Total</th>
+                                    <th>Used</th>
+                                    <th>Pending</th>
+                                    <th>Available</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for balance in report_data.balances %}
+                                    <tr>
+                                        <td>{{ balance.employee__full_name }}</td>
+                                        <td>{{ balance.leave_type }}</td>
+                                        <td>{{ balance.total }}</td>
+                                        <td><span class="badge bg-danger">{{ balance.used }}</span></td>
+                                        <td><span class="badge bg-warning">{{ balance.pending }}</span></td>
+                                        <td><span class="badge bg-success">{{ balance.available }}</span></td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                {% elif report_data.type == 'Detailed' %}
+                    <p class="text-muted">Total Records: <strong>{{ report_data.total_records }}</strong></p>
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Employee</th>
+                                    <th>Leave Type</th>
+                                    <th>From Date</th>
+                                    <th>To Date</th>
+                                    <th>Days</th>
+                                    <th>Status</th>
+                                    <th>Reason</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for leave in report_data.leaves %}
+                                    <tr>
+                                        <td>{{ leave.employee__full_name }}</td>
+                                        <td>{{ leave.leave_type }}</td>
+                                        <td>{{ leave.from_date|date:"M d, Y" }}</td>
+                                        <td>{{ leave.to_date|date:"M d, Y" }}</td>
+                                        <td>{{ leave.number_of_days }}</td>
+                                        <td><span class="badge bg-info">{{ leave.status|title }}</span></td>
+                                        <td>{{ leave.reason|truncatewords:10 }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                {% elif report_data.type == 'Pending Approvals' %}
+                    <p class="text-muted mb-3">Total Pending: <strong class="text-danger">{{ report_data.total_pending }}</strong></p>
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Employee</th>
+                                    <th>Leave Type</th>
+                                    <th>From Date</th>
+                                    <th>Days</th>
+                                    <th>Applied On</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for leave in report_data.pending_leaves %}
+                                    <tr>
+                                        <td>{{ leave.employee__full_name }}</td>
+                                        <td>{{ leave.leave_type }}</td>
+                                        <td>{{ leave.from_date|date:"M d, Y" }}</td>
+                                        <td>{{ leave.number_of_days }}</td>
+                                        <td>{{ leave.applied_on|date:"M d, Y" }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    {% else %}
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i> Select filters and click "Generate Report" to view leave data
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

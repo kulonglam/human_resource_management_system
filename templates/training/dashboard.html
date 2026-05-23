@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block title %}Training & Development Dashboard{% endblock %}
+
+{% block page_content %}
+<div class="container-fluid mt-5">
+    <h1 class="mb-4">Training & Development Dashboard</h1>
+    
+    <!-- Key Metrics -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h6 class="card-title text-muted">Active Courses</h6>
+                    <h2 class="card-text text-primary">{{ active_courses }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h6 class="card-title text-muted">Upcoming Courses</h6>
+                    <h2 class="card-text text-success">{{ upcoming_courses }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h6 class="card-title text-muted">Employees Trained</h6>
+                    <h2 class="card-text text-info">{{ total_employees_trained }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h6 class="card-title text-muted">Certs Expiring Soon</h6>
+                    <h2 class="card-text text-warning">{{ expiring_certifications }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Certifications Expiring Soon -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">⚠️ Certifications Expiring Soon</h5>
+                </div>
+                <div class="card-body">
+                    {% if certifications_expiring_soon %}
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Employee</th>
+                                    <th>Certification</th>
+                                    <th>Expiry Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for cert in certifications_expiring_soon %}
+                                    <tr class="text-danger">
+                                        <td>{{ cert.employee.full_name }}</td>
+                                        <td>{{ cert.certification.name }}</td>
+                                        <td>
+                                            <strong>{{ cert.expiry_date|date:"M d, Y" }}</strong>
+                                            <br>
+                                            <small class="text-muted">{{ cert.days_until_expiry }} days</small>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% else %}
+                        <p class="text-muted">No certifications expiring soon</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Trainings Completed -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">✓ Recent Trainings Completed</h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_trainings %}
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Employee</th>
+                                    <th>Course</th>
+                                    <th>Score</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for training in recent_trainings %}
+                                    <tr>
+                                        <td>{{ training.employee.full_name }}</td>
+                                        <td>{{ training.course.title }}</td>
+                                        <td>
+                                            {% if training.score %}
+                                                <span class="badge bg-info">{{ training.score }}%</span>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% else %}
+                        <p class="text-muted">No recent trainings</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5 class="mb-0">Quick Actions</h5>
+        </div>
+        <div class="card-body">
+            <a href="{% url 'course_list' %}" class="btn btn-primary me-2">
+                <i class="fas fa-book"></i> View Courses
+            </a>
+            <a href="{% url 'course_create' %}" class="btn btn-success me-2">
+                <i class="fas fa-plus"></i> Create Course
+            </a>
+            <a href="{% url 'training_record_list' %}" class="btn btn-info me-2">
+                <i class="fas fa-users"></i> Training Records
+            </a>
+            <a href="{% url 'skill_list' %}" class="btn btn-secondary me-2">
+                <i class="fas fa-star"></i> Skills
+            </a>
+            <a href="{% url 'employee_certification_list' %}" class="btn btn-warning me-2">
+                <i class="fas fa-certificate"></i> Certifications
+            </a>
+            <a href="{% url 'development_plan_list' %}" class="btn btn-danger">
+                <i class="fas fa-rocket"></i> Development Plans
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

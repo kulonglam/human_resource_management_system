@@ -42,6 +42,15 @@
       </div>
     </div>
   </div>
+  <div class="col-md-3">
+    <div class="card text-white bg-danger mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Performance Goals</h5>
+        <p class="card-text fs-5">{{ active_goals }}/{{ total_goals }}</p>
+        <a href="{% url 'goal_list' %}" class="btn btn-light btn-sm">View All</a>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- Leave Balance Section -->
@@ -181,5 +190,104 @@
   </div>
 </div>
 {% endif %}
+
+<!-- Performance Management Section -->
+<div class="row mt-4">
+  <div class="col-12">
+    <h4 class="mb-3">
+      <i class="bi bi-graph-up-arrow"></i> Performance Management
+    </h4>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-white bg-info mb-3">
+      <div class="card-body">
+        <h6 class="card-title">Active Goals</h6>
+        <p class="card-text fs-4">{{ active_goals }}/{{ total_goals }}</p>
+        <a href="{% url 'goal_list' %}" class="btn btn-light btn-sm">View All</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-white bg-purple mb-3" style="background-color: #6f42c1;">
+      <div class="card-body">
+        <h6 class="card-title">Appraisals</h6>
+        <p class="card-text fs-4">{{ total_appraisals }}</p>
+        <a href="{% url 'appraisal_list' %}" class="btn btn-light btn-sm">View All</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-white bg-teal mb-3" style="background-color: #20c997;">
+      <div class="card-body">
+        <h6 class="card-title">Feedback Rounds</h6>
+        <p class="card-text fs-4"><i class="bi bi-arrow-right"></i></p>
+        <a href="{% url 'feedback_round_list' %}" class="btn btn-light btn-sm">View Rounds</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-white bg-secondary mb-3">
+      <div class="card-body">
+        <h6 class="card-title">My Feedback</h6>
+        <p class="card-text fs-4"><i class="bi bi-chat-dots"></i></p>
+        <a href="{% url 'my_feedback_requests' %}" class="btn btn-light btn-sm">Submit Feedback</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Training & Development Section -->
+<div class="row mt-4">
+  <div class="col-12">
+    <h4 class="mb-3">
+      <i class="bi bi-book"></i> Training & Development
+    </h4>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-white bg-success mb-3">
+      <div class="card-body">
+        <h6 class="card-title">Active Courses</h6>
+        <p class="card-text fs-4">{{ active_courses }}</p>
+        <a href="{% url 'course_list' %}" class="btn btn-light btn-sm">View Courses</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-white bg-primary mb-3">
+      <div class="card-body">
+        <h6 class="card-title">Upcoming Courses</h6>
+        <p class="card-text fs-4">{{ upcoming_courses }}</p>
+        <a href="{% url 'course_list' %}" class="btn btn-light btn-sm">Enroll Now</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-white bg-info mb-3">
+      <div class="card-body">
+        <h6 class="card-title">Employees Trained</h6>
+        <p class="card-text fs-4">{{ total_employees_trained }}</p>
+        <a href="{% url 'training_record_list' %}" class="btn btn-light btn-sm">Records</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-white bg-danger mb-3">
+      <div class="card-body">
+        <h6 class="card-title">Expiring Certs</h6>
+        <p class="card-text fs-4">{{ expiring_certifications }}</p>
+        <a href="{% url 'employee_certification_list' %}" class="btn btn-light btn-sm">View</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-white mb-3" style="background-color: #fd7e14;">
+      <div class="card-body">
+        <h6 class="card-title">Active Plans</h6>
+        <p class="card-text fs-4">{{ active_development_plans }}</p>
+        <a href="{% url 'development_plan_list' %}" class="btn btn-light btn-sm">View Plans</a>
+      </div>
+    </div>
+  </div>
+</div>
 
 {% endblock %}

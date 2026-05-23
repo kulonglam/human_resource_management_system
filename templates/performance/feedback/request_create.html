@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Create Feedback Requests{% endblock %}
+
+{% block page_content %}
+<div class="container-fluid mt-5">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1>Create Feedback Requests</h1>
+            <h4 class="text-muted">Round: {{ round.name }}</h4>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'feedback_round_detail' round.pk %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+        </div>
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+        
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Select Employees to Request Feedback From</h5>
+                
+                <div class="mb-3">
+                    <label class="form-label">Employees</label>
+                    <select name="employees" class="form-select" multiple required>
+                        {% for emp in employees %}
+                            <option value="{{ emp.id }}">{{ emp.full_name }} - {{ emp.job_title }}</option>
+                        {% endfor %}
+                    </select>
+                    <small class="form-text text-muted">Hold Ctrl/Cmd to select multiple employees</small>
+                </div>
+
+                <h5 class="card-title mt-4">Select Feedback Givers</h5>
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Feedback Givers (Users)</label>
+                        <select name="givers" class="form-select" multiple required>
+                            {% for user in users %}
+                                <option value="{{ user.id }}">{{ user.first_name }} {{ user.last_name }} ({{ user.username }})</option>
+                            {% endfor %}
+                        </select>
+                        <small class="form-text text-muted">Hold Ctrl/Cmd to select multiple users</small>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Feedback Giver Type</label>
+                        <select name="giver_types" class="form-select" multiple required>
+                            {% for value, label in giver_types %}
+                                <option value="{{ value }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="form-text text-muted">Select relationship types (must match count of givers)</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Create Feedback Requests
+            </button>
+            <a href="{% url 'feedback_round_detail' round.pk %}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

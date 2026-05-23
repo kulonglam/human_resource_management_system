@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Submit Feedback - {{ recipient.full_name }}{% endblock %}
+
+{% block page_content %}
+<div class="container-fluid mt-5">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1>360-Degree Feedback</h1>
+            <h4 class="text-muted">Provide feedback for: <strong>{{ recipient.full_name }}</strong></h4>
+            <p class="text-muted">Round: {{ feedback_request.feedback_round.name }}</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'my_feedback_requests' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+        </div>
+    </div>
+
+    <form method="post" class="needs-validation">
+        {% csrf_token %}
+        
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Competency Ratings (1-5)</h5>
+                <p class="text-muted">1 = Strongly Disagree, 5 = Strongly Agree</p>
+                {{ form.communication|as_crispy_field }}
+                {{ form.leadership|as_crispy_field }}
+                {{ form.teamwork|as_crispy_field }}
+                {{ form.reliability|as_crispy_field }}
+                {{ form.initiative|as_crispy_field }}
+                {{ form.problem_solving|as_crispy_field }}
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-body">
+                <h5 class="card-title">Comments</h5>
+                {{ form.strengths|as_crispy_field }}
+                {{ form.areas_for_improvement|as_crispy_field }}
+                {{ form.additional_comments|as_crispy_field }}
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-body">
+                {{ form.is_anonymous|as_crispy_field }}
+                <small class="form-text text-muted">Check this box to submit your feedback anonymously</small>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-paper-plane"></i> Submit Feedback
+            </button>
+            <a href="{% url 'my_feedback_requests' %}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

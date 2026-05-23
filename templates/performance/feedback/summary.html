@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block title %}360 Feedback Summary - {{ employee.full_name }}{% endblock %}
+
+{% block page_content %}
+<div class="container-fluid mt-5">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1>360 Feedback Summary</h1>
+            <h4 class="text-muted">{{ employee.full_name }}</h4>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'feedback_round_list' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+        </div>
+    </div>
+
+    {% if summary %}
+        <!-- Average Ratings -->
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Average Competency Ratings (out of 5)</h5>
+                <table class="table">
+                    <tr>
+                        <th>Communication</th>
+                        <td>
+                            <span class="badge bg-info">{{ summary.avg_communication|floatformat:2 }}/5</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Leadership</th>
+                        <td>
+                            <span class="badge bg-info">{{ summary.avg_leadership|floatformat:2 }}/5</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Teamwork</th>
+                        <td>
+                            <span class="badge bg-info">{{ summary.avg_teamwork|floatformat:2 }}/5</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Reliability</th>
+                        <td>
+                            <span class="badge bg-info">{{ summary.avg_reliability|floatformat:2 }}/5</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Initiative</th>
+                        <td>
+                            <span class="badge bg-info">{{ summary.avg_initiative|floatformat:2 }}/5</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Problem Solving</th>
+                        <td>
+                            <span class="badge bg-info">{{ summary.avg_problem_solving|floatformat:2 }}/5</span>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="card mt-3">
+            <div class="card-body">
+                <h5 class="card-title">Key Strengths</h5>
+                <p>{{ summary.key_strengths }}</p>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-body">
+                <h5 class="card-title">Development Areas</h5>
+                <p>{{ summary.development_areas }}</p>
+            </div>
+        </div>
+
+        {% if summary.recommendations %}
+            <div class="card mt-3">
+                <div class="card-body">
+                    <h5 class="card-title">Recommendations</h5>
+                    <p>{{ summary.recommendations }}</p>
+                </div>
+            </div>
+        {% endif %}
+
+        <div class="card mt-3">
+            <div class="card-body">
+                <p class="text-muted">Total responses: <strong>{{ summary.total_responses }}</strong></p>
+                <p class="text-muted">Generated: <strong>{{ summary.created_at|date:"M d, Y H:i" }}</strong></p>
+            </div>
+        </div>
+
+    {% else %}
+        <div class="alert alert-info">
+            No feedback summary available yet for this employee.
+        </div>
+    {% endif %}
+
+    <!-- All Feedback Responses -->
+    <div class="card mt-4">
+        <div class="card-body">
+            <h5 class="card-title">Individual Feedback Responses</h5>
+            
+            {% if feedback_requests %}
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Feedback Giver</th>
+                                <th>Type</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for request in feedback_requests %}
+                                <tr>
+                                    <td>
+                                        {% if request.feedback.is_anonymous %}
+                                            <em>Anonymous</em>
+                                        {% else %}
+                                            {{ request.feedback_giver.first_name }} {{ request.feedback_giver.last_name }}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ request.get_giver_type_display }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-success">Submitted</span>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-muted">No feedback responses yet</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

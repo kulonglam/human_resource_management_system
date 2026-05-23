@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Training Records{% endblock %}
+
+{% block page_content %}
+<div class="container-fluid mt-5">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1>Training Records</h1>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'training_record_create' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Enroll Employee
+            </a>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <select name="status" class="form-select">
+                        <option value="">All Status</option>
+                        <option value="enrolled" {% if selected_status == 'enrolled' %}selected{% endif %}>Enrolled</option>
+                        <option value="completed" {% if selected_status == 'completed' %}selected{% endif %}>Completed</option>
+                        <option value="no_show" {% if selected_status == 'no_show' %}selected{% endif %}>No Show</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <select name="employee" class="form-select">
+                        <option value="">All Employees</option>
+                        {% for emp in employees %}
+                            <option value="{{ emp.id }}" {% if selected_employee|stringformat:'s' == emp.id|stringformat:'s' %}selected{% endif %}>
+                                {{ emp.full_name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-secondary w-100">Filter</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Employee</th>
+                        <th>Course</th>
+                        <th>Status</th>
+                        <th>Score</th>
+                        <th>Certificate</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in records %}
+                        <tr>
+                            <td>{{ record.employee.full_name }}</td>
+                            <td>{{ record.course.title }}</td>
+                            <td>
+                                <span class="badge bg-{{ record.status|lower }}">{{ record.get_status_display }}</span>
+                            </td>
+                            <td>
+                                {% if record.score %}
+                                    <span class="badge bg-info">{{ record.score }}%</span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if record.certificate_issued %}
+                                    <span class="badge bg-success">✓ Issued</span>
+                                {% else %}
+                                    <span class="text-muted">Not issued</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{% url 'training_record_edit' record.pk %}" class="btn btn-sm btn-warning">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted">No training records</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

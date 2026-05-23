@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}My Feedback Requests{% endblock %}
+
+{% block page_content %}
+<div class="container-fluid mt-5">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1>My Feedback Requests</h1>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'feedback_round_list' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+        </div>
+    </div>
+
+    <!-- Statistics -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h6 class="card-title text-muted">Pending Feedback</h6>
+                    <h2 class="card-text text-warning">{{ pending }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h6 class="card-title text-muted">Submitted Feedback</h6>
+                    <h2 class="card-text text-success">{{ submitted }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Feedback Requests -->
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Recipient</th>
+                        <th>Feedback Round</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for request in requests %}
+                        <tr>
+                            <td>{{ request.recipient.full_name }}</td>
+                            <td>{{ request.feedback_round.name }}</td>
+                            <td>
+                                <span class="badge bg-secondary">{{ request.get_giver_type_display }}</span>
+                            </td>
+                            <td>
+                                <span class="badge bg-{{ request.status|lower }}">
+                                    {{ request.get_status_display }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if request.status == 'pending' %}
+                                    <a href="{% url 'feedback_submit' request.pk %}" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-pen"></i> Submit Feedback
+                                    </a>
+                                {% else %}
+                                    <span class="badge bg-success">Completed</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">No feedback requests assigned to you</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

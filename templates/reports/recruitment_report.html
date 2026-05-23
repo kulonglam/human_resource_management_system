@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}Recruitment Report{% endblock %}
+
+{% block page_content %}
+<div class="container-fluid mt-5">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1>Recruitment Report</h1>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'analytics_dashboard' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Report Filters -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Report Filters</h5>
+        </div>
+        <div class="card-body">
+            <form method="get" class="needs-validation">
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Report Type</label>
+                        {% for value, label in form.report_type %}
+                            <div class="form-check">
+                                {{ form.report_type|safe }}
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <div class="col-md-4">
+                        <label for="{{ form.department.id_for_label }}" class="form-label">Department</label>
+                        {{ form.department }}
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-12">
+                        <label class="form-label">Job Status</label>
+                        <div>
+                            {% for value, label in form.job_status %}
+                                <div class="form-check form-check-inline">
+                                    {{ form.job_status|safe }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-search"></i> Generate Report
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Report Results -->
+    {% if report_data %}
+        <div class="card">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0">{{ report_data.type }}</h5>
+            </div>
+            <div class="card-body">
+                {% if report_data.type == 'Job Summary' %}
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="text-center p-4 bg-light rounded">
+                                <h5 class="text-muted">Total Jobs</h5>
+                                <h3 class="text-primary">{{ report_data.total_jobs }}</h3>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center p-4 bg-light rounded">
+                                <h5 class="text-muted">Open Positions</h5>
+                                <h3 class="text-success">{{ report_data.open_positions }}</h3>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center p-4 bg-light rounded">
+                                <h5 class="text-muted">Closed Positions</h5>
+                                <h3 class="text-danger">{{ report_data.closed_positions }}</h3>
+                            </div>
+                        </div>
+                    </div>
+
+                {% elif report_data.type == 'Applicant Status' %}
+                    <h6 class="mb-3">Total Applications: <strong>{{ report_data.total_applications }}</strong></h6>
+                    <div class="row">
+                        {% for item in report_data.status_breakdown %}
+                            <div class="col-md-3">
+                                <div class="text-center p-3 bg-light rounded mb-2">
+                                    <h5 class="text-primary">{{ item.count }}</h5>
+                                    <p class="text-muted">{{ item.status|title }}</p>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                {% elif report_data.type == 'Hiring Funnel' %}
+                    <div class="row">
+                        {% for status, count in report_data.funnel.items %}
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <h6>{{ status|title }}: <strong>{{ count }}</strong></h6>
+                                    <div class="progress" style="height: 30px;">
+                                        <div class="progress-bar" role="progressbar" 
+                                             style="width: 100%;" 
+                                             aria-valuenow="{{ count }}" 
+                                             aria-valuemin="0" 
+                                             aria-valuemax="100">
+                                            {{ count }} applications
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    {% else %}
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i> Select filters and click "Generate Report" to view recruitment data
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

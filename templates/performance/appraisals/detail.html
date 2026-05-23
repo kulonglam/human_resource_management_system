@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}Appraisal for {{ appraisal.employee.full_name }}{% endblock %}
+
+{% block page_content %}
+<div class="container-fluid mt-5">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1>Appraisal: {{ appraisal.employee.full_name }}</h1>
+            <p class="text-muted">{{ appraisal.appraisal_period_start|date:"M d, Y" }} - {{ appraisal.appraisal_period_end|date:"M d, Y" }}</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'appraisal_edit' appraisal.pk %}" class="btn btn-warning">
+                <i class="fas fa-edit"></i> Edit
+            </a>
+            <a href="{% url 'appraisal_list' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+        </div>
+    </div>
+
+    <!-- Status Card -->
+    <div class="card mb-3 border-primary">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6 class="text-muted">Status</h6>
+                    <span class="badge bg-{{ appraisal.status|lower|default:'secondary' }} fs-6">
+                        {{ appraisal.get_status_display }}
+                    </span>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="text-muted">Overall Rating</h6>
+                    <h3 class="text-primary">{{ appraisal.overall_rating }}/5</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Performance Ratings -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Performance Ratings</h5>
+                    <table class="table table-sm">
+                        <tr>
+                            <td>Job Knowledge</td>
+                            <td><strong>{{ appraisal.job_knowledge }}/5</strong></td>
+                        </tr>
+                        <tr>
+                            <td>Work Quality</td>
+                            <td><strong>{{ appraisal.work_quality }}/5</strong></td>
+                        </tr>
+                        <tr>
+                            <td>Productivity</td>
+                            <td><strong>{{ appraisal.productivity }}/5</strong></td>
+                        </tr>
+                        <tr>
+                            <td>Communication</td>
+                            <td><strong>{{ appraisal.communication }}/5</strong></td>
+                        </tr>
+                        <tr>
+                            <td>Teamwork</td>
+                            <td><strong>{{ appraisal.teamwork }}/5</strong></td>
+                        </tr>
+                        <tr>
+                            <td>Initiative</td>
+                            <td><strong>{{ appraisal.initiative }}/5</strong></td>
+                        </tr>
+                        <tr>
+                            <td>Reliability</td>
+                            <td><strong>{{ appraisal.reliability }}/5</strong></td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="text-muted">Appraiser</h6>
+                    <p>{{ appraisal.appraiser.first_name }} {{ appraisal.appraiser.last_name }}</p>
+                    
+                    {% if appraisal.submitted_at %}
+                        <h6 class="text-muted">Submitted</h6>
+                        <p>{{ appraisal.submitted_at|date:"M d, Y H:i" }}</p>
+                    {% endif %}
+
+                    {% if appraisal.approved_at %}
+                        <h6 class="text-muted">Approved</h6>
+                        <p>{{ appraisal.approved_at|date:"M d, Y H:i" }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Feedback -->
+    <div class="card mt-3">
+        <div class="card-body">
+            <h5 class="card-title">Strengths</h5>
+            <p>{{ appraisal.strengths }}</p>
+        </div>
+    </div>
+
+    <div class="card mt-3">
+        <div class="card-body">
+            <h5 class="card-title">Areas for Improvement</h5>
+            <p>{{ appraisal.areas_for_improvement }}</p>
+        </div>
+    </div>
+
+    {% if appraisal.reviewer_comments %}
+        <div class="card mt-3">
+            <div class="card-body">
+                <h5 class="card-title">Reviewer Comments</h5>
+                <p>{{ appraisal.reviewer_comments }}</p>
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Development -->
+    <div class="card mt-3">
+        <div class="card-body">
+            <h5 class="card-title">Next Goals</h5>
+            <p>{{ appraisal.next_goals }}</p>
+        </div>
+    </div>
+
+    {% if appraisal.training_needs %}
+        <div class="card mt-3">
+            <div class="card-body">
+                <h5 class="card-title">Training Needs</h5>
+                <p>{{ appraisal.training_needs }}</p>
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Actions -->
+    <div class="mt-4">
+        {% if appraisal.status == 'submitted' %}
+            <form method="post" action="{% url 'appraisal_approve' appraisal.pk %}" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-success">
+                    <i class="fas fa-check"></i> Approve Appraisal
+                </button>
+            </form>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

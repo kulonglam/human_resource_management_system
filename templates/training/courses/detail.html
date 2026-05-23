@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}{{ course.title }}{% endblock %}
+
+{% block page_content %}
+<div class="container-fluid mt-5">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1>{{ course.title }}</h1>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'course_edit' course.pk %}" class="btn btn-warning">
+                <i class="fas fa-edit"></i> Edit
+            </a>
+            <a href="{% url 'course_list' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Course Details</h5>
+                    <table class="table">
+                        <tr>
+                            <th>Category</th>
+                            <td><span class="badge bg-secondary">{{ course.get_category_display }}</span></td>
+                        </tr>
+                        <tr>
+                            <th>Provider</th>
+                            <td>{{ course.provider }}</td>
+                        </tr>
+                        <tr>
+                            <th>Duration</th>
+                            <td>{{ course.duration_hours }} hours</td>
+                        </tr>
+                        <tr>
+                            <th>Start Date</th>
+                            <td>{{ course.start_date|date:"M d, Y" }}</td>
+                        </tr>
+                        <tr>
+                            <th>End Date</th>
+                            <td>{{ course.end_date|date:"M d, Y" }}</td>
+                        </tr>
+                        <tr>
+                            <th>Location</th>
+                            <td>{{ course.location }}{% if course.is_online %} (Online){% endif %}</td>
+                        </tr>
+                        <tr>
+                            <th>Cost</th>
+                            <td>${{ course.cost }}</td>
+                        </tr>
+                        <tr>
+                            <th>Status</th>
+                            <td><span class="badge bg-{{ course.status|lower }}">{{ course.get_status_display }}</span></td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-body">
+                    <h5 class="card-title">Description</h5>
+                    <p>{{ course.description }}</p>
+                </div>
+            </div>
+
+            {% if course.related_skills.all %}
+                <div class="card mt-3">
+                    <div class="card-body">
+                        <h5 class="card-title">Related Skills</h5>
+                        {% for skill in course.related_skills.all %}
+                            <span class="badge bg-info me-1">{{ skill.name }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Participants</h5>
+                    <p class="fs-3 text-primary">{{ trainings.count }}</p>
+                    {% if course.max_participants %}
+                        <p class="text-muted">Max: {{ course.max_participants }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5 class="mb-0">Enrolled Employees</h5>
+                </div>
+                <div class="card-body">
+                    {% if trainings %}
+                        <ul class="list-unstyled">
+                            {% for training in trainings %}
+                                <li class="mb-2">
+                                    <strong>{{ training.employee.full_name }}</strong>
+                                    <br>
+                                    <span class="badge bg-{{ training.status|lower }}">{{ training.get_status_display }}</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="text-muted">No enrollments yet</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block title %}HR Analytics Dashboard{% endblock %}
+
+{% block page_content %}
+<div class="container-fluid mt-5">
+    <h1 class="mb-4">HR Analytics Dashboard</h1>
+    
+    <!-- Quick Links -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Quick Report Links</h5>
+                    <div class="btn-group flex-wrap" role="group">
+                        <a href="{% url 'attendance_report' %}" class="btn btn-outline-primary">
+                            <i class="fas fa-calendar-check"></i> Attendance
+                        </a>
+                        <a href="{% url 'leave_report' %}" class="btn btn-outline-success">
+                            <i class="fas fa-calendar-times"></i> Leave
+                        </a>
+                        <a href="{% url 'payroll_report' %}" class="btn btn-outline-info">
+                            <i class="fas fa-money-bill"></i> Payroll
+                        </a>
+                        <a href="{% url 'performance_report' %}" class="btn btn-outline-warning">
+                            <i class="fas fa-chart-line"></i> Performance
+                        </a>
+                        <a href="{% url 'recruitment_report' %}" class="btn btn-outline-danger">
+                            <i class="fas fa-briefcase"></i> Recruitment
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Key Metrics Row 1: Employees -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body">
+                    <h6 class="card-title">Total Employees</h6>
+                    <h2 class="card-text">{{ total_employees }}</h2>
+                    <small class="text-light">Active workforce</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-success">
+                <div class="card-body">
+                    <h6 class="card-title">New Joiners</h6>
+                    <h2 class="card-text">{{ new_joiners }}</h2>
+                    <small class="text-light">Last 30 days</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-info">
+                <div class="card-body">
+                    <h6 class="card-title">Open Positions</h6>
+                    <h2 class="card-text">{{ open_positions }}</h2>
+                    <small class="text-light">Hiring in progress</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-warning">
+                <div class="card-body">
+                    <h6 class="card-title">Pending Applications</h6>
+                    <h2 class="card-text">{{ pending_applications }}</h2>
+                    <small class="text-light">Awaiting review</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Key Metrics Row 2: Attendance -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="card-title text-success">
+                        <i class="fas fa-check-circle"></i> Present Today
+                    </h6>
+                    <h2 class="text-success">{{ present_today }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="card-title text-danger">
+                        <i class="fas fa-times-circle"></i> Absent Today
+                    </h6>
+                    <h2 class="text-danger">{{ absent_today }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="card-title text-warning">
+                        <i class="fas fa-clock"></i> Late Today
+                    </h6>
+                    <h2 class="text-warning">{{ late_today }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="card-title text-info">Attendance Rate</h6>
+                    <h2 class="text-info">
+                        {% if present_today|add:absent_today|add:late_today > 0 %}
+                            {{ percent_present }}%
+                        {% else %}
+                            -
+                        {% endif %}
+                    </h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Key Metrics Row 3: Leave & Performance -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="card-title">Pending Leaves</h6>
+                    <h2 class="text-primary">{{ pending_leaves }}</h2>
+                    <small class="text-muted">Awaiting approval</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="card-title">Leaves Used</h6>
+                    <h2 class="text-info">{{ leaves_used_this_year }}</h2>
+                    <small class="text-muted">This year</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="card-title">Active Goals</h6>
+                    <h2 class="text-success">{{ active_goals }}</h2>
+                    <small class="text-muted">In progress</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="card-title">Appraisals Due</h6>
+                    <h2 class="text-warning">{{ appraisals_due }}</h2>
+                    <small class="text-muted">Pending submission</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Instructions -->
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">📊 Generate Reports</h5>
+            <p class="text-muted">Use the quick links above to generate detailed reports for each HR function. Each report offers filtering options to customize the data according to your needs.</p>
+            <ul class="list-group list-group-flush">
+                <li class="list-group-item"><strong>Attendance Report:</strong> Track attendance patterns, absences, and tardiness</li>
+                <li class="list-group-item"><strong>Leave Report:</strong> Monitor leave applications, balances, and utilization</li>
+                <li class="list-group-item"><strong>Payroll Report:</strong> View salary summaries, deductions, and tax information</li>
+                <li class="list-group-item"><strong>Performance Report:</strong> Analyze appraisals and goal progress</li>
+                <li class="list-group-item"><strong>Recruitment Report:</strong> Track job openings and application status</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

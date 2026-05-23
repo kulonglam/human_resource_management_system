@@ -52,14 +52,39 @@ def dashboard(request):
     from departments.models import Department
     from leaves.models import Leave, LeaveBalance
     from recruitment.models import JobPosting
+    from performance.models import PerformanceGoal, PerformanceAppraisal
+    from training.models import TrainingCourse, TrainingRecord, DevelopmentPlan, EmployeeCertification
     from django.utils import timezone
+    from datetime import timedelta
 
     context = {
         'total_employees': Employee.objects.filter(is_active=True).count(),
         'total_departments': Department.objects.count(),
         'pending_leaves': Leave.objects.filter(status='pending').count(),
         'open_jobs': JobPosting.objects.filter(is_open=True).count(),
+        'total_goals': PerformanceGoal.objects.count(),
+        'active_goals': PerformanceGoal.objects.filter(status='in_progress').count(),
+        'total_appraisals': PerformanceAppraisal.objects.count(),
+        'active_courses': TrainingCourse.objects.filter(status='active').count(),
+        'upcoming_courses': TrainingCourse.objects.filter(status='planned').count(),
+        'total_employees_trained': TrainingRecord.objects.filter(status='completed').values('employee').distinct().count(),
+        'expiring_certifications': EmployeeCertification.objects.filter(
+            expiry_date__lte=timezone.now() + timedelta(days=30),
+            expiry_date__gte=timezone.now()
+        ).count(),
+        'active_development_plans': DevelopmentPlan.objects.filter(status='active').count(),
     }
+    
+    # Recent trainings (last 5)
+    recent_trainings = TrainingRecord.objects.filter(status='completed').order_by('-completion_date')[:5]
+    context['recent_trainings'] = recent_trainings
+    
+    # Certifications expiring soon
+    certifications_expiring_soon = EmployeeCertification.objects.filter(
+        expiry_date__lte=timezone.now() + timedelta(days=30),
+        expiry_date__gte=timezone.now()
+    ).order_by('expiry_date')[:5]
+    context['certifications_expiring_soon'] = certifications_expiring_soon
     
     current_year = timezone.now().year
     

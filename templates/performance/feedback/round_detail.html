@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}{{ round.name }}{% endblock %}
+
+{% block page_content %}
+<div class="container-fluid mt-5">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1>{{ round.name }}</h1>
+            <p class="text-muted">{{ round.start_date|date:"M d, Y" }} - {{ round.end_date|date:"M d, Y" }}</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'feedback_request_create' round.pk %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Add Feedback Requests
+            </a>
+            <a href="{% url 'feedback_round_list' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+        </div>
+    </div>
+
+    <!-- Statistics -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h6 class="card-title text-muted">Total Requests</h6>
+                    <h2 class="card-text text-primary">{{ total_requests }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h6 class="card-title text-muted">Submitted</h6>
+                    <h2 class="card-text text-success">{{ submitted }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h6 class="card-title text-muted">Pending</h6>
+                    <h2 class="card-text text-warning">{{ pending }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h6 class="card-title text-muted">Completion Rate</h6>
+                    <h2 class="card-text text-info">
+                        {% if total_requests > 0 %}
+                            {{ submitted|floatformat:0 }}%
+                        {% else %}
+                            0%
+                        {% endif %}
+                    </h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Feedback Requests Table -->
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Recipient</th>
+                        <th>Feedback Giver</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for request in feedback_requests %}
+                        <tr>
+                            <td>{{ request.recipient.full_name }}</td>
+                            <td>{{ request.feedback_giver.first_name }} {{ request.feedback_giver.last_name }}</td>
+                            <td>
+                                <span class="badge bg-secondary">{{ request.get_giver_type_display }}</span>
+                            </td>
+                            <td>
+                                <span class="badge bg-{{ request.status|lower }}">
+                                    {{ request.get_status_display }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if request.status == 'pending' %}
+                                    <a href="{% url 'feedback_submit' request.pk %}" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-pen"></i> Submit Feedback
+                                    </a>
+                                {% else %}
+                                    <span class="text-muted">Submitted</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">No feedback requests yet</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

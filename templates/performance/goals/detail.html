@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}{{ goal.goal_title }}{% endblock %}
+
+{% block page_content %}
+<div class="container-fluid mt-5">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1>{{ goal.goal_title }}</h1>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'goal_edit' goal.pk %}" class="btn btn-warning">
+                <i class="fas fa-edit"></i> Edit
+            </a>
+            <a href="{% url 'goal_list' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Goal Information</h5>
+                    <table class="table">
+                        <tr>
+                            <th>Employee</th>
+                            <td>{{ goal.employee.full_name }}</td>
+                        </tr>
+                        <tr>
+                            <th>Description</th>
+                            <td>{{ goal.goal_description }}</td>
+                        </tr>
+                        <tr>
+                            <th>Target Metric</th>
+                            <td>{{ goal.target_metric }}</td>
+                        </tr>
+                        <tr>
+                            <th>Start Date</th>
+                            <td>{{ goal.start_date|date:"M d, Y" }}</td>
+                        </tr>
+                        <tr>
+                            <th>End Date</th>
+                            <td>{{ goal.end_date|date:"M d, Y" }}</td>
+                        </tr>
+                        <tr>
+                            <th>Priority</th>
+                            <td>
+                                <span class="badge bg-{{ goal.priority|lower }}-subtle text-{{ goal.priority|lower }}">
+                                    {{ goal.get_priority_display }}
+                                </span>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Progress & Status</h5>
+                    <div class="mb-3">
+                        <p class="text-muted">Progress: <strong>{{ goal.progress }}%</strong></p>
+                        <div class="progress" style="height: 25px;">
+                            <div class="progress-bar" role="progressbar" 
+                                style="width: {{ goal.progress }}%;" 
+                                aria-valuenow="{{ goal.progress }}" aria-valuemin="0" aria-valuemax="100">
+                                {{ goal.progress }}%
+                            </div>
+                        </div>
+                    </div>
+                    <table class="table table-sm">
+                        <tr>
+                            <th>Status</th>
+                            <td>
+                                <span class="badge bg-{{ goal.status|lower|default:'secondary' }}">
+                                    {{ goal.get_status_display }}
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Set By</th>
+                            <td>{{ goal.set_by.username }}</td>
+                        </tr>
+                        <tr>
+                            <th>Created</th>
+                            <td>{{ goal.created_at|date:"M d, Y" }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if goal.notes %}
+        <div class="card mt-3">
+            <div class="card-body">
+                <h5 class="card-title">Notes</h5>
+                <p>{{ goal.notes }}</p>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

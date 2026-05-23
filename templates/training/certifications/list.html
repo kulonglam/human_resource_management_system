@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Certifications{% endblock %}
+
+{% block page_content %}
+<div class="container-fluid mt-5">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1>Certification Types</h1>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'certification_create' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Add Certification
+            </a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Issuing Body</th>
+                        <th>Validity</th>
+                        <th>Employees</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cert in certifications %}
+                        <tr>
+                            <td><strong>{{ cert.name }}</strong></td>
+                            <td>{{ cert.issuing_body }}</td>
+                            <td>{{ cert.validity_years }} years</td>
+                            <td>
+                                <span class="badge bg-info">{{ cert.employee_count }}</span>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted">No certifications</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

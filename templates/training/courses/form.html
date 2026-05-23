@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block page_content %}
+<div class="container-fluid mt-5">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1>{{ title }}</h1>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'course_list' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+        </div>
+    </div>
+
+    <form method="post" class="needs-validation">
+        {% csrf_token %}
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Course Information</h5>
+                        {{ form.title|as_crispy_field }}
+                        {{ form.description|as_crispy_field }}
+                        {{ form.category|as_crispy_field }}
+                        {{ form.provider|as_crispy_field }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Details</h5>
+                        {{ form.duration_hours|as_crispy_field }}
+                        {{ form.start_date|as_crispy_field }}
+                        {{ form.end_date|as_crispy_field }}
+                        {{ form.location|as_crispy_field }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-body">
+                <h5 class="card-title">Additional Information</h5>
+                <div class="row">
+                    <div class="col-md-4">{{ form.is_online|as_crispy_field }}</div>
+                    <div class="col-md-4">{{ form.max_participants|as_crispy_field }}</div>
+                    <div class="col-md-4">{{ form.cost|as_crispy_field }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-body">
+                <h5 class="card-title">Related Skills</h5>
+                {{ form.related_skills|as_crispy_field }}
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-body">
+                {{ form.status|as_crispy_field }}
+                {{ form.notes|as_crispy_field }}
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i> Save Course
+            </button>
+            <a href="{% url 'course_list' %}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
