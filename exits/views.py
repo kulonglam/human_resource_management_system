@@ -22,7 +22,7 @@ def exit_create(request):
         if form.is_valid():
             form.save()
             messages.success(request, 'Exit process created successfully')
-            return redirect('exit_list')
+            return redirect('exits:list')
     else:
         form = ExitProcessForm()
     return render(request, 'exits/form.html', {'form': form, 'title': 'Create Exit Process'})
@@ -35,7 +35,7 @@ def exit_update(request, pk):
         if form.is_valid():
             form.save()
             messages.success(request, 'Exit process updated successfully')
-            return redirect('exit_detail', pk=exit_process.pk)
+            return redirect('exits:detail', pk=exit_process.pk)
     else:
         form = ExitProcessForm(instance=exit_process)
     return render(request, 'exits/form.html', {'form': form, 'exit_process': exit_process, 'title': 'Update Exit Process'})
@@ -50,7 +50,7 @@ def checklist_add(request, exit_id):
             checklist_item.exit_process = exit_process
             checklist_item.save()
             messages.success(request, 'Checklist item added')
-            return redirect('exit_detail', pk=exit_process.pk)
+            return redirect('exits:detail', pk=exit_process.pk)
     else:
         form = ExitChecklistForm()
     return render(request, 'exits/checklist_form.html', {'form': form, 'exit_process': exit_process})
@@ -63,7 +63,7 @@ def checklist_update(request, pk):
         if form.is_valid():
             form.save()
             messages.success(request, 'Checklist item updated')
-            return redirect('exit_detail', pk=checklist_item.exit_process.pk)
+            return redirect('exits:detail', pk=checklist_item.exit_process.pk)
     else:
         form = ExitChecklistStatusForm(instance=checklist_item)
     return render(request, 'exits/checklist_update.html', {'form': form, 'checklist_item': checklist_item})

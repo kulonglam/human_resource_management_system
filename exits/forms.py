@@ -4,8 +4,9 @@ from .models import ExitProcess, ExitChecklist
 class ExitProcessForm(forms.ModelForm):
     class Meta:
         model = ExitProcess
-        fields = ['exit_date', 'reason', 'notice_period_days', 'last_working_day', 'notes']
+        fields = ['employee', 'exit_date', 'reason', 'notice_period_days', 'last_working_day', 'notes']
         widgets = {
+            'employee': forms.Select(attrs={'class': 'form-select'}),
             'exit_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'reason': forms.Select(attrs={'class': 'form-select'}),
             'notice_period_days': forms.NumberInput(attrs={'class': 'form-control'}),
