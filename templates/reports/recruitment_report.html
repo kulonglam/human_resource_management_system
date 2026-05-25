@@ -25,11 +25,9 @@
                 <div class="row mb-3">
                     <div class="col-md-4">
                         <label class="form-label">Report Type</label>
-                        {% for value, label in form.report_type %}
-                            <div class="form-check">
-                                {{ form.report_type|safe }}
-                            </div>
-                        {% endfor %}
+                        <div class="d-flex flex-column gap-2">
+                            {{ form.report_type }}
+                        </div>
                     </div>
                     <div class="col-md-4">
                         <label for="{{ form.department.id_for_label }}" class="form-label">Department</label>
@@ -41,11 +39,7 @@
                     <div class="col-md-12">
                         <label class="form-label">Job Status</label>
                         <div>
-                            {% for value, label in form.job_status %}
-                                <div class="form-check form-check-inline">
-                                    {{ form.job_status|safe }}
-                                </div>
-                            {% endfor %}
+                            {{ form.job_status }}
                         </div>
                     </div>
                 </div>

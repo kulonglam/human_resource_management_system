@@ -1,0 +1,157 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block page_content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1>Exit Process Details</h1>
+            <a href="{% url 'exits:list' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Exit Processes
+            </a>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'exits:update' exit_process.id %}" class="btn btn-warning">
+                <i class="bi bi-pencil"></i> Edit
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Exit Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-sm-4">
+                            <label class="form-label fw-bold">Employee</label>
+                        </div>
+                        <div class="col-sm-8">
+                            <p>{{ exit_process.employee.first_name }} {{ exit_process.employee.last_name }}</p>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-sm-4">
+                            <label class="form-label fw-bold">Exit Date</label>
+                        </div>
+                        <div class="col-sm-8">
+                            <p>{{ exit_process.exit_date|date:"F d, Y" }}</p>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-sm-4">
+                            <label class="form-label fw-bold">Reason</label>
+                        </div>
+                        <div class="col-sm-8">
+                            <p>{{ exit_process.get_reason_display }}</p>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-sm-4">
+                            <label class="form-label fw-bold">Status</label>
+                        </div>
+                        <div class="col-sm-8">
+                            {% if exit_process.status == 'initiated' %}
+                                <span class="badge bg-warning text-dark">Initiated</span>
+                            {% elif exit_process.status == 'in_progress' %}
+                                <span class="badge bg-info">In Progress</span>
+                            {% elif exit_process.status == 'completed' %}
+                                <span class="badge bg-success">Completed</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-sm-4">
+                            <label class="form-label fw-bold">Last Working Day</label>
+                        </div>
+                        <div class="col-sm-8">
+                            <p>{{ exit_process.last_working_day|date:"F d, Y"|default:"Not set" }}</p>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-sm-4">
+                            <label class="form-label fw-bold">Notice Period</label>
+                        </div>
+                        <div class="col-sm-8">
+                            <p>{{ exit_process.notice_period_days }} days</p>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-sm-4">
+                            <label class="form-label fw-bold">Exit Interview</label>
+                        </div>
+                        <div class="col-sm-8">
+                            {% if exit_process.exit_interview_completed %}
+                                <span class="badge bg-success">Completed</span> on {{ exit_process.exit_interview_date|date:"F d, Y" }}
+                            {% else %}
+                                <span class="badge bg-danger">Pending</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% if exit_process.notes %}
+                <div class="card">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0">Notes</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>{{ exit_process.notes }}</p>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Offboarding Checklist</h5>
+                        <a href="{% url 'exits:checklist_add' exit_process.id %}" class="btn btn-sm btn-primary">
+                            <i class="bi bi-plus-circle"></i> Add Item
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if checklist_items %}
+                        <div class="list-group">
+                            {% for item in checklist_items %}
+                                <div class="list-group-item">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <h6 class="mb-1">{{ item.item_name }}</h6>
+                                            {% if item.responsible_person %}
+                                                <small class="text-muted">Responsible: {{ item.responsible_person }}</small><br>
+                                            {% endif %}
+                                            {% if item.notes %}
+                                                <small class="text-muted">{{ item.notes }}</small>
+                                            {% endif %}
+                                        </div>
+                                        <div class="ms-2">
+                                            {% if item.status == 'pending' %}
+                                                <span class="badge bg-warning">Pending</span>
+                                            {% elif item.status == 'completed' %}
+                                                <span class="badge bg-success">Completed</span>
+                                            {% elif item.status == 'not_applicable' %}
+                                                <span class="badge bg-secondary">N/A</span>
+                                            {% endif %}
+                                            <a href="{% url 'exits:checklist_update' item.id %}" class="btn btn-sm btn-outline-secondary ms-2">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No checklist items. <a href="{% url 'exits:checklist_add' exit_process.id %}">Add one</a></p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,13 +1,15 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q, Sum, Avg, F
+from django.db.models.functions import Concat
+from django.db.models import Value
 from django.utils import timezone
 from datetime import timedelta, datetime
 import json
 
 from employees.models import Employee
 from departments.models import Department
-from attendance.models import AttendanceRecord
+from attendance.models import Attendance
 from leaves.models import Leave, LeaveBalance
 from payroll.models import Salary
 from recruitment.models import JobPosting, Application
@@ -28,22 +30,22 @@ def analytics_dashboard(request):
     # Employee statistics
     total_employees = Employee.objects.filter(is_active=True).count()
     new_joiners = Employee.objects.filter(
-        date_of_joining__gte=timezone.now() - timedelta(days=30),
+        date_joined__gte=timezone.now() - timedelta(days=30),
         is_active=True
     ).count()
     
     # Attendance metrics
     today = timezone.now().date()
-    present_today = AttendanceRecord.objects.filter(
-        attendance_date=today,
+    present_today = Attendance.objects.filter(
+        date=today,
         status='present'
     ).count()
-    absent_today = AttendanceRecord.objects.filter(
-        attendance_date=today,
+    absent_today = Attendance.objects.filter(
+        date=today,
         status='absent'
     ).count()
-    late_today = AttendanceRecord.objects.filter(
-        attendance_date=today,
+    late_today = Attendance.objects.filter(
+        date=today,
         status='late'
     ).count()
     
@@ -51,12 +53,12 @@ def analytics_dashboard(request):
     pending_leaves = Leave.objects.filter(status='pending').count()
     leaves_used_this_year = Leave.objects.filter(
         status='approved',
-        from_date__year=timezone.now().year
+        start_date__year=timezone.now().year
     ).count()
     
     # Recruitment metrics
     open_positions = JobPosting.objects.filter(is_open=True).count()
-    pending_applications = Application.objects.filter(status='pending').count()
+    pending_applications = Application.objects.filter(status='received').count()
     
     # Performance metrics
     active_goals = PerformanceGoal.objects.filter(status='in_progress').count()
@@ -113,8 +115,8 @@ def attendance_report(request):
             end_date = form.cleaned_data.get('end_date')
         
         # Build query
-        query = AttendanceRecord.objects.filter(
-            attendance_date__range=[start_date, end_date]
+        query = Attendance.objects.filter(
+            date__range=[start_date, end_date]
         )
         
         # Filter by department
@@ -138,7 +140,9 @@ def attendance_report(request):
             'total_records': total_records,
             'status_breakdown': status_breakdown,
             'department': str(department) if department else 'All Departments',
-            'records': list(query.values('employee__full_name', 'attendance_date', 'status', 'check_in', 'check_out'))
+            'records': list(query.annotate(
+                employee_name=Concat(F('employee__first_name'), Value(' '), F('employee__last_name'))
+            ).values('employee_name', 'date', 'status', 'time_in', 'time_out'))
         }
     
     context = {
@@ -160,7 +164,7 @@ def leave_report(request):
         year = form.cleaned_data['year']
         
         # Build base query
-        query = Leave.objects.filter(from_date__year=year)
+        query = Leave.objects.filter(start_date__year=year)
         
         # Apply filters
         department = form.cleaned_data.get('department')
@@ -178,8 +182,7 @@ def leave_report(request):
         if report_type == 'summary':
             # Leave summary by type
             summary = query.values('leave_type').annotate(
-                count=Count('id'),
-                total_days=Sum('number_of_days')
+                count=Count('id')
             )
             report_data = {
                 'type': 'Summary',
@@ -192,28 +195,31 @@ def leave_report(request):
             if department:
                 balances = balances.filter(employee__department=department)
             
-            balance_data = balances.values(
+            balance_data = list(balances.annotate(
+                employee_name=Concat(F('employee__first_name'), Value(' '), F('employee__last_name'))
+            ).values(
                 'leave_type',
-                'employee__full_name'
+                'employee_name',
+                'total_days',
+                'used_days',
+                'pending_days'
             ).annotate(
-                total=F('total_days'),
-                used=F('used_days'),
-                pending=F('pending_days'),
-                available=F('available_days')
-            )
+                available=F('total_days') - F('used_days') - F('pending_days')
+            ))
             report_data = {
                 'type': 'Balance',
                 'year': year,
-                'balances': list(balance_data)
+                'balances': balance_data
             }
         elif report_type == 'detailed':
             # Detailed leave records
-            leaves = list(query.values(
-                'employee__full_name',
+            leaves = list(query.annotate(
+                employee_name=Concat(F('employee__first_name'), Value(' '), F('employee__last_name'))
+            ).values(
+                'employee_name',
                 'leave_type',
-                'from_date',
-                'to_date',
-                'number_of_days',
+                'start_date',
+                'end_date',
                 'status',
                 'reason'
             ))
@@ -225,12 +231,16 @@ def leave_report(request):
             }
         elif report_type == 'pending':
             # Pending approvals
-            pending = list(query.filter(status='pending').values(
-                'employee__full_name',
+            pending = list(query.filter(status='pending').annotate(
+                employee_name=Concat(F('employee__first_name'), Value(' '), F('employee__last_name')),
+                duration=F('end_date') - F('start_date')
+            ).values(
+                'employee_name',
                 'leave_type',
-                'from_date',
-                'number_of_days',
-                'applied_on'
+                'start_date',
+                'end_date',
+                'applied_on',
+                'duration'
             ))
             report_data = {
                 'type': 'Pending Approvals',
@@ -254,14 +264,13 @@ def payroll_report(request):
     report_data = None
     
     if form.is_valid():
-        report_type = form.cleaned_data['report_type']
         month = form.cleaned_data['month']
         year = form.cleaned_data['year']
         
         # Build base query
         query = Salary.objects.filter(
-            salary_month__month=month,
-            salary_month__year=year
+            month=month,
+            year=year
         )
         
         department = form.cleaned_data.get('department')
@@ -274,49 +283,38 @@ def payroll_report(request):
         if 'inactive' in employee_status:
             query = query.filter(employee__is_active=False)
         
-        if report_type == 'summary':
-            # Payroll summary
-            total_gross = query.aggregate(Sum('gross_salary'))['gross_salary__sum'] or 0
-            total_net = query.aggregate(Sum('net_salary'))['net_salary__sum'] or 0
-            total_deductions = total_gross - total_net
-            
-            report_data = {
-                'type': 'Summary',
-                'period': f"{month}/{year}",
-                'total_employees': query.count(),
-                'total_gross': total_gross,
-                'total_deductions': total_deductions,
-                'total_net': total_net,
-            }
-        elif report_type == 'detailed':
-            # Detailed payroll
-            salaries = list(query.values(
-                'employee__full_name',
-                'employee__employee_id',
-                'gross_salary',
-                'basic_salary',
-                'allowances',
-                'deductions',
-                'tax',
-                'net_salary'
-            ))
-            report_data = {
-                'type': 'Detailed',
-                'period': f"{month}/{year}",
-                'salaries': salaries
-            }
-        elif report_type == 'deductions':
-            # Deductions breakdown
-            total_deductions = query.aggregate(Sum('deductions'))['deductions__sum'] or 0
-            total_tax = query.aggregate(Sum('tax'))['tax__sum'] or 0
-            
-            report_data = {
-                'type': 'Deductions',
-                'period': f"{month}/{year}",
-                'total_deductions': total_deductions,
-                'total_tax': total_tax,
-                'total_combined': total_deductions + total_tax,
-            }
+        # Calculate gross salary (basic + allowances)
+        salaries_with_gross = query.annotate(
+            gross_salary=F('basic_salary') + F('allowances'),
+            employee_name=Concat(F('employee__first_name'), Value(' '), F('employee__last_name'))
+        )
+        
+        # Payroll summary
+        total_gross = salaries_with_gross.aggregate(Sum('gross_salary'))['gross_salary__sum'] or 0
+        total_net = query.aggregate(Sum('net_salary'))['net_salary__sum'] or 0
+        total_deductions = query.aggregate(Sum('deductions'))['deductions__sum'] or 0
+        total_tax = query.aggregate(Sum('tax'))['tax__sum'] or 0
+        
+        salary_records = list(salaries_with_gross.values(
+            'employee_name',
+            'employee__id',
+            'basic_salary',
+            'allowances',
+            'deductions',
+            'tax',
+            'net_salary'
+        ).annotate(gross_salary=F('basic_salary') + F('allowances')))
+        
+        report_data = {
+            'period': f"{month}/{year}",
+            'total_employees': query.count(),
+            'total_gross': total_gross,
+            'total_allowances': query.aggregate(Sum('allowances'))['allowances__sum'] or 0,
+            'total_deductions': total_deductions,
+            'total_tax': total_tax,
+            'total_net': total_net,
+            'salaries': salary_records
+        }
     
     context = {
         'form': form,
@@ -397,7 +395,10 @@ def recruitment_report(request):
         
         job_statuses = form.cleaned_data.get('job_status')
         if job_statuses:
-            job_query = job_query.filter(is_open__in=[s == 'open' for s in job_statuses])
+            if 'open' in job_statuses:
+                job_query = job_query.filter(is_open=True)
+            elif 'closed' in job_statuses:
+                job_query = job_query.filter(is_open=False)
         
         if report_type == 'job_summary':
             report_data = {
@@ -407,7 +408,7 @@ def recruitment_report(request):
                 'closed_positions': job_query.filter(is_open=False).count(),
             }
         elif report_type == 'applicant_status':
-            app_query = Application.objects.filter(job_posting__in=job_query)
+            app_query = Application.objects.filter(job__in=job_query)
             app_summary = app_query.values('status').annotate(count=Count('id'))
             
             report_data = {
@@ -416,8 +417,9 @@ def recruitment_report(request):
                 'status_breakdown': list(app_summary)
             }
         elif report_type == 'hiring_funnel':
-            app_query = Application.objects.filter(job_posting__in=job_query)
-            statuses = ['applied', 'under_review', 'shortlisted', 'interview', 'offer', 'rejected']
+            app_query = Application.objects.filter(job__in=job_query)
+            # Use actual status values from Application model
+            statuses = ['received', 'shortlisted', 'interviewed', 'hired', 'rejected']
             funnel_data = {}
             for status in statuses:
                 funnel_data[status] = app_query.filter(status=status).count()

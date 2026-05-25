@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block page_content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1>Exit Management</h1>
+            <p class="text-muted">Track and manage employee exit processes and offboarding</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'exits:create' %}" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> New Exit Process
+            </a>
+        </div>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="row">
+        <div class="col-md-12">
+            {% if exits %}
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Employee</th>
+                                        <th>Exit Date</th>
+                                        <th>Reason</th>
+                                        <th>Status</th>
+                                        <th>Last Working Day</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for exit in exits %}
+                                        <tr>
+                                            <td>
+                                                <strong>{{ exit.employee.first_name }} {{ exit.employee.last_name }}</strong>
+                                                <br><small class="text-muted">{{ exit.employee.employee_id }}</small>
+                                            </td>
+                                            <td>{{ exit.exit_date|date:"M d, Y" }}</td>
+                                            <td>{{ exit.get_reason_display }}</td>
+                                            <td>
+                                                {% if exit.status == 'initiated' %}
+                                                    <span class="badge bg-warning">Initiated</span>
+                                                {% elif exit.status == 'in_progress' %}
+                                                    <span class="badge bg-info">In Progress</span>
+                                                {% elif exit.status == 'completed' %}
+                                                    <span class="badge bg-success">Completed</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if exit.last_working_day %}
+                                                    {{ exit.last_working_day|date:"M d, Y" }}
+                                                {% else %}
+                                                    <span class="text-muted">—</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <a href="{% url 'exits:detail' exit.id %}" class="btn btn-sm btn-info" title="View">
+                                                    <i class="bi bi-eye"></i>
+                                                </a>
+                                                <a href="{% url 'exits:update' exit.id %}" class="btn btn-sm btn-secondary" title="Edit">
+                                                    <i class="bi bi-pencil"></i>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> No exit processes found. <a href="{% url 'exits:create' %}">Create one</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

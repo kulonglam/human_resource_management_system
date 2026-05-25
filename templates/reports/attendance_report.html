@@ -25,11 +25,9 @@
                 <div class="row mb-3">
                     <div class="col-md-6">
                         <label class="form-label">Date Range</label>
-                        {% for value, label in form.date_range %}
-                            <div class="form-check">
-                                {{ form.date_range|safe }}
-                            </div>
-                        {% endfor %}
+                        <div class="d-flex flex-wrap gap-3">
+                            {{ form.date_range }}
+                        </div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Department</label>
@@ -41,13 +39,9 @@
                     <div class="col-md-12">
                         <label class="form-label">Attendance Status</label>
                         <div class="row">
-                            {% for value, label in form.attendance_status %}
-                                <div class="col-md-3">
-                                    <div class="form-check">
-                                        {{ form.attendance_status|safe }}
-                                    </div>
-                                </div>
-                            {% endfor %}
+                            <div class="col-md-12">
+                                {{ form.attendance_status }}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -116,15 +110,15 @@
                         <tbody>
                             {% for record in report_data.records %}
                                 <tr>
-                                    <td>{{ record.employee__full_name }}</td>
-                                    <td>{{ record.attendance_date|date:"M d, Y" }}</td>
+                                    <td>{{ record.employee_name }}</td>
+                                    <td>{{ record.date|date:"M d, Y" }}</td>
                                     <td>
                                         <span class="badge bg-{% if record.status == 'present' %}success{% elif record.status == 'absent' %}danger{% else %}warning{% endif %}">
                                             {{ record.status|title }}
                                         </span>
                                     </td>
-                                    <td>{{ record.check_in|default:"-" }}</td>
-                                    <td>{{ record.check_out|default:"-" }}</td>
+                                    <td>{{ record.time_in|default:"-" }}</td>
+                                    <td>{{ record.time_out|default:"-" }}</td>
                                 </tr>
                             {% empty %}
                                 <tr>

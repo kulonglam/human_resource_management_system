@@ -290,4 +290,94 @@
   </div>
 </div>
 
+<!-- Reports & Analytics Section -->
+<div class="row mt-4">
+  <div class="col-12">
+    <h4 class="mb-3">
+      <i class="bi bi-bar-chart"></i> Reports & Analytics
+    </h4>
+  </div>
+  <div class="col-md-4">
+    <div class="card mb-3 border-primary">
+      <div class="card-body">
+        <h6 class="card-title"><i class="bi bi-calendar-check"></i> Attendance Report</h6>
+        <p class="card-text small">View attendance records by date range, department, and status.</p>
+        <a href="{% url 'attendance_report' %}" class="btn btn-primary btn-sm">Generate Report</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card mb-3 border-success">
+      <div class="card-body">
+        <h6 class="card-title"><i class="bi bi-calendar-event"></i> Leave Report</h6>
+        <p class="card-text small">Analyze leave usage, balances, and pending approvals.</p>
+        <a href="{% url 'leave_report' %}" class="btn btn-success btn-sm">Generate Report</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card mb-3 border-info">
+      <div class="card-body">
+        <h6 class="card-title"><i class="bi bi-cash-coin"></i> Payroll Report</h6>
+        <p class="card-text small">Review payroll summaries, deductions, and salary details.</p>
+        <a href="{% url 'payroll_report' %}" class="btn btn-info btn-sm">Generate Report</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card mb-3 border-warning">
+      <div class="card-body">
+        <h6 class="card-title"><i class="bi bi-star"></i> Performance Report</h6>
+        <p class="card-text small">Analyze appraisals, goals, and performance ratings.</p>
+        <a href="{% url 'performance_report' %}" class="btn btn-warning btn-sm">Generate Report</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card mb-3 border-danger">
+      <div class="card-body">
+        <h6 class="card-title"><i class="bi bi-briefcase"></i> Recruitment Report</h6>
+        <p class="card-text small">Track job postings, applications, and hiring progress.</p>
+        <a href="{% url 'recruitment_report' %}" class="btn btn-danger btn-sm">Generate Report</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card mb-3 border-dark">
+      <div class="card-body">
+        <h6 class="card-title"><i class="bi bi-graph-up"></i> Analytics Dashboard</h6>
+        <p class="card-text small">View key HR metrics and organization-wide analytics.</p>
+        <a href="{% url 'analytics_dashboard' %}" class="btn btn-dark btn-sm">View Dashboard</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Exit Management Section -->
+<div class="row mt-4">
+  <div class="col-12">
+    <h4 class="mb-3">
+      <i class="bi bi-door-closed"></i> Exit Management
+    </h4>
+  </div>
+  <div class="col-md-6">
+    <div class="card mb-3 border-secondary">
+      <div class="card-body">
+        <h6 class="card-title"><i class="bi bi-list-check"></i> Exit Processes</h6>
+        <p class="card-text small">Manage employee offboarding, exit interviews, and separation checklists.</p>
+        <a href="{% url 'exits:list' %}" class="btn btn-secondary btn-sm">Manage</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card mb-3 border-info">
+      <div class="card-body">
+        <h6 class="card-title"><i class="bi bi-plus-circle"></i> New Exit Process</h6>
+        <p class="card-text small">Initiate exit process for a departing employee.</p>
+        <a href="{% url 'exits:create' %}" class="btn btn-info btn-sm">Create</a>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% endblock %}

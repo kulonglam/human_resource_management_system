@@ -34,6 +34,15 @@ urlpatterns = [
     path('payroll/', include('payroll.urls')),
     path('performance/', include('performance.urls')),
     path('training/', include('training.urls')),
+    path('reports/', include('reports.urls')),
+    path('assets/', include('assets.urls')),
+    path('exits/', include('exits.urls')),
+    path('shifts/', include('shifts.urls')),
+    path('expenses/', include('expenses.urls')),
+    path('surveys/', include('surveys.urls')),
+    path('leave-policies/', include('leave_policies.urls')),
+    path('benefits/', include('benefits.urls')),
+    path('discipline/', include('discipline.urls')),
     path('', include('accounts.urls')),   # root → login/dashboard
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 

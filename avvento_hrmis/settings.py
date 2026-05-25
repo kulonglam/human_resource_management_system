@@ -51,6 +51,15 @@ INSTALLED_APPS = [
     'payroll',
     'performance',
     'training',
+    'reports',
+    'assets',
+    'exits',
+    'shifts',
+    'expenses',
+    'surveys',
+    'leave_policies',
+    'benefits',
+    'discipline',
 ]
 
 MIDDLEWARE = [
