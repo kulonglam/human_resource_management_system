@@ -1,8 +1,9 @@
 from django import forms
+from avvento_hrmis.form_utils import BootstrapFormMixin
 from .models import Salary
 
 
-class SalaryForm(forms.ModelForm):
+class SalaryForm(BootstrapFormMixin, forms.ModelForm):
     paid_on = forms.DateField(
         required=False,
         widget=forms.DateInput(attrs={'type': 'date'})

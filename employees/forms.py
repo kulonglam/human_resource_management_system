@@ -1,7 +1,8 @@
 from django import forms
+from avvento_hrmis.form_utils import BootstrapFormMixin
 from .models import Employee
 
-class EmployeeForm(forms.ModelForm):
+class EmployeeForm(BootstrapFormMixin, forms.ModelForm):
     date_of_birth = forms.DateField(widget=forms.DateInput(attrs={'type': 'date'}))
     date_joined = forms.DateField(widget=forms.DateInput(attrs={'type': 'date'}))
 

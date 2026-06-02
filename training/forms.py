@@ -1,11 +1,12 @@
 from django import forms
+from avvento_hrmis.form_utils import BootstrapFormMixin
 from .models import (
     Skill, EmployeeSkill, TrainingCourse, TrainingRecord, 
     Certification, EmployeeCertification, DevelopmentPlan
 )
 
 
-class SkillForm(forms.ModelForm):
+class SkillForm(BootstrapFormMixin, forms.ModelForm):
     class Meta:
         model = Skill
         fields = ['name', 'category', 'description']
@@ -16,7 +17,7 @@ class SkillForm(forms.ModelForm):
         }
 
 
-class EmployeeSkillForm(forms.ModelForm):
+class EmployeeSkillForm(BootstrapFormMixin, forms.ModelForm):
     class Meta:
         model = EmployeeSkill
         fields = ['employee', 'skill', 'proficiency_level', 'years_of_experience', 'acquired_date', 'notes']
@@ -30,7 +31,7 @@ class EmployeeSkillForm(forms.ModelForm):
         }
 
 
-class TrainingCourseForm(forms.ModelForm):
+class TrainingCourseForm(BootstrapFormMixin, forms.ModelForm):
     class Meta:
         model = TrainingCourse
         fields = ['title', 'description', 'category', 'provider', 'duration_hours', 
@@ -54,7 +55,7 @@ class TrainingCourseForm(forms.ModelForm):
         }
 
 
-class TrainingRecordForm(forms.ModelForm):
+class TrainingRecordForm(BootstrapFormMixin, forms.ModelForm):
     class Meta:
         model = TrainingRecord
         fields = ['employee', 'course', 'status', 'completion_date', 'score', 'feedback', 'certificate_issued']
@@ -69,7 +70,7 @@ class TrainingRecordForm(forms.ModelForm):
         }
 
 
-class CertificationForm(forms.ModelForm):
+class CertificationForm(BootstrapFormMixin, forms.ModelForm):
     class Meta:
         model = Certification
         fields = ['name', 'issuing_body', 'description', 'validity_years', 'required_for_roles']
@@ -82,7 +83,7 @@ class CertificationForm(forms.ModelForm):
         }
 
 
-class EmployeeCertificationForm(forms.ModelForm):
+class EmployeeCertificationForm(BootstrapFormMixin, forms.ModelForm):
     class Meta:
         model = EmployeeCertification
         fields = ['employee', 'certification', 'issue_date', 'expiry_date', 'certificate_number', 'notes']
@@ -96,7 +97,7 @@ class EmployeeCertificationForm(forms.ModelForm):
         }
 
 
-class DevelopmentPlanForm(forms.ModelForm):
+class DevelopmentPlanForm(BootstrapFormMixin, forms.ModelForm):
     class Meta:
         model = DevelopmentPlan
         fields = ['employee', 'title', 'description', 'goals', 'start_date', 'end_date', 

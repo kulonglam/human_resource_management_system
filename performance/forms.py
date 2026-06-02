@@ -1,8 +1,9 @@
 from django import forms
+from avvento_hrmis.form_utils import BootstrapFormMixin
 from .models import PerformanceGoal, PerformanceAppraisal, FeedbackRound, FeedbackRequest, Feedback
 
 
-class PerformanceGoalForm(forms.ModelForm):
+class PerformanceGoalForm(BootstrapFormMixin, forms.ModelForm):
     class Meta:
         model = PerformanceGoal
         fields = ['employee', 'goal_title', 'goal_description', 'start_date', 'end_date', 
@@ -21,7 +22,7 @@ class PerformanceGoalForm(forms.ModelForm):
         }
 
 
-class PerformanceAppraisalForm(forms.ModelForm):
+class PerformanceAppraisalForm(BootstrapFormMixin, forms.ModelForm):
     class Meta:
         model = PerformanceAppraisal
         fields = ['employee', 'appraisal_period_start', 'appraisal_period_end', 'appraiser',
@@ -49,7 +50,7 @@ class PerformanceAppraisalForm(forms.ModelForm):
         }
 
 
-class FeedbackRoundForm(forms.ModelForm):
+class FeedbackRoundForm(BootstrapFormMixin, forms.ModelForm):
     class Meta:
         model = FeedbackRound
         fields = ['name', 'description', 'start_date', 'end_date', 'status']
@@ -62,7 +63,7 @@ class FeedbackRoundForm(forms.ModelForm):
         }
 
 
-class FeedbackForm(forms.ModelForm):
+class FeedbackForm(BootstrapFormMixin, forms.ModelForm):
     class Meta:
         model = Feedback
         fields = ['communication', 'leadership', 'teamwork', 'reliability', 'initiative',

@@ -1,9 +1,10 @@
 # recruitment/forms.py
 from django import forms
+from avvento_hrmis.form_utils import BootstrapFormMixin
 from .models import JobPosting, Application
 
 
-class JobPostingForm(forms.ModelForm):
+class JobPostingForm(BootstrapFormMixin, forms.ModelForm):
     deadline = forms.DateField(widget=forms.DateInput(attrs={'type': 'date'}))
 
     class Meta:
@@ -15,7 +16,7 @@ class JobPostingForm(forms.ModelForm):
         }
 
 
-class ApplicationStatusForm(forms.ModelForm):
+class ApplicationStatusForm(BootstrapFormMixin, forms.ModelForm):
     class Meta:
         model = Application
         fields = ['status']

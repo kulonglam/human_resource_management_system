@@ -3,6 +3,14 @@
 
 {% block page_content %}
 <div class="container-fluid">
+    <!-- Breadcrumb Navigation -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Home</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Exit Management</li>
+        </ol>
+    </nav>
+
     <div class="row mb-4">
         <div class="col-md-8">
             <h1>Exit Management</h1>
@@ -10,7 +18,7 @@
         </div>
         <div class="col-md-4 text-end">
             <a href="{% url 'exits:create' %}" class="btn btn-primary">
-                <i class="bi bi-plus-circle"></i> New Exit Process
+                <i class="bi bi-plus-circle" aria-hidden="true"></i> New Exit Process
             </a>
         </div>
     </div>
@@ -22,6 +30,65 @@
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
         {% endfor %}
+    {% endif %}
+
+    {% if exits %}
+    <!-- Quick Stats Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-center shadow-sm">
+                <div class="card-body">
+                    <h3 class="card-title mb-0">{{ exits|length }}</h3>
+                    <p class="card-text text-muted mb-0 small mt-2">Total Exits</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center shadow-sm">
+                <div class="card-body">
+                    <h3 class="card-title mb-0 text-warning">
+                        {% with initiated=exits|dictsort:"status" %}
+                            {% regroup initiated by status as status_list %}
+                            {% for status in status_list %}
+                                {% if status.grouper == 'initiated' %}{{ status.list|length }}{% endif %}
+                            {% endfor %}
+                        {% endwith %}
+                    </h3>
+                    <p class="card-text text-muted mb-0 small mt-2">Initiated</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center shadow-sm">
+                <div class="card-body">
+                    <h3 class="card-title mb-0 text-info">
+                        {% with in_prog=exits|dictsort:"status" %}
+                            {% regroup in_prog by status as status_list %}
+                            {% for status in status_list %}
+                                {% if status.grouper == 'in_progress' %}{{ status.list|length }}{% endif %}
+                            {% endfor %}
+                        {% endwith %}
+                    </h3>
+                    <p class="card-text text-muted mb-0 small mt-2">In Progress</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center shadow-sm">
+                <div class="card-body">
+                    <h3 class="card-title mb-0 text-success">
+                        {% with completed=exits|dictsort:"status" %}
+                            {% regroup completed by status as status_list %}
+                            {% for status in status_list %}
+                                {% if status.grouper == 'completed' %}{{ status.list|length }}{% endif %}
+                            {% endfor %}
+                        {% endwith %}
+                    </h3>
+                    <p class="card-text text-muted mb-0 small mt-2">Completed</p>
+                </div>
+            </div>
+        </div>
+    </div>
     {% endif %}
 
     <div class="row">
@@ -67,11 +134,11 @@
                                                 {% endif %}
                                             </td>
                                             <td>
-                                                <a href="{% url 'exits:detail' exit.id %}" class="btn btn-sm btn-info" title="View">
-                                                    <i class="bi bi-eye"></i>
+                                                <a href="{% url 'exits:detail' exit.id %}" class="btn btn-sm btn-info" title="View exit process" aria-label="View exit process for {{ exit.employee.first_name }} {{ exit.employee.last_name }}">
+                                                    <i class="bi bi-eye" aria-hidden="true"></i>
                                                 </a>
-                                                <a href="{% url 'exits:update' exit.id %}" class="btn btn-sm btn-secondary" title="Edit">
-                                                    <i class="bi bi-pencil"></i>
+                                                <a href="{% url 'exits:update' exit.id %}" class="btn btn-sm btn-secondary" title="Edit exit process" aria-label="Edit exit process for {{ exit.employee.first_name }} {{ exit.employee.last_name }}">
+                                                    <i class="bi bi-pencil" aria-hidden="true"></i>
                                                 </a>
                                             </td>
                                         </tr>
@@ -82,8 +149,15 @@
                     </div>
                 </div>
             {% else %}
-                <div class="alert alert-info">
-                    <i class="bi bi-info-circle"></i> No exit processes found. <a href="{% url 'exits:create' %}">Create one</a>
+                <div class="card border-light">
+                    <div class="card-body text-center py-5">
+                        <i class="bi bi-inbox" style="font-size: 3rem; color: #6c757d; opacity: 0.5;"></i>
+                        <h5 class="mt-3 mb-2">No Exit Processes Found</h5>
+                        <p class="text-muted mb-4">Get started by creating your first exit process for a departing employee.</p>
+                        <a href="{% url 'exits:create' %}" class="btn btn-primary">
+                            <i class="bi bi-plus-circle" aria-hidden="true"></i> Create Exit Process
+                        </a>
+                    </div>
                 </div>
             {% endif %}
         </div>

@@ -1,9 +1,18 @@
 from django import forms
-
+from django.contrib.auth import get_user_model
 from attendance.models import Attendance
-from .models import Leave  # adjust if your model name differs
+from avvento_hrmis.form_utils import BootstrapFormMixin
+from .models import Leave
+from employees.models import Employee
 
-class LeaveForm(forms.ModelForm):
+User = get_user_model()
+
+class LeaveForm(BootstrapFormMixin, forms.ModelForm):
     class Meta:
         model = Leave
-        fields = '__all__'  # or list specific fields, e.g. ['employee', 'date', 'status']
+        fields = ['employee', 'leave_type', 'start_date', 'end_date', 'reason']
+        widgets = {
+            'start_date': forms.DateInput(attrs={'type': 'date'}),
+            'end_date': forms.DateInput(attrs={'type': 'date'}),
+            'reason': forms.Textarea(attrs={'rows': 3}),
+        }

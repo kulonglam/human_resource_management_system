@@ -4,6 +4,8 @@ from django.utils import timezone
 from django.contrib import messages
 from .models import Leave, LeaveBalance
 from .forms import LeaveForm
+from employees.models import Employee
+from accounts.access_control import get_user_accessible_employees
 from datetime import datetime
 
 @login_required
@@ -25,6 +27,11 @@ def leave_apply(request):
     form = LeaveForm(request.POST or None)
     balances = []
     current_year = timezone.now().year
+    selected_employee = None
+    
+    # Filter form employees based on user access
+    accessible_employees = get_user_accessible_employees(request.user)
+    form.fields['employee'].queryset = accessible_employees
     
     if form.is_valid():
         leave = form.save(commit=False)
@@ -46,7 +53,7 @@ def leave_apply(request):
                     employee=leave.employee,
                     year=current_year
                 ).order_by('leave_type')
-                return render(request, 'leaves/form.html', {'form': form, 'balances': balances})
+                return render(request, 'leaves/form.html', {'form': form, 'balances': balances, 'current_year': current_year})
             
             # Add pending days
             balance.pending_days += leave.duration
@@ -58,14 +65,26 @@ def leave_apply(request):
         messages.success(request, "Leave application submitted successfully.")
         return redirect('leave_list')
     
-    # Get balances if available (showing all leave types)
-    if request.user.employee_profile:
-        balances = LeaveBalance.objects.filter(
-            employee=request.user.employee_profile,
-            year=current_year
-        ).order_by('leave_type')
+    # Get balances for selected employee if any
+    # Check if employee_id is in the request (GET parameter or form data)
+    employee_id = request.GET.get('employee_id') or request.POST.get('employee')
     
-    return render(request, 'leaves/form.html', {'form': form, 'balances': balances})
+    if employee_id:
+        try:
+            selected_employee = accessible_employees.get(pk=employee_id)
+            balances = LeaveBalance.objects.filter(
+                employee=selected_employee,
+                year=current_year
+            ).order_by('leave_type')
+        except Employee.DoesNotExist:
+            pass
+    
+    return render(request, 'leaves/form.html', {
+        'form': form,
+        'balances': balances,
+        'current_year': current_year,
+        'selected_employee': selected_employee
+    })
 
 @login_required
 def leave_approve(request, pk):

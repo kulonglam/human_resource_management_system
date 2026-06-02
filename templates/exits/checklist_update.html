@@ -2,33 +2,97 @@
 {% load crispy_forms_tags %}
 
 {% block page_content %}
+<style>
+    .has-error .form-control {
+        border-color: #dc3545;
+    }
+    
+    .error-message {
+        color: #dc3545;
+        font-size: 0.875rem;
+        margin-top: 0.25rem;
+        display: block;
+    }
+</style>
+
 <div class="container-fluid">
+    <!-- Breadcrumb Navigation -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Home</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'exits:list' %}">Exit Management</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'exits:detail' checklist_item.exit_process.id %}">Exit Details</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Update Checklist Item</li>
+        </ol>
+    </nav>
+
     <div class="row mb-4">
         <div class="col-md-8">
             <h1>Update Checklist Item</h1>
             <p class="text-muted">{{ checklist_item.exit_process.employee.first_name }} {{ checklist_item.exit_process.employee.last_name }}'s Exit Process</p>
             <a href="{% url 'exits:detail' checklist_item.exit_process.id %}" class="btn btn-outline-secondary">
-                <i class="bi bi-arrow-left"></i> Back
+                <i class="bi bi-arrow-left" aria-hidden="true"></i> Back
             </a>
         </div>
     </div>
 
     <div class="row">
-        <div class="col-md-6">
+        <div class="col-md-8">
             <div class="card">
                 <div class="card-header bg-light">
                     <h5 class="mb-0">{{ checklist_item.item_name }}</h5>
                 </div>
                 <div class="card-body">
-                    <form method="post">
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <strong>Form Errors:</strong>
+                            <ul class="mb-0">
+                                {% for error in form.non_field_errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endif %}
+
+                    <form method="post" novalidate id="updateForm">
                         {% csrf_token %}
-                        {{ form|crispy }}
+                        
+                        {% for field in form %}
+                            <div class="mb-3 {% if field.errors %}is-invalid{% endif %}">
+                                {% if field.field.required %}
+                                    <label class="form-label" for="{{ field.id_for_label }}">
+                                        {{ field.label }}
+                                        <span class="text-danger" title="Required field">*</span>
+                                    </label>
+                                {% else %}
+                                    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                {% endif %}
+                                
+                                {{ field }}
+                                
+                                {% if field.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in field.errors %}
+                                            <span class="error-message">{{ error }}</span>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                                
+                                {% if field.help_text %}
+                                    <small class="form-text text-muted d-block mt-1">{{ field.help_text|safe }}</small>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                        
                         <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-check-circle"></i> Update Status
+                            <button type="submit" class="btn btn-primary" id="submitBtn" aria-label="Update checklist item status">
+                                <i class="bi bi-check-circle" aria-hidden="true"></i> 
+                                <span id="submitText">Update Status</span>
+                                <span class="spinner-border spinner-border-sm ms-2" id="submitSpinner" style="display: none;" aria-hidden="true"></span>
                             </button>
                             <a href="{% url 'exits:detail' checklist_item.exit_process.id %}" class="btn btn-secondary">
-                                <i class="bi bi-x-circle"></i> Cancel
+                                <i class="bi bi-x-circle" aria-hidden="true"></i> Cancel
                             </a>
                         </div>
                     </form>
@@ -37,4 +101,27 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('updateForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const spinner = document.getElementById('submitSpinner');
+    const submitText = document.getElementById('submitText');
+    
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            if (!form.checkValidity() === false) {
+                e.preventDefault();
+                e.stopPropagation();
+            } else {
+                submitBtn.disabled = true;
+                spinner.style.display = 'inline-block';
+                submitText.textContent = 'Updating...';
+            }
+            form.classList.add('was-validated');
+        });
+    }
+});
+</script>
 {% endblock %}
