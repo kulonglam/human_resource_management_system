@@ -31,7 +31,7 @@ DEBUG =os.environ.get('DEBUG', 'False') == 'True'
 ALLOWED_HOSTS = [ 
     'localhost',
     '127.0.0.1',
-    'https://human-resource-management-system-i1d3.onrender.com']
+    'human-resource-management-system-i1d3.onrender.com']
 
 CSRF_TRUSTED_ORIGINS = [
      'https://human-resource-management-system-i1d3.onrender.com'
