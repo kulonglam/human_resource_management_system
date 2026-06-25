@@ -34,8 +34,16 @@ ALLOWED_HOSTS = [
     'human-resource-management-system-i1d3.onrender.com']
 
 CSRF_TRUSTED_ORIGINS = [
-     'https://human-resource-management-system-i1d3.onrender.com'
- ]
+    'https://human-resource-management-system-i1d3.onrender.com',
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+]
+
+CORS_ALLOWED_ORIGINS = [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+]
+CORS_ALLOW_CREDENTIALS = True
 # Application definition
 
 INSTALLED_APPS = [
@@ -46,9 +54,10 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     # Third-party
-    'crispy_forms',
-    'crispy_bootstrap5',
+    'rest_framework',
+    'corsheaders',
     # Local apps
+    'api',
     'accounts',
     'departments',
     'employees',
@@ -73,6 +82,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -86,7 +96,7 @@ ROOT_URLCONF = 'avvento_hrmis.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],
+        'DIRS': [],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -104,24 +114,26 @@ WSGI_APPLICATION = 'avvento_hrmis.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
-DATABASES = {
-    'default': dj_database_url.config(
-        default=os.environ.get('DATABASE_URL'),
-        conn_max_age=600,
-        ssl_require=True
-    )
-}
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': 'avvento_hrmis',
-#         'USER': 'postgres',
-#         'PASSWORD': 'Makhol@5627',
-#         'HOST': 'localhost',
-#         'PORT': '5432',
-#     }
-# }
+if os.environ.get('DATABASE_URL'):
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=os.environ['DATABASE_URL'],
+            conn_max_age=600,
+            ssl_require=not DEBUG,
+        )
+    }
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': 'avvento_hrmis',
+            'USER': 'postgres',
+            'PASSWORD': 'Makhol@5627',
+            'HOST': 'localhost',
+            'PORT': '5432',
+        }
+    }
 
 
 # Password validation
@@ -151,11 +163,17 @@ USE_TZ = True
 # Static files
 STATIC_URL = '/static/'
 
-STATICFILES_DIRS = [
-    BASE_DIR / 'static',
-]
+REACT_BUILD_DIR = BASE_DIR / 'frontend' / 'dist'
+
+STATICFILES_DIRS = []
+_react_assets = REACT_BUILD_DIR / 'assets'
+if _react_assets.exists():
+    STATICFILES_DIRS.append(_react_assets)
 
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+if REACT_BUILD_DIR.exists():
+    WHITENOISE_ROOT = REACT_BUILD_DIR
 
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
@@ -165,20 +183,15 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 # Auth
 AUTH_USER_MODEL = 'accounts.CustomUser'
-LOGIN_REDIRECT_URL = '/'
-LOGIN_URL = '/accounts/login/'
+LOGIN_URL = '/login'
 
-# Crispy Forms
-CRISPY_ALLOWED_TEMPLATE_PACKS = 'bootstrap5'
-CRISPY_TEMPLATE_PACK = 'bootstrap5'
-
-# Django Messages Framework
-from django.contrib.messages import constants as messages
-
-MESSAGE_TAGS = {
-    messages.DEBUG: 'debug',
-    messages.INFO: 'info',
-    messages.SUCCESS: 'success',
-    messages.WARNING: 'warning',
-    messages.ERROR: 'danger',
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 25,
 }

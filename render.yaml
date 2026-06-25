@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: human-resource-management-system
+    runtime: python
+    plan: free
+    buildCommand: >-
+      pip install -r requirements.txt &&
+      cd frontend && npm install && npm run build && cd .. &&
+      python manage.py collectstatic --noinput
+    preDeployCommand: >-
+      python manage.py migrate --noinput &&
+      python manage.py seed_data --reset-password
+    startCommand: gunicorn avvento_hrmis.wsgi:application
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: SEED_ADMIN_PASSWORD
+        generateValue: true
+      - key: SEED_MANAGER_PASSWORD
+        generateValue: true
+      - key: SEED_EMPLOYEE_PASSWORD
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: avvento-hrmis-db
+          property: connectionString
+
+databases:
+  - name: avvento-hrmis-db
+    plan: free
