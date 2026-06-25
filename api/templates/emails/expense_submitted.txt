@@ -1,0 +1,11 @@
+{% extends "emails/base.txt" %}
+{% block content %}A new expense claim requires review.
+
+Employee: {{ employee_name }}
+Category: {{ category }}
+Amount: {{ amount }} {{ currency }}
+Description: {{ description }}
+Date: {{ expense_date }}
+
+Please log in to HRMIS to approve or reject this claim.
+{% endblock %}

@@ -1,0 +1,10 @@
+{% extends "emails/base.txt" %}
+{% block content %}A performance appraisal has been submitted for review.
+
+Employee: {{ employee_name }}
+Period: {{ period_start }} to {{ period_end }}
+Overall rating: {{ overall_rating }}/5
+Submitted by: {{ submitted_by }}
+
+Please log in to HRMIS to review and approve.
+{% endblock %}

@@ -49,16 +49,60 @@ export const api = {
   ensureCsrf: () => request('/auth/csrf/'),
   login: (username, password) =>
     request('/auth/login/', { method: 'POST', body: { username, password } }),
+  verifyMfa: (mfaToken, code) =>
+    request('/auth/mfa/verify/', { method: 'POST', body: { mfa_token: mfaToken, code } }),
+  getMfaSetup: () => request('/auth/mfa/setup/'),
+  enableMfa: (code) => request('/auth/mfa/setup/', { method: 'POST', body: { code } }),
+  getHealth: () => request('/health/'),
   logout: () => request('/auth/logout/', { method: 'POST' }),
   register: (payload) => request('/auth/register/', { method: 'POST', body: payload }),
   getMe: () => request('/auth/me/'),
   getRoles: () => request('/roles/'),
   getDashboard: () => request('/dashboard/'),
   getAuthConfig: () => request('/auth/config/'),
+  getSsoConfig: () => request('/auth/sso/config/'),
+  startSso: (provider) => request(`/auth/sso/${provider}/start/`),
+  getOrgChart: () => request('/departments/org_chart/'),
+  getWebhookEvents: () => request('/webhooks/events/'),
+  downloadPayroll: async (query = '', format = 'xlsx') => {
+    const params = new URLSearchParams(query);
+    params.set('format', format);
+    const csrfToken = document.cookie.match(/(^| )csrftoken=([^;]+)/)?.[2];
+    const response = await fetch(`/api/v1/payroll/export/?${params.toString()}`, {
+      credentials: 'include',
+      headers: csrfToken ? { 'X-CSRFToken': decodeURIComponent(csrfToken) } : {},
+    });
+    if (!response.ok) throw new Error('Payroll export failed');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `payroll_export.${format}`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+  },
   getReportsAnalytics: () => request('/reports/analytics/'),
   getReportFilters: () => request('/reports/filters/'),
   getReport: (type, query = '') =>
     request(`/reports/${type}/${query ? `?${query}` : ''}`),
+
+  downloadReport: async (type, query = '', format = 'xlsx') => {
+    const params = new URLSearchParams(query);
+    params.set('format', format);
+    const csrfToken = document.cookie.match(/(^| )csrftoken=([^;]+)/)?.[2];
+    const response = await fetch(`/api/v1/reports/${type}/?${params.toString()}`, {
+      credentials: 'include',
+      headers: csrfToken ? { 'X-CSRFToken': decodeURIComponent(csrfToken) } : {},
+    });
+    if (!response.ok) throw new Error('Export failed');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${type}_report.${format}`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+  },
 
   list: (resource, query = '') =>
     request(`/${resource}/${query ? `?${query}` : ''}`).then(unwrapList),
@@ -70,6 +114,9 @@ export const api = {
 
   create: (resource, payload) =>
     request(`/${resource}/`, { method: 'POST', body: payload }),
+
+  createForm: (resource, formData) =>
+    request(`/${resource}/`, { method: 'POST', body: formData }),
 
   update: (resource, id, payload) =>
     request(`/${resource}/${id}/`, { method: 'PATCH', body: payload }),

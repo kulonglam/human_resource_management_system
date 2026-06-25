@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import NotificationBell from './NotificationBell';
 import { useAuth } from '../context/AuthContext';
 
 const navItems = [
@@ -13,6 +14,7 @@ const navItems = [
   { to: '/performance', icon: 'bi-graph-up-arrow', label: 'Performance' },
   { to: '/training', icon: 'bi-book', label: 'Training' },
   { to: '/reports', icon: 'bi-bar-chart', label: 'Reports' },
+  { to: '/documents', icon: 'bi-folder2-open', label: 'Documents' },
   { to: '/exits', icon: 'bi-door-closed', label: 'Exit Management' },
   { to: '/assets', icon: 'bi-laptop', label: 'Assets' },
   { to: '/shifts', icon: 'bi-clock', label: 'Shifts' },
@@ -22,6 +24,13 @@ const navItems = [
   { to: '/discipline', icon: 'bi-exclamation-triangle', label: 'Discipline' },
   { to: '/surveys', icon: 'bi-clipboard-data', label: 'Surveys' },
   { to: '/kin', icon: 'bi-person-hearts', label: 'Next of Kin' },
+];
+
+const adminNavItems = [
+  { to: '/org-chart', icon: 'bi-diagram-3', label: 'Org Chart' },
+  { to: '/audit-logs', icon: 'bi-journal-text', label: 'Audit Log' },
+  { to: '/settings/security', icon: 'bi-shield-lock', label: 'Security' },
+  { to: '/settings/integrations', icon: 'bi-plug', label: 'Integrations' },
 ];
 
 export default function Layout() {
@@ -55,6 +64,25 @@ export default function Layout() {
               <span>{item.label}</span>
             </NavLink>
           ))}
+
+          {user?.is_admin && (
+            <>
+              <div className="sidebar-section-label px-3 py-2 small text-muted text-uppercase">
+                Administration
+              </div>
+              {adminNavItems.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  className={({ isActive }) => (isActive ? 'active' : undefined)}
+                  onClick={closeSidebar}
+                >
+                  <i className={`bi ${item.icon}`} />
+                  <span>{item.label}</span>
+                </NavLink>
+              ))}
+            </>
+          )}
         </nav>
 
         <div className="sidebar-logout">
@@ -83,7 +111,8 @@ export default function Layout() {
           >
             <i className="bi bi-list" />
           </button>
-          <div className="top-bar-user">
+          <div className="top-bar-user d-flex align-items-center gap-2">
+            <NotificationBell />
             <span>
               <i className="bi bi-person-circle" /> {user?.username}
             </span>

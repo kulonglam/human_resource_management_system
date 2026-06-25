@@ -1,0 +1,14 @@
+{% extends "emails/base.txt" %}
+{% block content %}Hello {{ applicant_name }},
+
+Your job application status has been updated.
+
+Position: {{ job_title }}
+Previous status: {{ previous_status }}
+New status: {{ new_status }}
+
+{% if new_status == 'Rejected' %}Thank you for your interest. We encourage you to apply for future openings.
+{% elif new_status == 'Hired' %}Congratulations! HR will contact you with next steps.
+{% else %}Log in or contact HR for more information about your application.
+{% endif %}
+{% endblock %}

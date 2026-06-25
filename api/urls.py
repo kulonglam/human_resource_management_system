@@ -2,6 +2,8 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from . import views, viewsets
+from .payroll_views import PayrollExportView
+from .sso_views import SSOCallbackView, SSOConfigView, SSOStartView
 from .report_views import (
     AttendanceReportView,
     LeaveReportView,
@@ -51,17 +53,29 @@ router.register('surveys', viewsets.SurveyViewSet, basename='survey')
 router.register('survey-questions', viewsets.SurveyQuestionViewSet, basename='survey-question')
 router.register('survey-responses', viewsets.SurveyResponseViewSet, basename='survey-response')
 router.register('audit-logs', viewsets.AuditLogViewSet, basename='audit-log')
+router.register('notifications', viewsets.NotificationViewSet, basename='notification')
+router.register('documents', viewsets.HRDocumentViewSet, basename='document')
+router.register('approval-workflows', viewsets.ApprovalWorkflowViewSet, basename='approval-workflow')
+router.register('approval-requests', viewsets.ApprovalRequestViewSet, basename='approval-request')
+router.register('api-keys', viewsets.APIKeyViewSet, basename='api-key')
+router.register('webhooks', viewsets.WebhookEndpointViewSet, basename='webhook')
 
 urlpatterns = [
     path('auth/csrf/', views.CsrfView.as_view(), name='api-csrf'),
     path('auth/config/', views.AuthConfigView.as_view(), name='api-auth-config'),
+    path('auth/sso/config/', SSOConfigView.as_view(), name='api-sso-config'),
+    path('auth/sso/<str:provider>/start/', SSOStartView.as_view(), name='api-sso-start'),
+    path('auth/sso/<str:provider>/callback/', SSOCallbackView.as_view(), name='api-sso-callback'),
     path('auth/login/', views.LoginView.as_view(), name='api-login'),
+    path('auth/mfa/verify/', views.MFAVerifyView.as_view(), name='api-mfa-verify'),
+    path('auth/mfa/setup/', views.MFASetupView.as_view(), name='api-mfa-setup'),
     path('auth/logout/', views.LogoutView.as_view(), name='api-logout'),
     path('auth/register/', views.RegisterView.as_view(), name='api-register'),
     path('auth/me/', views.CurrentUserView.as_view(), name='api-me'),
     path('roles/', views.RoleListView.as_view(), name='api-roles'),
     path('users/', views.UserListView.as_view(), name='api-users'),
     path('dashboard/', views.DashboardView.as_view(), name='api-dashboard'),
+    path('health/', views.HealthCheckView.as_view(), name='api-health'),
     path('reports/analytics/', views.ReportsAnalyticsView.as_view(), name='api-reports-analytics'),
     path('reports/filters/', ReportFiltersView.as_view(), name='api-reports-filters'),
     path('reports/attendance/', AttendanceReportView.as_view(), name='api-reports-attendance'),
@@ -69,5 +83,6 @@ urlpatterns = [
     path('reports/payroll/', PayrollReportView.as_view(), name='api-reports-payroll'),
     path('reports/performance/', PerformanceReportView.as_view(), name='api-reports-performance'),
     path('reports/recruitment/', RecruitmentReportView.as_view(), name='api-reports-recruitment'),
+    path('payroll/export/', PayrollExportView.as_view(), name='api-payroll-export'),
     path('', include(router.urls)),
 ]

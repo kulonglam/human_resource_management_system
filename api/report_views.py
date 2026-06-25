@@ -13,6 +13,21 @@ from payroll.models import Salary
 from performance.models import PerformanceAppraisal, PerformanceGoal
 from recruitment.models import Application, JobPosting
 
+from .report_exports import export_key_value_xlsx, export_rows_csv, export_rows_xlsx
+
+
+def _maybe_export(request, payload, columns, filename_prefix):
+    export_format = request.query_params.get('format', '').lower()
+    if export_format not in ('csv', 'xlsx'):
+        return None
+    rows = payload.get('rows') or payload.get('records') or []
+    if not rows and payload.get('funnel'):
+        rows = [{'status': k, 'count': v} for k, v in payload['funnel'].items()]
+        columns = [{'key': 'status', 'label': 'Stage'}, {'key': 'count', 'label': 'Count'}]
+    if export_format == 'csv':
+        return export_rows_csv(rows, columns, filename_prefix)
+    return export_rows_xlsx(rows, columns, filename_prefix)
+
 
 def _parse_date(value):
     if hasattr(value, 'year'):
@@ -60,12 +75,26 @@ class AttendanceReportView(APIView):
             ).values('employee_name', 'date', 'status', 'time_in', 'time_out')[:500]
         )
 
-        return Response({
+        payload = {
             'period': f'{start_date} to {end_date}',
             'total_records': query.count(),
             'status_breakdown': {s['status']: s['count'] for s in stats},
             'records': records,
-        })
+        }
+        exported = _maybe_export(
+            request, payload,
+            [
+                {'key': 'employee_name', 'label': 'Employee'},
+                {'key': 'date', 'label': 'Date'},
+                {'key': 'status', 'label': 'Status'},
+                {'key': 'time_in', 'label': 'Time In'},
+                {'key': 'time_out', 'label': 'Time Out'},
+            ],
+            'attendance_report',
+        )
+        if exported:
+            return exported
+        return Response(payload)
 
 
 class LeaveReportView(APIView):
@@ -95,7 +124,17 @@ class LeaveReportView(APIView):
                     employee_name=Concat(F('employee__first_name'), Value(' '), F('employee__last_name'))
                 ).values('employee_name', 'leave_type', 'total_days', 'used_days', 'pending_days')
             )
-            return Response({'type': 'Balance', 'year': year, 'rows': data})
+            payload = {'type': 'Balance', 'year': year, 'rows': data}
+            exported = _maybe_export(request, payload, [
+                {'key': 'employee_name', 'label': 'Employee'},
+                {'key': 'leave_type', 'label': 'Type'},
+                {'key': 'total_days', 'label': 'Total'},
+                {'key': 'used_days', 'label': 'Used'},
+                {'key': 'pending_days', 'label': 'Pending'},
+            ], 'leave_balance_report')
+            if exported:
+                return exported
+            return Response(payload)
 
         if report_type == 'pending':
             pending = list(
@@ -103,7 +142,17 @@ class LeaveReportView(APIView):
                     employee_name=Concat(F('employee__first_name'), Value(' '), F('employee__last_name'))
                 ).values('employee_name', 'leave_type', 'start_date', 'end_date', 'applied_on')
             )
-            return Response({'type': 'Pending', 'year': year, 'rows': pending, 'total': len(pending)})
+            payload = {'type': 'Pending', 'year': year, 'rows': pending, 'total': len(pending)}
+            exported = _maybe_export(request, payload, [
+                {'key': 'employee_name', 'label': 'Employee'},
+                {'key': 'leave_type', 'label': 'Type'},
+                {'key': 'start_date', 'label': 'Start'},
+                {'key': 'end_date', 'label': 'End'},
+                {'key': 'applied_on', 'label': 'Applied On'},
+            ], 'leave_pending_report')
+            if exported:
+                return exported
+            return Response(payload)
 
         if report_type == 'detailed':
             leaves = list(
@@ -111,10 +160,28 @@ class LeaveReportView(APIView):
                     employee_name=Concat(F('employee__first_name'), Value(' '), F('employee__last_name'))
                 ).values('employee_name', 'leave_type', 'start_date', 'end_date', 'status', 'reason')
             )
-            return Response({'type': 'Detailed', 'year': year, 'rows': leaves})
+            payload = {'type': 'Detailed', 'year': year, 'rows': leaves}
+            exported = _maybe_export(request, payload, [
+                {'key': 'employee_name', 'label': 'Employee'},
+                {'key': 'leave_type', 'label': 'Type'},
+                {'key': 'start_date', 'label': 'Start'},
+                {'key': 'end_date', 'label': 'End'},
+                {'key': 'status', 'label': 'Status'},
+                {'key': 'reason', 'label': 'Reason'},
+            ], 'leave_detailed_report')
+            if exported:
+                return exported
+            return Response(payload)
 
         summary = list(query.values('leave_type').annotate(count=Count('id')))
-        return Response({'type': 'Summary', 'year': year, 'rows': summary})
+        payload = {'type': 'Summary', 'year': year, 'rows': summary}
+        exported = _maybe_export(request, payload, [
+            {'key': 'leave_type', 'label': 'Leave Type'},
+            {'key': 'count', 'label': 'Count'},
+        ], 'leave_summary_report')
+        if exported:
+            return exported
+        return Response(payload)
 
 
 class PayrollReportView(APIView):
@@ -134,14 +201,26 @@ class PayrollReportView(APIView):
             ).values('employee_name', 'basic_salary', 'allowances', 'deductions', 'tax', 'net_salary', 'gross_salary')
         )
 
-        return Response({
+        payload = {
             'period': f'{month}/{year}',
             'total_employees': query.count(),
             'total_gross': query.aggregate(v=Sum(F('basic_salary') + F('allowances')))['v'] or 0,
             'total_net': query.aggregate(v=Sum('net_salary'))['v'] or 0,
             'total_tax': query.aggregate(v=Sum('tax'))['v'] or 0,
             'rows': salaries,
-        })
+        }
+        exported = _maybe_export(request, payload, [
+            {'key': 'employee_name', 'label': 'Employee'},
+            {'key': 'basic_salary', 'label': 'Basic'},
+            {'key': 'allowances', 'label': 'Allowances'},
+            {'key': 'deductions', 'label': 'Deductions'},
+            {'key': 'tax', 'label': 'Tax'},
+            {'key': 'net_salary', 'label': 'Net'},
+            {'key': 'gross_salary', 'label': 'Gross'},
+        ], 'payroll_report')
+        if exported:
+            return exported
+        return Response(payload)
 
 
 class PerformanceReportView(APIView):
@@ -153,12 +232,19 @@ class PerformanceReportView(APIView):
             goals = PerformanceGoal.objects.all()
             if department:
                 goals = goals.filter(employee__department_id=department)
-            return Response({
+            payload = {
                 'type': 'Goal Progress',
                 'total_goals': goals.count(),
                 'average_progress': round(goals.aggregate(v=Avg('progress'))['v'] or 0, 1),
                 'rows': list(goals.values('status').annotate(count=Count('id'))),
-            })
+            }
+            exported = _maybe_export(request, payload, [
+                {'key': 'status', 'label': 'Status'},
+                {'key': 'count', 'label': 'Count'},
+            ], 'goal_progress_report')
+            if exported:
+                return exported
+            return Response(payload)
 
         query = PerformanceAppraisal.objects.all()
         if department:
@@ -168,12 +254,19 @@ class PerformanceReportView(APIView):
         if rating:
             query = query.filter(overall_rating=rating)
 
-        return Response({
+        payload = {
             'type': 'Appraisal Summary',
             'total_appraisals': query.count(),
             'average_rating': round(query.aggregate(v=Avg('overall_rating'))['v'] or 0, 2),
             'rows': list(query.values('overall_rating').annotate(count=Count('id'))),
-        })
+        }
+        exported = _maybe_export(request, payload, [
+            {'key': 'overall_rating', 'label': 'Rating'},
+            {'key': 'count', 'label': 'Count'},
+        ], 'appraisal_summary_report')
+        if exported:
+            return exported
+        return Response(payload)
 
 
 class RecruitmentReportView(APIView):
@@ -193,25 +286,44 @@ class RecruitmentReportView(APIView):
 
         if report_type == 'applicant_status':
             apps = Application.objects.filter(job__in=jobs)
-            return Response({
+            payload = {
                 'type': 'Applicant Status',
                 'total_applications': apps.count(),
                 'rows': list(apps.values('status').annotate(count=Count('id'))),
-            })
+            }
+            exported = _maybe_export(request, payload, [
+                {'key': 'status', 'label': 'Status'},
+                {'key': 'count', 'label': 'Count'},
+            ], 'applicant_status_report')
+            if exported:
+                return exported
+            return Response(payload)
 
         if report_type == 'hiring_funnel':
             apps = Application.objects.filter(job__in=jobs)
             funnel = {s: apps.filter(status=s).count() for s in [
                 'received', 'shortlisted', 'interviewed', 'hired', 'rejected'
             ]}
-            return Response({'type': 'Hiring Funnel', 'funnel': funnel})
+            payload = {'type': 'Hiring Funnel', 'funnel': funnel}
+            exported = _maybe_export(request, payload, [], 'hiring_funnel_report')
+            if exported:
+                return exported
+            return Response(payload)
 
-        return Response({
+        payload = {
             'type': 'Job Summary',
             'total_jobs': jobs.count(),
             'open_positions': jobs.filter(is_open=True).count(),
             'closed_positions': jobs.filter(is_open=False).count(),
-        })
+        }
+        export_format = request.query_params.get('format', '').lower()
+        if export_format == 'xlsx':
+            return export_key_value_xlsx({
+                'Total jobs': payload['total_jobs'],
+                'Open positions': payload['open_positions'],
+                'Closed positions': payload['closed_positions'],
+            }, 'job_summary_report', 'Job Summary')
+        return Response(payload)
 
 
 class ReportFiltersView(APIView):

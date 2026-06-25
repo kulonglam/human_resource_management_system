@@ -1,0 +1,12 @@
+{% extends "emails/base.txt" %}
+{% block content %}Hello {{ employee_name }},
+
+Your expense claim has been {{ decision }}.
+
+Category: {{ category }}
+Amount: {{ amount }} {{ currency }}
+Description: {{ description }}
+{% if rejection_reason %}Reason: {{ rejection_reason }}
+{% endif %}
+Reviewed on: {{ reviewed_on }}
+{% endblock %}

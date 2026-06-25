@@ -1,0 +1,11 @@
+{% extends "emails/base.txt" %}
+{% block content %}Hello {{ employee_name }},
+
+Your leave request has been {{ decision }}.
+
+Type: {{ leave_type }}
+Dates: {{ start_date }} to {{ end_date }}
+Reviewed by: {{ reviewed_by }}
+
+{% if decision == 'rejected' %}Contact HR if you have questions about this decision.{% else %}Enjoy your time off.{% endif %}
+{% endblock %}

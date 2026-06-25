@@ -10,14 +10,22 @@ class UserSerializer(serializers.ModelSerializer):
     role_name = serializers.CharField(source='role.name', read_only=True, default=None)
     is_admin = serializers.BooleanField(read_only=True)
     is_manager = serializers.BooleanField(read_only=True)
+    mfa_enabled = serializers.BooleanField(read_only=True)
+    mfa_setup_required = serializers.SerializerMethodField()
 
     class Meta:
         model = CustomUser
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name',
             'role', 'role_name', 'is_admin', 'is_manager',
+            'mfa_enabled', 'mfa_setup_required',
         ]
         read_only_fields = fields
+
+    def get_mfa_setup_required(self, obj):
+        if not getattr(settings, 'ENFORCE_MFA_FOR_ADMINS', True):
+            return False
+        return obj.is_admin and not obj.mfa_enabled
 
 
 class LoginSerializer(serializers.Serializer):
@@ -79,7 +87,7 @@ class DepartmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Department
         fields = [
-            'id', 'name', 'location', 'history',
+            'id', 'name', 'location', 'history', 'parent',
             'manager_name', 'manager_contact', 'created_at', 'employee_count',
         ]
 

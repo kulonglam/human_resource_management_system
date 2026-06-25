@@ -260,3 +260,32 @@ body.sidebar-open {
     padding: 1.25rem;
   }
 }
+
+.notification-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1040;
+}
+
+.notification-panel {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  width: min(360px, 90vw);
+  z-index: 1050;
+  max-height: 420px;
+}
+
+.notification-list {
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.top-bar-user {
+  position: relative;
+}
+
+.sidebar-section-label {
+  letter-spacing: 0.05em;
+  font-size: 0.7rem;
+}

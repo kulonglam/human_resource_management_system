@@ -1,6 +1,8 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
+const MFA_SETUP_PATH = '/settings/security';
+
 export default function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
   const location = useLocation();
@@ -17,6 +19,10 @@ export default function ProtectedRoute({ children }) {
 
   if (!user) {
     return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+
+  if (user.mfa_setup_required && location.pathname !== MFA_SETUP_PATH) {
+    return <Navigate to={MFA_SETUP_PATH} replace />;
   }
 
   return children;

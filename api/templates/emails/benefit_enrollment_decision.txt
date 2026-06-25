@@ -1,0 +1,12 @@
+{% extends "emails/base.txt" %}
+{% block content %}Hello {{ employee_name }},
+
+Your benefit enrollment has been {{ decision }}.
+
+Benefit: {{ benefit_name }}
+Enrollment date: {{ enrollment_date }}
+Plan type: {{ plan_type }}
+Status: {{ status }}
+
+Contact HR if you have questions.
+{% endblock %}

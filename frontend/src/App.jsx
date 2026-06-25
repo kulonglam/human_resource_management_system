@@ -8,17 +8,22 @@ import {
   exitTabs, assetTabs, shiftTabs,
   expenseTabs, benefitTabs, leavePolicyTabs, disciplineTabs, kinTabs,
 } from './config/opsModules';
+import Documents from './pages/Documents';
 import DashboardPage from './pages/DashboardPage';
 import Departments from './pages/Departments';
 import EmployeeDetail from './pages/EmployeeDetail';
 import EmployeeForm from './pages/EmployeeForm';
 import Employees from './pages/Employees';
+import AuditLogs from './pages/AuditLogs';
+import IntegrationsSettings from './pages/IntegrationsSettings';
 import Login from './pages/Login';
+import OrgChart from './pages/OrgChart';
 import ModulePage from './pages/ModulePage';
 import Performance from './pages/Performance';
 import RecordDetail from './pages/RecordDetail';
 import Register from './pages/Register';
 import Reports from './pages/Reports';
+import SecuritySettings from './pages/SecuritySettings';
 import Surveys from './pages/Surveys';
 import SurveyTake from './pages/SurveyTake';
 import Training from './pages/Training';
@@ -50,6 +55,9 @@ export default function App() {
         <Route path="exits/:id" element={<RecordDetail configKey="exit-processes" />} />
         <Route path="training" element={<Training />} />
         <Route path="reports" element={<Reports />} />
+        <Route path="documents" element={<Documents />} />
+        <Route path="org-chart" element={<OrgChart />} />
+        <Route path="settings/integrations" element={<IntegrationsSettings />} />
         <Route path="exits" element={<ModulePage title="Exit Management" icon="bi-door-closed" tabs={exitTabs} />} />
         <Route path="assets" element={<ModulePage title="Assets" icon="bi-laptop" tabs={assetTabs} />} />
         <Route path="shifts" element={<ModulePage title="Shifts" icon="bi-clock" tabs={shiftTabs} />} />
@@ -60,6 +68,8 @@ export default function App() {
         <Route path="surveys" element={<Surveys />} />
         <Route path="surveys/:id/take" element={<SurveyTake />} />
         <Route path="kin" element={<ModulePage title="Next of Kin" icon="bi-people" tabs={kinTabs} />} />
+        <Route path="audit-logs" element={<AuditLogs />} />
+        <Route path="settings/security" element={<SecuritySettings />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

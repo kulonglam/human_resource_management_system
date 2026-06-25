@@ -77,6 +77,9 @@ INSTALLED_APPS = [
     'leave_policies',
     'benefits',
     'discipline',
+    'workflows',
+    'documents',
+    'integrations',
 ]
 
 MIDDLEWARE = [
@@ -96,7 +99,7 @@ ROOT_URLCONF = 'avvento_hrmis.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'api' / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -184,14 +187,35 @@ if REACT_BUILD_DIR.exists():
 
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
-# Media files
+# Media files — local by default; S3 when AWS_STORAGE_BUCKET_NAME is set
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+if os.environ.get('AWS_STORAGE_BUCKET_NAME'):
+    STORAGES = {
+        'default': {
+            'BACKEND': 'storages.backends.s3boto3.S3Boto3Storage',
+        },
+        'staticfiles': {
+            'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+        },
+    }
+    AWS_STORAGE_BUCKET_NAME = os.environ['AWS_STORAGE_BUCKET_NAME']
+    AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', 'us-east-1')
+    AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID', '')
+    AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY', '')
+    AWS_S3_CUSTOM_DOMAIN = os.environ.get('AWS_S3_CUSTOM_DOMAIN', '')
+    AWS_DEFAULT_ACL = None
+    AWS_QUERYSTRING_AUTH = True
+    AWS_S3_FILE_OVERWRITE = False
+    if AWS_S3_CUSTOM_DOMAIN:
+        MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/'
 
 # Auth
 AUTH_USER_MODEL = 'accounts.CustomUser'
 LOGIN_URL = '/login'
 ALLOW_PUBLIC_REGISTRATION = os.environ.get('ALLOW_PUBLIC_REGISTRATION', 'False') == 'True'
+ENFORCE_MFA_FOR_ADMINS = os.environ.get('ENFORCE_MFA_FOR_ADMINS', 'True') == 'True'
 
 # Email
 EMAIL_BACKEND = os.environ.get(
@@ -206,9 +230,21 @@ EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@hrmis.local')
 HR_NOTIFY_EMAIL = os.environ.get('HR_NOTIFY_EMAIL', '')
 
+# SSO (Google / Microsoft)
+GOOGLE_OAUTH_CLIENT_ID = os.environ.get('GOOGLE_OAUTH_CLIENT_ID', '')
+GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get('GOOGLE_OAUTH_CLIENT_SECRET', '')
+MICROSOFT_OAUTH_CLIENT_ID = os.environ.get('MICROSOFT_OAUTH_CLIENT_ID', '')
+MICROSOFT_OAUTH_CLIENT_SECRET = os.environ.get('MICROSOFT_OAUTH_CLIENT_SECRET', '')
+MICROSOFT_OAUTH_TENANT = os.environ.get('MICROSOFT_OAUTH_TENANT', 'common')
+SSO_CALLBACK_BASE_URL = os.environ.get('SSO_CALLBACK_BASE_URL', 'http://localhost:8000')
+SSO_FRONTEND_REDIRECT = os.environ.get('SSO_FRONTEND_REDIRECT', 'http://localhost:5173/dashboard')
+SSO_AUTO_PROVISION = os.environ.get('SSO_AUTO_PROVISION', 'False') == 'True'
+WEBHOOKS_ENABLED = os.environ.get('WEBHOOKS_ENABLED', 'True') == 'True'
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.SessionAuthentication',
+        'api.authentication.APIKeyAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
@@ -216,3 +252,16 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 25,
 }
+
+SENTRY_DSN = os.environ.get('SENTRY_DSN', '')
+if SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.django import DjangoIntegration
+
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=float(os.environ.get('SENTRY_TRACES_SAMPLE_RATE', '0.1')),
+        environment=os.environ.get('RENDER_SERVICE_NAME', 'development'),
+        send_default_pii=False,
+    )

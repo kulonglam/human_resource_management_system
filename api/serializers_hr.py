@@ -11,6 +11,7 @@ from kin.models import Kin
 from leave_policies.models import LeavePolicy, LeavePolicyAllocation
 from leaves.models import Leave, LeaveBalance
 from payroll.models import Salary
+from workflows.services import approval_status_payload
 from performance.models import (
     Feedback,
     FeedbackRequest,
@@ -41,11 +42,15 @@ class LeaveSerializer(serializers.ModelSerializer):
     duration = serializers.IntegerField(read_only=True)
     leave_type_display = serializers.CharField(source='get_leave_type_display', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    approval_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Leave
         fields = '__all__'
         read_only_fields = ['status', 'applied_on', 'reviewed_by', 'reviewed_on']
+
+    def get_approval_status(self, obj):
+        return approval_status_payload(obj)
 
 
 class LeaveBalanceSerializer(serializers.ModelSerializer):
@@ -83,10 +88,14 @@ class ApplicationSerializer(serializers.ModelSerializer):
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     full_name = serializers.SerializerMethodField()
     resume_url = serializers.SerializerMethodField()
+    approval_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Application
         fields = '__all__'
+
+    def get_approval_status(self, obj):
+        return approval_status_payload(obj)
 
     def get_full_name(self, obj):
         return f'{obj.first_name} {obj.last_name}'
@@ -283,10 +292,14 @@ class ExpenseSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.name', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     receipt_url = serializers.SerializerMethodField()
+    approval_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Expense
         fields = '__all__'
+
+    def get_approval_status(self, obj):
+        return approval_status_payload(obj)
 
     def get_receipt_url(self, obj):
         if obj.receipt_file:

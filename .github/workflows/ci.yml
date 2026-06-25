@@ -17,7 +17,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements.txt coverage
 
       - name: Django checks
         run: python manage.py check
@@ -25,11 +25,15 @@ jobs:
           SECRET_KEY: ci-test-secret-key
           DEBUG: 'True'
 
-      - name: Run API tests
-        run: python manage.py test api --verbosity=2
+      - name: Run API tests with coverage
+        run: |
+          coverage run --source=api manage.py test api --verbosity=2
+          coverage report --omit="api/tests/*"
+          coverage report --omit="api/tests/*" --fail-under=60
         env:
           SECRET_KEY: ci-test-secret-key
           DEBUG: 'True'
+          ENFORCE_MFA_FOR_ADMINS: 'False'
 
   frontend:
     runs-on: ubuntu-latest

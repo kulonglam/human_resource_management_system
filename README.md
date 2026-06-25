@@ -92,9 +92,21 @@ python manage.py seed_data --reset-password
 | `SEED_MANAGER_PASSWORD` | Manager password for seed command |
 | `SEED_EMPLOYEE_PASSWORD` | Employee password for seed command |
 | `ALLOW_PUBLIC_REGISTRATION` | Set `True` to allow public sign-up (default: `False`) |
-| `HR_NOTIFY_EMAIL` | HR inbox for new leave request alerts |
+| `ENFORCE_MFA_FOR_ADMINS` | Require TOTP MFA for admin accounts (default: `True`) |
+| `HR_NOTIFY_EMAIL` | HR inbox for new leave/expense alerts |
 | `EMAIL_BACKEND` | Django email backend (default: console for dev) |
 | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` | SMTP settings for production email |
+| `SENTRY_DSN` | Optional Sentry error tracking DSN |
+| `SENTRY_TRACES_SAMPLE_RATE` | Sentry performance sampling (default: `0.1`) |
+| `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | Google SSO (optional) |
+| `MICROSOFT_OAUTH_CLIENT_ID` / `MICROSOFT_OAUTH_CLIENT_SECRET` / `MICROSOFT_OAUTH_TENANT` | Microsoft SSO (optional; tenant defaults to `common`) |
+| `SSO_CALLBACK_BASE_URL` | Backend base URL for OAuth callbacks (e.g. `https://your-app.onrender.com`) |
+| `SSO_FRONTEND_REDIRECT` | SPA URL after successful SSO (e.g. `https://your-app.onrender.com/dashboard`) |
+| `SSO_AUTO_PROVISION` | Auto-create users on first SSO login (default: `False`) |
+| `AWS_STORAGE_BUCKET_NAME` | S3 bucket for media uploads (optional; local `media/` when unset) |
+| `AWS_S3_REGION_NAME` | S3 region (default: `us-east-1`) |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | S3 credentials when not using IAM roles |
+| `AWS_S3_CUSTOM_DOMAIN` | Optional CloudFront/custom domain for media URLs |
 
 Local dev uses **SQLite** when `DATABASE_URL` is unset. For PostgreSQL locally, set `POSTGRES_NAME`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, etc.
 
@@ -110,6 +122,17 @@ The repo includes `render.yaml`. Render will:
 
 Push to your connected Git branch; Render handles the rest.
 
+See **[DEPLOY.md](DEPLOY.md)** for the full staging/production checklist (SMTP, Sentry, MFA verification).
+
+### Staging environment
+
+`render.yaml` defines a second **staging** web service (`human-resource-management-system-staging`) with its own PostgreSQL database. Use it to validate changes before production. Staging runs with `DEBUG=True` and the same security defaults (registration off, MFA enforced for admins).
+
+## Health check
+
+- `GET /api/v1/health/` — public endpoint returning `{ status, database, version }`
+- Render uses this path for deploy health checks (`healthCheckPath` in `render.yaml`)
+
 ## API
 
 - Base URL: `/api/v1/`
@@ -121,6 +144,8 @@ Push to your connected Git branch; Render handles the rest.
 ```powershell
 python manage.py check
 python manage.py test api
+coverage run --source=api manage.py test api
+coverage report --omit="api/tests/*"
 python manage.py createsuperuser
 python manage.py collectstatic --noinput
 cd frontend && npm run build
@@ -130,8 +155,37 @@ cd frontend && npm run build
 
 - Public registration is **disabled by default**. Only admins can create users unless `ALLOW_PUBLIC_REGISTRATION=True`.
 - Self-registration always assigns the **employee** role.
-- Login, logout, leave, and expense actions are written to the **audit log** (viewable at `/api/v1/audit-logs/` for admins).
-- Leave submit/approve/reject triggers **email notifications** when SMTP is configured.
+- **Admin MFA (TOTP)** is enforced by default. Admins must enable MFA at `/settings/security` before using the app. Set `ENFORCE_MFA_FOR_ADMINS=False` only for local testing.
+- All API write operations (create/update/delete) are logged to the **audit trail** (viewable at `/audit-logs` in the SPA or `/api/v1/audit-logs/`).
+- Leave, expense, performance appraisal, discipline appeal, recruitment, and benefit enrollment flows send **templated email notifications** when SMTP is configured.
+- CI enforces **≥60% API test coverage** (see `.coveragerc`).
+- Optional **Sentry** integration via `SENTRY_DSN`.
+
+## Phase 2 features (workflow & policy depth)
+
+- **Multi-step approval chains** for leave, expenses, and recruitment (`/api/v1/approval-workflows/`, `/api/v1/approval-requests/`)
+- **In-app notification center** (bell icon in the top bar; `/api/v1/notifications/`)
+- **Document management** — contracts, policies, offer letters (`/documents` in the SPA)
+- **Leave policy sync** — `POST /api/v1/leave-policy-allocations/sync/` applies policies to employee balances
+- **Report export** — CSV/Excel via `?format=xlsx` or the Export Excel button on Reports
+
+Default workflows (seeded via `python manage.py seed_workflows`):
+
+| Workflow | Steps |
+|----------|-------|
+| Leave | Manager → HR (HR step when duration ≥ 5 days) |
+| Expense | Manager → HR (HR step when amount ≥ 10,000) |
+| Recruitment | Manager → HR |
+
+## Phase 3 features (enterprise integrations)
+
+- **Google / Microsoft SSO** — OAuth2 login buttons on the sign-in page when credentials are configured (`/api/v1/auth/sso/`)
+- **API keys** — machine-to-machine access via `Authorization: Api-Key <key>` (admin UI at `/settings/integrations`)
+- **Webhooks** — outbound HTTP notifications for leave, expense, and employee lifecycle events
+- **S3 media storage** — enable by setting `AWS_STORAGE_BUCKET_NAME` (uses `django-storages` + `boto3`)
+- **Payroll export** — CSV/Excel/JSON at `GET /api/v1/payroll/export/?month=&year=&format=` (Export Excel on Reports → Payroll)
+- **Org chart** — department hierarchy with parent/child relationships (`/org-chart`)
+- **Role-based dashboards** — tailored views for employees, managers, and HR/admins on `/dashboard`
 
 ## Notes
 

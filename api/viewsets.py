@@ -44,9 +44,28 @@ from training.models import (
     TrainingRecord,
 )
 
+from .approval_integration import (
+    process_expense_decision,
+    process_leave_decision,
+    process_recruitment_decision,
+    start_expense_approval,
+    start_leave_approval,
+)
 from .audit import log_action
-from .mixins import EmployeeQuerysetMixin
-from .notifications import notify_leave_decision, notify_leave_submitted
+from .mixins import AuditedModelViewSet, EmployeeQuerysetMixin
+from .notifications import (
+    notify_appraisal_approved,
+    notify_appraisal_submitted,
+    notify_application_status,
+    notify_benefit_enrollment_decision,
+    notify_benefit_enrollment_submitted,
+    notify_discipline_appeal_decision,
+    notify_discipline_appeal_submitted,
+    notify_expense_decision,
+    notify_expense_submitted,
+    notify_leave_decision,
+    notify_leave_submitted,
+)
 from .permissions import IsAdmin, IsAdminOrManager, IsAdminOrManagerOrReadOnly, IsAdminOrReadOnly
 from .serializers import (
     AuditLogSerializer,
@@ -94,7 +113,7 @@ from .serializers_hr import (
 )
 
 
-class EmployeeViewSet(viewsets.ModelViewSet):
+class EmployeeViewSet(AuditedModelViewSet):
     serializer_class = EmployeeSerializer
 
     def get_queryset(self):
@@ -150,16 +169,43 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             user.save()
         except CustomUser.DoesNotExist:
             pass
+        log_action(
+            request, 'update', 'Employee', employee.id, employee.full_name,
+            f'Employee terminated: {employee.exit_reason}',
+        )
+        from integrations.services import dispatch_webhook
+        dispatch_webhook('employee.terminated', {
+            'id': employee.id,
+            'email': employee.email,
+            'full_name': employee.full_name,
+            'exit_reason': employee.exit_reason,
+        })
         return Response(EmployeeSerializer(employee, context={'request': request}).data)
 
+    def perform_create(self, serializer):
+        employee = serializer.save()
+        from integrations.services import dispatch_webhook
+        dispatch_webhook('employee.created', {
+            'id': employee.id,
+            'email': employee.email,
+            'full_name': employee.full_name,
+            'department_id': employee.department_id,
+            'job_title': employee.job_title,
+        })
 
-class DepartmentViewSet(viewsets.ModelViewSet):
-    queryset = Department.objects.all()
+
+class DepartmentViewSet(AuditedModelViewSet):
+    queryset = Department.objects.select_related('parent').all()
     serializer_class = DepartmentSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
 
+    @action(detail=False, methods=['get'])
+    def org_chart(self, request):
+        from departments.services import build_org_chart
+        return Response(build_org_chart())
 
-class LeaveViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
+
+class LeaveViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
     serializer_class = LeaveSerializer
 
     def get_queryset(self):
@@ -189,59 +235,48 @@ class LeaveViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
             balance.save()
         except LeaveBalance.DoesNotExist:
             pass
-        log_action(
-            self.request, 'create', 'Leave', leave.id, str(leave),
-            f'Leave submitted for {leave.employee.full_name}',
-        )
         notify_leave_submitted(leave)
+        start_leave_approval(leave, self.request.user)
+        from integrations.services import dispatch_webhook
+        dispatch_webhook('leave.submitted', {
+            'id': leave.id,
+            'employee_id': leave.employee_id,
+            'employee_name': leave.employee.full_name,
+            'leave_type': leave.leave_type,
+            'start_date': str(leave.start_date),
+            'end_date': str(leave.end_date),
+            'duration': leave.duration,
+        })
 
     @action(detail=True, methods=['post'], permission_classes=[IsAdminOrManager])
     def approve(self, request, pk=None):
         leave = self.get_object()
         if leave.status != 'pending':
             return Response({'detail': 'Leave is not pending.'}, status=status.HTTP_400_BAD_REQUEST)
-        current_year = timezone.now().year
-        try:
-            balance = LeaveBalance.objects.get(
-                employee=leave.employee, leave_type=leave.leave_type, year=current_year
-            )
-            balance.pending_days -= leave.duration
-            balance.used_days += leave.duration
-            balance.save()
-        except LeaveBalance.DoesNotExist:
-            pass
-        leave.status = 'approved'
-        leave.reviewed_by = request.user.get_full_name() or request.user.username
-        leave.reviewed_on = timezone.now()
-        leave.save()
-        log_action(request, 'approve', 'Leave', leave.id, str(leave), 'Leave approved')
-        notify_leave_decision(leave, 'approved')
-        return Response(LeaveSerializer(leave).data)
+        outcome = process_leave_decision(request, leave, True, request.data.get('comment', ''))
+        if outcome['status'] == 403:
+            return Response({'detail': outcome['detail']}, status=status.HTTP_403_FORBIDDEN)
+        if outcome['result'] == 'approved':
+            notify_leave_decision(leave, 'approved')
+        elif outcome['result'] == 'rejected':
+            notify_leave_decision(leave, 'rejected')
+        return Response(LeaveSerializer(leave, context={'request': request}).data)
 
     @action(detail=True, methods=['post'], permission_classes=[IsAdminOrManager])
     def reject(self, request, pk=None):
         leave = self.get_object()
         if leave.status != 'pending':
             return Response({'detail': 'Leave is not pending.'}, status=status.HTTP_400_BAD_REQUEST)
-        current_year = timezone.now().year
-        try:
-            balance = LeaveBalance.objects.get(
-                employee=leave.employee, leave_type=leave.leave_type, year=current_year
-            )
-            balance.pending_days -= leave.duration
-            balance.save()
-        except LeaveBalance.DoesNotExist:
-            pass
-        leave.status = 'rejected'
-        leave.reviewed_by = request.user.get_full_name() or request.user.username
-        leave.reviewed_on = timezone.now()
-        leave.save()
-        log_action(request, 'reject', 'Leave', leave.id, str(leave), 'Leave rejected')
+        outcome = process_leave_decision(
+            request, leave, False, request.data.get('reason', request.data.get('comment', '')),
+        )
+        if outcome['status'] == 403:
+            return Response({'detail': outcome['detail']}, status=status.HTTP_403_FORBIDDEN)
         notify_leave_decision(leave, 'rejected')
-        return Response(LeaveSerializer(leave).data)
+        return Response(LeaveSerializer(leave, context={'request': request}).data)
 
 
-class LeaveBalanceViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
+class LeaveBalanceViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
     serializer_class = LeaveBalanceSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
 
@@ -255,7 +290,7 @@ class LeaveBalanceViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
         return qs
 
 
-class AttendanceViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
+class AttendanceViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
     serializer_class = AttendanceSerializer
 
     def get_queryset(self):
@@ -271,13 +306,13 @@ class AttendanceViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
         return qs
 
 
-class JobPostingViewSet(viewsets.ModelViewSet):
+class JobPostingViewSet(AuditedModelViewSet):
     queryset = JobPosting.objects.all().order_by('-posted_on')
     serializer_class = JobPostingSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
 
 
-class ApplicationViewSet(viewsets.ModelViewSet):
+class ApplicationViewSet(AuditedModelViewSet):
     serializer_class = ApplicationSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
@@ -289,8 +324,37 @@ class ApplicationViewSet(viewsets.ModelViewSet):
             qs = qs.filter(job_id=job_id)
         return qs
 
+    def perform_update(self, serializer):
+        previous_status = serializer.instance.get_status_display()
+        old_status = serializer.instance.status
+        application = serializer.save()
+        if old_status != application.status:
+            notify_application_status(application, previous_status)
 
-class SalaryViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminOrManager])
+    def approve(self, request, pk=None):
+        application = self.get_object()
+        outcome = process_recruitment_decision(request, application, True, request.data.get('comment', ''))
+        if outcome['status'] == 403:
+            return Response({'detail': outcome['detail']}, status=status.HTTP_403_FORBIDDEN)
+        if application.email and outcome['result'] == 'approved':
+            notify_application_status(application, application.get_status_display())
+        return Response(ApplicationSerializer(application, context={'request': request}).data)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminOrManager])
+    def reject(self, request, pk=None):
+        application = self.get_object()
+        outcome = process_recruitment_decision(
+            request, application, False, request.data.get('reason', request.data.get('comment', '')),
+        )
+        if outcome['status'] == 403:
+            return Response({'detail': outcome['detail']}, status=status.HTTP_403_FORBIDDEN)
+        if application.email:
+            notify_application_status(application, 'Pending')
+        return Response(ApplicationSerializer(application, context={'request': request}).data)
+
+
+class SalaryViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
     serializer_class = SalarySerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
 
@@ -312,7 +376,7 @@ class SalaryViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
         return generate_salary_slip_pdf(salary)
 
 
-class PerformanceGoalViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
+class PerformanceGoalViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
     serializer_class = PerformanceGoalSerializer
 
     def get_queryset(self):
@@ -325,7 +389,7 @@ class PerformanceGoalViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
         serializer.save(set_by=self.request.user)
 
 
-class PerformanceAppraisalViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
+class PerformanceAppraisalViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
     serializer_class = PerformanceAppraisalSerializer
 
     def get_queryset(self):
@@ -340,6 +404,12 @@ class PerformanceAppraisalViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
         appraisal.status = 'submitted'
         appraisal.submitted_at = timezone.now()
         appraisal.save()
+        log_action(
+            request, 'update', 'PerformanceAppraisal', appraisal.id, str(appraisal),
+            'Appraisal submitted for review',
+        )
+        submitted_by = request.user.get_full_name() or request.user.username
+        notify_appraisal_submitted(appraisal, submitted_by)
         return Response(PerformanceAppraisalSerializer(appraisal).data)
 
     @action(detail=True, methods=['post'], permission_classes=[IsAdminOrManager])
@@ -348,10 +418,15 @@ class PerformanceAppraisalViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
         appraisal.status = 'approved'
         appraisal.approved_at = timezone.now()
         appraisal.save()
+        log_action(
+            request, 'approve', 'PerformanceAppraisal', appraisal.id, str(appraisal),
+            'Appraisal approved',
+        )
+        notify_appraisal_approved(appraisal)
         return Response(PerformanceAppraisalSerializer(appraisal).data)
 
 
-class FeedbackRoundViewSet(viewsets.ModelViewSet):
+class FeedbackRoundViewSet(AuditedModelViewSet):
     queryset = FeedbackRound.objects.all().order_by('-created_at')
     serializer_class = FeedbackRoundSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
@@ -390,7 +465,7 @@ class FeedbackRoundViewSet(viewsets.ModelViewSet):
         return Response({'created': created})
 
 
-class FeedbackRequestViewSet(viewsets.ModelViewSet):
+class FeedbackRequestViewSet(AuditedModelViewSet):
     serializer_class = FeedbackRequestSerializer
 
     def get_queryset(self):
@@ -477,18 +552,18 @@ class FeedbackRequestViewSet(viewsets.ModelViewSet):
         })
 
 
-class FeedbackViewSet(viewsets.ModelViewSet):
+class FeedbackViewSet(AuditedModelViewSet):
     queryset = Feedback.objects.all().order_by('-created_at')
     serializer_class = FeedbackSerializer
 
 
-class SkillViewSet(viewsets.ModelViewSet):
+class SkillViewSet(AuditedModelViewSet):
     queryset = Skill.objects.all().order_by('category', 'name')
     serializer_class = SkillSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
 
 
-class EmployeeSkillViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
+class EmployeeSkillViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
     serializer_class = EmployeeSkillSerializer
 
     def get_queryset(self):
@@ -498,7 +573,7 @@ class EmployeeSkillViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
         return qs
 
 
-class TrainingCourseViewSet(viewsets.ModelViewSet):
+class TrainingCourseViewSet(AuditedModelViewSet):
     queryset = TrainingCourse.objects.all().order_by('-start_date')
     serializer_class = TrainingCourseSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
@@ -507,7 +582,7 @@ class TrainingCourseViewSet(viewsets.ModelViewSet):
         serializer.save(created_by=self.request.user)
 
 
-class TrainingRecordViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
+class TrainingRecordViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
     serializer_class = TrainingRecordSerializer
 
     def get_queryset(self):
@@ -517,13 +592,13 @@ class TrainingRecordViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
         return qs
 
 
-class CertificationViewSet(viewsets.ModelViewSet):
+class CertificationViewSet(AuditedModelViewSet):
     queryset = Certification.objects.all().order_by('name')
     serializer_class = CertificationSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
 
 
-class EmployeeCertificationViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
+class EmployeeCertificationViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
     serializer_class = EmployeeCertificationSerializer
 
     def get_queryset(self):
@@ -533,7 +608,7 @@ class EmployeeCertificationViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet)
         return qs
 
 
-class DevelopmentPlanViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
+class DevelopmentPlanViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
     serializer_class = DevelopmentPlanSerializer
 
     def get_queryset(self):
@@ -543,7 +618,7 @@ class DevelopmentPlanViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
         return qs
 
 
-class ExitProcessViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
+class ExitProcessViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
     serializer_class = ExitProcessSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
 
@@ -551,7 +626,7 @@ class ExitProcessViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
         return ExitProcess.objects.select_related('employee').order_by('-created_at')
 
 
-class ExitChecklistViewSet(viewsets.ModelViewSet):
+class ExitChecklistViewSet(AuditedModelViewSet):
     serializer_class = ExitChecklistSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
 
@@ -563,13 +638,13 @@ class ExitChecklistViewSet(viewsets.ModelViewSet):
         return qs
 
 
-class AssetViewSet(viewsets.ModelViewSet):
+class AssetViewSet(AuditedModelViewSet):
     queryset = Asset.objects.all().order_by('-created_at')
     serializer_class = AssetSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
 
 
-class AssetAssignmentViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
+class AssetAssignmentViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
     serializer_class = AssetAssignmentSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
 
@@ -580,13 +655,13 @@ class AssetAssignmentViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
         return qs
 
 
-class ShiftViewSet(viewsets.ModelViewSet):
+class ShiftViewSet(AuditedModelViewSet):
     queryset = Shift.objects.filter(is_active=True).order_by('start_time')
     serializer_class = ShiftSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
 
 
-class ShiftAssignmentViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
+class ShiftAssignmentViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
     serializer_class = ShiftAssignmentSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
 
@@ -597,13 +672,13 @@ class ShiftAssignmentViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
         return qs
 
 
-class ExpenseCategoryViewSet(viewsets.ModelViewSet):
+class ExpenseCategoryViewSet(AuditedModelViewSet):
     queryset = ExpenseCategory.objects.filter(is_active=True).order_by('name')
     serializer_class = ExpenseCategorySerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
 
 
-class ExpenseViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
+class ExpenseViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
     serializer_class = ExpenseSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
@@ -613,23 +688,41 @@ class ExpenseViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
             qs = self.filter_by_accessible_employees(qs)
         return qs
 
+    def perform_create(self, serializer):
+        expense = serializer.save()
+        if expense.status in ('submitted', 'approved'):
+            notify_expense_submitted(expense)
+            start_expense_approval(expense, self.request.user)
+
+    def perform_update(self, serializer):
+        previous_status = serializer.instance.status
+        expense = serializer.save()
+        if previous_status != 'submitted' and expense.status == 'submitted':
+            notify_expense_submitted(expense)
+            start_expense_approval(expense, self.request.user)
+
     @action(detail=True, methods=['post'], permission_classes=[IsAdminOrManager])
     def approve(self, request, pk=None):
         expense = self.get_object()
-        expense.status = 'approved'
-        expense.approved_date = timezone.now()
-        expense.save()
-        log_action(request, 'approve', 'Expense', expense.id, expense.description, 'Expense approved')
-        return Response(ExpenseSerializer(expense).data)
+        outcome = process_expense_decision(request, expense, True, request.data.get('comment', ''))
+        if outcome['status'] == 403:
+            return Response({'detail': outcome['detail']}, status=status.HTTP_403_FORBIDDEN)
+        if outcome['result'] == 'approved':
+            notify_expense_decision(expense, 'approved')
+        elif outcome['result'] == 'rejected':
+            notify_expense_decision(expense, 'rejected')
+        return Response(ExpenseSerializer(expense, context={'request': request}).data)
 
     @action(detail=True, methods=['post'], permission_classes=[IsAdminOrManager])
     def reject(self, request, pk=None):
         expense = self.get_object()
-        expense.status = 'rejected'
-        expense.rejection_reason = request.data.get('reason', '')
-        expense.save()
-        log_action(request, 'reject', 'Expense', expense.id, expense.description, 'Expense rejected')
-        return Response(ExpenseSerializer(expense).data)
+        outcome = process_expense_decision(
+            request, expense, False, request.data.get('reason', request.data.get('comment', '')),
+        )
+        if outcome['status'] == 403:
+            return Response({'detail': outcome['detail']}, status=status.HTTP_403_FORBIDDEN)
+        notify_expense_decision(expense, 'rejected')
+        return Response(ExpenseSerializer(expense, context={'request': request}).data)
 
 
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
@@ -640,13 +733,13 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
         return AuditLog.objects.select_related('user').order_by('-timestamp')
 
 
-class BenefitViewSet(viewsets.ModelViewSet):
+class BenefitViewSet(AuditedModelViewSet):
     queryset = Benefit.objects.filter(is_active=True).order_by('name')
     serializer_class = BenefitSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
 
 
-class EmployeeBenefitViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
+class EmployeeBenefitViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
     serializer_class = EmployeeBenefitSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
 
@@ -656,14 +749,27 @@ class EmployeeBenefitViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
             qs = self.filter_by_accessible_employees(qs)
         return qs
 
+    def perform_create(self, serializer):
+        enrollment = serializer.save()
+        if enrollment.status == 'pending':
+            notify_benefit_enrollment_submitted(enrollment)
 
-class LeavePolicyViewSet(viewsets.ModelViewSet):
+    def perform_update(self, serializer):
+        previous_status = serializer.instance.status
+        enrollment = serializer.save()
+        if previous_status == 'pending' and enrollment.status == 'active':
+            notify_benefit_enrollment_decision(enrollment, 'approved')
+        elif previous_status == 'pending' and enrollment.status == 'terminated':
+            notify_benefit_enrollment_decision(enrollment, 'rejected')
+
+
+class LeavePolicyViewSet(AuditedModelViewSet):
     queryset = LeavePolicy.objects.filter(is_active=True).order_by('name')
     serializer_class = LeavePolicySerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
 
 
-class LeavePolicyAllocationViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
+class LeavePolicyAllocationViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
     serializer_class = LeavePolicyAllocationSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
 
@@ -673,8 +779,21 @@ class LeavePolicyAllocationViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet)
             qs = self.filter_by_accessible_employees(qs)
         return qs
 
+    @action(detail=False, methods=['post'], permission_classes=[IsAdminOrManager])
+    def sync(self, request):
+        from leave_policies.services import sync_all_employees, sync_employee_allocations
 
-class DisciplineViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
+        employee_id = request.data.get('employee')
+        year = request.data.get('year')
+        if employee_id:
+            employee = Employee.objects.get(pk=employee_id)
+            results = sync_employee_allocations(employee, year)
+            return Response({'employee': employee.id, 'synced': len(results), 'details': results})
+        summary = sync_all_employees(year)
+        return Response(summary)
+
+
+class DisciplineViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
     serializer_class = DisciplineSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
 
@@ -685,13 +804,45 @@ class DisciplineViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
         return qs
 
 
-class DisciplineAppealViewSet(viewsets.ModelViewSet):
+class DisciplineAppealViewSet(AuditedModelViewSet):
     queryset = DisciplineAppeal.objects.all().order_by('-created_at')
     serializer_class = DisciplineAppealSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
 
+    def perform_create(self, serializer):
+        appeal = serializer.save()
+        notify_discipline_appeal_submitted(appeal)
 
-class KinViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminOrManager])
+    def approve(self, request, pk=None):
+        appeal = self.get_object()
+        appeal.status = 'approved'
+        appeal.review_date = timezone.now().date()
+        appeal.review_notes = request.data.get('review_notes', appeal.review_notes)
+        appeal.save()
+        log_action(
+            request, 'approve', 'DisciplineAppeal', appeal.id, str(appeal),
+            'Discipline appeal approved',
+        )
+        notify_discipline_appeal_decision(appeal, 'approved')
+        return Response(DisciplineAppealSerializer(appeal).data)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminOrManager])
+    def reject(self, request, pk=None):
+        appeal = self.get_object()
+        appeal.status = 'rejected'
+        appeal.review_date = timezone.now().date()
+        appeal.review_notes = request.data.get('review_notes', appeal.review_notes)
+        appeal.save()
+        log_action(
+            request, 'reject', 'DisciplineAppeal', appeal.id, str(appeal),
+            'Discipline appeal rejected',
+        )
+        notify_discipline_appeal_decision(appeal, 'rejected')
+        return Response(DisciplineAppealSerializer(appeal).data)
+
+
+class KinViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
     serializer_class = KinSerializer
 
     def get_queryset(self):
@@ -704,7 +855,7 @@ class KinViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
         return qs
 
 
-class SurveyViewSet(viewsets.ModelViewSet):
+class SurveyViewSet(AuditedModelViewSet):
     queryset = Survey.objects.all().order_by('-created_at')
     serializer_class = SurveySerializer
 
@@ -799,7 +950,7 @@ class SurveyViewSet(viewsets.ModelViewSet):
         })
 
 
-class SurveyQuestionViewSet(viewsets.ModelViewSet):
+class SurveyQuestionViewSet(AuditedModelViewSet):
     serializer_class = SurveyQuestionSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
 
@@ -811,7 +962,7 @@ class SurveyQuestionViewSet(viewsets.ModelViewSet):
         return qs
 
 
-class SurveyResponseViewSet(viewsets.ModelViewSet):
+class SurveyResponseViewSet(AuditedModelViewSet):
     serializer_class = SurveyResponseSerializer
 
     def get_queryset(self):
@@ -820,3 +971,139 @@ class SurveyResponseViewSet(viewsets.ModelViewSet):
         if survey_id:
             qs = qs.filter(survey_id=survey_id)
         return qs
+
+
+class NotificationViewSet(viewsets.ModelViewSet):
+    http_method_names = ['get', 'patch', 'head', 'options', 'post']
+
+    def get_serializer_class(self):
+        from .serializers_phase2 import NotificationSerializer
+        return NotificationSerializer
+
+    def get_queryset(self):
+        return self.request.user.notifications.order_by('-created_at')
+
+    @action(detail=False, methods=['post'])
+    def mark_all_read(self, request):
+        updated = request.user.notifications.filter(is_read=False).update(is_read=True)
+        return Response({'marked_read': updated})
+
+
+class HRDocumentViewSet(AuditedModelViewSet):
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def get_serializer_class(self):
+        from .serializers_phase2 import HRDocumentSerializer
+        return HRDocumentSerializer
+
+    def get_queryset(self):
+        from documents.models import HRDocument
+        qs = HRDocument.objects.filter(is_active=True).select_related('employee', 'uploaded_by')
+        if not self.request.user.is_admin:
+            try:
+                employee = Employee.objects.get(email=self.request.user.email)
+                qs = qs.filter(Q(employee=employee) | Q(employee__isnull=True))
+            except Employee.DoesNotExist:
+                qs = qs.filter(employee__isnull=True)
+        category = self.request.query_params.get('category')
+        if category:
+            qs = qs.filter(category=category)
+        employee_id = self.request.query_params.get('employee')
+        if employee_id:
+            qs = qs.filter(employee_id=employee_id)
+        return qs.order_by('-created_at')
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [IsAuthenticated()]
+        return [IsAdminOrManagerOrReadOnly()]
+
+    def perform_create(self, serializer):
+        serializer.save(uploaded_by=self.request.user)
+
+
+class ApprovalWorkflowViewSet(viewsets.ReadOnlyModelViewSet):
+    def get_serializer_class(self):
+        from .serializers_phase2 import ApprovalWorkflowSerializer
+        return ApprovalWorkflowSerializer
+
+    def get_queryset(self):
+        from workflows.models import ApprovalWorkflow
+        return ApprovalWorkflow.objects.filter(is_active=True).prefetch_related('steps')
+
+    def get_permissions(self):
+        return [IsAdminOrManagerOrReadOnly()]
+
+
+class ApprovalRequestViewSet(viewsets.ReadOnlyModelViewSet):
+    def get_serializer_class(self):
+        from .serializers_phase2 import ApprovalRequestSerializer
+        return ApprovalRequestSerializer
+
+    def get_queryset(self):
+        from workflows.models import ApprovalRequest
+        from workflows.services import get_pending_for_user
+
+        scope = self.request.query_params.get('scope', 'mine')
+        if scope == 'all' and self.request.user.is_admin:
+            return ApprovalRequest.objects.select_related('workflow', 'content_type').prefetch_related('decisions')
+        return get_pending_for_user(self.request.user)
+
+
+class APIKeyViewSet(viewsets.ModelViewSet):
+    http_method_names = ['get', 'post', 'delete', 'head', 'options']
+
+    def get_permissions(self):
+        return [IsAdmin()]
+
+    def get_serializer_class(self):
+        from .integrations_serializers import APIKeyCreateSerializer, APIKeySerializer
+        if self.action == 'create':
+            return APIKeyCreateSerializer
+        return APIKeySerializer
+
+    def get_queryset(self):
+        from integrations.models import APIKey
+        return APIKey.objects.select_related('user').order_by('-created_at')
+
+    def create(self, request, *args, **kwargs):
+        from integrations.models import APIKey
+        from .integrations_serializers import APIKeyCreateSerializer, APIKeySerializer
+
+        serializer = APIKeyCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        instance, raw_key = APIKey.generate(request.user, serializer.validated_data['name'])
+        data = APIKeySerializer(instance).data
+        data['api_key'] = raw_key
+        return Response(data, status=status.HTTP_201_CREATED)
+
+
+class WebhookEndpointViewSet(AuditedModelViewSet):
+    def get_serializer_class(self):
+        from .integrations_serializers import WebhookDeliverySerializer, WebhookEndpointSerializer
+        if self.action == 'deliveries':
+            return WebhookDeliverySerializer
+        return WebhookEndpointSerializer
+
+    def get_queryset(self):
+        from integrations.models import WebhookEndpoint
+        return WebhookEndpoint.objects.order_by('name')
+
+    def get_permissions(self):
+        return [IsAdmin()]
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+    @action(detail=True, methods=['get'])
+    def deliveries(self, request, pk=None):
+        endpoint = self.get_object()
+        from integrations.models import WebhookDelivery
+        qs = WebhookDelivery.objects.filter(endpoint=endpoint).order_by('-delivered_at')[:50]
+        from .integrations_serializers import WebhookDeliverySerializer
+        return Response(WebhookDeliverySerializer(qs, many=True).data)
+
+    @action(detail=False, methods=['get'])
+    def events(self, request):
+        from integrations.models import WEBHOOK_EVENTS
+        return Response({'events': WEBHOOK_EVENTS})

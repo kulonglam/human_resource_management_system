@@ -1,0 +1,10 @@
+{% extends "emails/base.txt" %}
+{% block content %}A new leave request requires review.
+
+Employee: {{ employee_name }}
+Type: {{ leave_type }}
+Dates: {{ start_date }} to {{ end_date }} ({{ duration }} days)
+Reason: {{ reason }}
+
+Please log in to HRMIS to review this request.
+{% endblock %}

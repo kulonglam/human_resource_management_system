@@ -1,0 +1,11 @@
+{% extends "emails/base.txt" %}
+{% block content %}Hello {{ employee_name }},
+
+Your performance appraisal has been approved.
+
+Period: {{ period_start }} to {{ period_end }}
+Overall rating: {{ overall_rating }}/5
+Approved on: {{ approved_at }}
+
+Log in to HRMIS to view the full appraisal.
+{% endblock %}

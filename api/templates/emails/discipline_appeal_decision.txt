@@ -1,0 +1,11 @@
+{% extends "emails/base.txt" %}
+{% block content %}Hello {{ employee_name }},
+
+Your discipline appeal has been {{ decision }}.
+
+Discipline type: {{ discipline_type }}
+Review date: {{ review_date }}
+{% if review_notes %}Notes: {{ review_notes }}
+{% endif %}
+Contact HR if you have questions about this decision.
+{% endblock %}

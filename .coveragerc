@@ -1,0 +1,10 @@
+[run]
+source = api
+omit =
+    api/tests/*
+    api/migrations/*
+
+[report]
+show_missing = True
+skip_covered = False
+fail_under = 60

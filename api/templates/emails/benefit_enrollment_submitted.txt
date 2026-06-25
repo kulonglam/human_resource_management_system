@@ -1,0 +1,10 @@
+{% extends "emails/base.txt" %}
+{% block content %}A new benefit enrollment request requires review.
+
+Employee: {{ employee_name }}
+Benefit: {{ benefit_name }}
+Enrollment date: {{ enrollment_date }}
+Plan type: {{ plan_type }}
+
+Please log in to HRMIS to activate or reject this enrollment.
+{% endblock %}

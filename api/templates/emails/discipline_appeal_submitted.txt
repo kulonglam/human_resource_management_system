@@ -1,0 +1,10 @@
+{% extends "emails/base.txt" %}
+{% block content %}A discipline appeal requires review.
+
+Employee: {{ employee_name }}
+Discipline type: {{ discipline_type }}
+Appeal date: {{ appeal_date }}
+Reason: {{ appeal_reason }}
+
+Please log in to HRMIS to approve or reject this appeal.
+{% endblock %}

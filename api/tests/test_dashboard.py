@@ -1,0 +1,23 @@
+from django.test import override_settings
+
+from .base import HRAPITestCase
+
+
+@override_settings(ENFORCE_MFA_FOR_ADMINS=False)
+class DashboardTests(HRAPITestCase):
+    def test_dashboard_requires_auth(self):
+        response = self.client.get('/api/v1/dashboard/')
+        self.assertIn(response.status_code, (401, 403))
+
+    def test_dashboard_returns_metrics(self):
+        self.login('admin', 'AdminPass123!')
+        response = self.client.get('/api/v1/dashboard/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('total_employees', response.data)
+        self.assertIn('pending_leaves', response.data)
+
+    def test_reports_analytics(self):
+        self.login('admin', 'AdminPass123!')
+        response = self.client.get('/api/v1/reports/analytics/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('present_today', response.data)

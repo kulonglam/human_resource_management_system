@@ -269,9 +269,34 @@ export default function Reports() {
       )}
 
       {activeTab !== 'overview' && (
-        <div className="col-md-2">
+        <div className="col-md-2 d-grid gap-1">
           <button type="submit" className="btn btn-primary btn-sm w-100" disabled={loading}>
             {loading ? 'Loading...' : 'Apply Filters'}
+          </button>
+          <button
+            type="button"
+            className="btn btn-outline-secondary btn-sm w-100"
+            disabled={loading || activeTab === 'overview'}
+            onClick={async () => {
+              const params = new URLSearchParams();
+              Object.entries(form).forEach(([key, val]) => {
+                if (val !== '' && val != null) params.set(key, val);
+              });
+              if (activeTab === 'leave') params.set('report_type', form.report_type || 'summary');
+              if (activeTab === 'performance') params.set('report_type', form.report_type || 'appraisal_summary');
+              if (activeTab === 'recruitment') params.set('report_type', form.report_type || 'job_summary');
+              try {
+                if (activeTab === 'payroll') {
+                  await api.downloadPayroll(params.toString(), 'xlsx');
+                } else {
+                  await api.downloadReport(activeTab, params.toString(), 'xlsx');
+                }
+              } catch (err) {
+                setError(err.message);
+              }
+            }}
+          >
+            Export Excel
           </button>
         </div>
       )}

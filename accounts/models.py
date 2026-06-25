@@ -23,6 +23,8 @@ class CustomUser(AbstractUser):
         Role, on_delete=models.SET_NULL, null=True, blank=True
     )
     email = models.EmailField(unique=True)
+    mfa_enabled = models.BooleanField(default=False)
+    mfa_secret = models.CharField(max_length=32, blank=True)
 
     def __str__(self):
         return f"{self.username} ({self.role})"
@@ -73,3 +75,34 @@ class AuditLog(models.Model):
     
     def __str__(self):
         return f"{self.get_action_display()} - {self.model_name} by {self.user} on {self.timestamp}"
+
+
+class Notification(models.Model):
+    CATEGORY_CHOICES = [
+        ('approval', 'Approval'),
+        ('leave', 'Leave'),
+        ('expense', 'Expense'),
+        ('recruitment', 'Recruitment'),
+        ('document', 'Document'),
+        ('system', 'System'),
+    ]
+
+    user = models.ForeignKey(
+        CustomUser, on_delete=models.CASCADE, related_name='notifications',
+    )
+    title = models.CharField(max_length=200)
+    message = models.TextField()
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='system')
+    link = models.CharField(max_length=255, blank=True)
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    class Meta:
+        ordering = ('-created_at',)
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+            models.Index(fields=['user', 'is_read']),
+        ]
+
+    def __str__(self):
+        return f'{self.title} → {self.user.username}'

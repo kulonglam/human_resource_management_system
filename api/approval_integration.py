@@ -1,0 +1,294 @@
+from django.utils import timezone
+
+from accounts.models import CustomUser
+
+from .audit import log_action
+from .in_app_notifications import get_hr_users, get_manager_users_for_employee, notify_user, notify_users
+from workflows.services import (
+    get_pending_for_user,
+    get_request_for_object,
+    process_decision,
+    start_approval,
+    user_can_approve,
+)
+
+
+def _notify_next_approvers(obj, approval_request, title, link):
+    from workflows.services import _current_step
+
+    step = _current_step(approval_request)
+    if not step:
+        return
+    if step.approver_type == 'admin':
+        notify_users(get_hr_users(), title, f'Your review is required: {title}', 'approval', link)
+    elif step.approver_type == 'manager' and hasattr(obj, 'employee'):
+        notify_users(
+            get_manager_users_for_employee(obj.employee),
+            title,
+            f'Your review is required: {title}',
+            'approval',
+            link,
+        )
+
+
+def _notify_submitter(submitted_by, title, message, link, category='approval'):
+    if submitted_by:
+        notify_user(submitted_by, title, message, category, link)
+
+
+def start_leave_approval(leave, user):
+    approval = start_approval('leave', leave, user, context={'duration': leave.duration})
+    if approval:
+        _notify_next_approvers(
+            leave,
+            approval,
+            f'Leave request — {leave.employee.full_name}',
+            f'/leaves',
+        )
+    return approval
+
+
+def start_expense_approval(expense, user):
+    approval = start_approval('expense', expense, user, context={'amount': expense.amount})
+    if approval:
+        _notify_next_approvers(
+            expense,
+            approval,
+            f'Expense claim — {expense.employee.full_name}',
+            f'/expenses',
+        )
+    return approval
+
+
+def start_recruitment_approval(application, user):
+    approval = start_approval('recruitment', application, user)
+    if approval:
+        recipients = list(get_hr_users())
+        manager_ids = {u.pk for u in recipients}
+        for manager in CustomUser.objects.filter(role__name='manager', is_active=True):
+            if manager.pk not in manager_ids:
+                recipients.append(manager)
+                manager_ids.add(manager.pk)
+        notify_users(
+            recipients,
+            f'Application review — {application.first_name} {application.last_name}',
+            f'Review required for {application.job.title}',
+            'recruitment',
+            f'/recruitment/jobs/{application.job_id}',
+        )
+    return approval
+
+
+def process_leave_decision(request, leave, approved, comment=''):
+    from leaves.models import LeaveBalance
+
+    approval = get_request_for_object(leave)
+    if approval and approval.status == 'pending':
+        outcome = process_decision(approval, request.user, approved, comment)
+        if outcome['result'] == 'denied':
+            return {'status': 403, 'detail': outcome['detail']}
+        if outcome['result'] == 'rejected':
+            _reject_leave(request, leave, comment)
+            _notify_submitter(
+                approval.submitted_by,
+                'Leave request rejected',
+                f'Your leave request was rejected at {outcome["step"]}.',
+                '/leaves',
+                'leave',
+            )
+            return {'status': 200, 'result': 'rejected'}
+        if outcome['result'] == 'advanced':
+            log_action(
+                request, 'approve', 'Leave', leave.id, str(leave),
+                f'Leave approved at {outcome["step"]}; pending {outcome["next_step"]}',
+            )
+            _notify_next_approvers(
+                leave, approval,
+                f'Leave request — {leave.employee.full_name}',
+                '/leaves',
+            )
+            _notify_submitter(
+                approval.submitted_by,
+                'Leave request progressed',
+                f'Approved at {outcome["step"]}. Pending {outcome["next_step"]}.',
+                '/leaves',
+                'leave',
+            )
+            return {'status': 200, 'result': 'advanced'}
+        if outcome['result'] == 'approved':
+            _finalize_leave_approval(request, leave)
+            _notify_submitter(
+                approval.submitted_by,
+                'Leave request approved',
+                'Your leave request has been fully approved.',
+                '/leaves',
+                'leave',
+            )
+            return {'status': 200, 'result': 'approved'}
+
+    if not approved:
+        _reject_leave(request, leave, comment)
+        return {'status': 200, 'result': 'rejected'}
+
+    _finalize_leave_approval(request, leave)
+    return {'status': 200, 'result': 'approved'}
+
+
+def _finalize_leave_approval(request, leave):
+    from leaves.models import LeaveBalance
+
+    current_year = timezone.now().year
+    try:
+        balance = LeaveBalance.objects.get(
+            employee=leave.employee, leave_type=leave.leave_type, year=current_year,
+        )
+        balance.pending_days -= leave.duration
+        balance.used_days += leave.duration
+        balance.save()
+    except LeaveBalance.DoesNotExist:
+        pass
+    leave.status = 'approved'
+    leave.reviewed_by = request.user.get_full_name() or request.user.username
+    leave.reviewed_on = timezone.now()
+    leave.save()
+    log_action(request, 'approve', 'Leave', leave.id, str(leave), 'Leave fully approved')
+    from integrations.services import dispatch_webhook
+    dispatch_webhook('leave.approved', {
+        'id': leave.id,
+        'employee_id': leave.employee_id,
+        'employee_name': leave.employee.full_name,
+        'leave_type': leave.leave_type,
+        'start_date': str(leave.start_date),
+        'end_date': str(leave.end_date),
+    })
+
+
+def _reject_leave(request, leave, comment=''):
+    from leaves.models import LeaveBalance
+
+    current_year = timezone.now().year
+    try:
+        balance = LeaveBalance.objects.get(
+            employee=leave.employee, leave_type=leave.leave_type, year=current_year,
+        )
+        balance.pending_days -= leave.duration
+        balance.save()
+    except LeaveBalance.DoesNotExist:
+        pass
+    leave.status = 'rejected'
+    leave.reviewed_by = request.user.get_full_name() or request.user.username
+    leave.reviewed_on = timezone.now()
+    leave.save()
+    log_action(request, 'reject', 'Leave', leave.id, str(leave), comment or 'Leave rejected')
+    from integrations.services import dispatch_webhook
+    dispatch_webhook('leave.rejected', {
+        'id': leave.id,
+        'employee_id': leave.employee_id,
+        'employee_name': leave.employee.full_name,
+        'reason': comment,
+    })
+
+
+def process_expense_decision(request, expense, approved, comment=''):
+    approval = get_request_for_object(expense)
+    if approval and approval.status == 'pending':
+        outcome = process_decision(approval, request.user, approved, comment)
+        if outcome['result'] == 'denied':
+            return {'status': 403, 'detail': outcome['detail']}
+        if outcome['result'] == 'rejected':
+            _reject_expense(request, expense, comment)
+            return {'status': 200, 'result': 'rejected'}
+        if outcome['result'] == 'advanced':
+            log_action(
+                request, 'approve', 'Expense', expense.id, expense.description,
+                f'Expense approved at {outcome["step"]}; pending {outcome["next_step"]}',
+            )
+            _notify_next_approvers(
+                expense, approval,
+                f'Expense — {expense.employee.full_name}',
+                '/expenses',
+            )
+            return {'status': 200, 'result': 'advanced'}
+        if outcome['result'] == 'approved':
+            _finalize_expense_approval(request, expense)
+            return {'status': 200, 'result': 'approved'}
+
+    if not approved:
+        _reject_expense(request, expense, comment)
+        return {'status': 200, 'result': 'rejected'}
+    _finalize_expense_approval(request, expense)
+    return {'status': 200, 'result': 'approved'}
+
+
+def _finalize_expense_approval(request, expense):
+    expense.status = 'approved'
+    expense.approved_date = timezone.now()
+    expense.save()
+    log_action(request, 'approve', 'Expense', expense.id, expense.description, 'Expense fully approved')
+    from integrations.services import dispatch_webhook
+    dispatch_webhook('expense.approved', {
+        'id': expense.id,
+        'employee_id': expense.employee_id,
+        'amount': str(expense.amount),
+        'description': expense.description,
+    })
+
+
+def _reject_expense(request, expense, comment=''):
+    expense.status = 'rejected'
+    expense.rejection_reason = comment
+    expense.save()
+    log_action(request, 'reject', 'Expense', expense.id, expense.description, comment or 'Expense rejected')
+    from integrations.services import dispatch_webhook
+    dispatch_webhook('expense.rejected', {
+        'id': expense.id,
+        'employee_id': expense.employee_id,
+        'amount': str(expense.amount),
+        'reason': comment,
+    })
+
+
+def process_recruitment_decision(request, application, approved, comment=''):
+    approval = get_request_for_object(application)
+    if not approval:
+        approval = start_recruitment_approval(application, request.user)
+
+    if approval and approval.status == 'pending':
+        outcome = process_decision(approval, request.user, approved, comment)
+        if outcome['result'] == 'denied':
+            return {'status': 403, 'detail': outcome['detail']}
+        if outcome['result'] == 'rejected':
+            application.status = 'rejected'
+            application.save()
+            log_action(request, 'reject', 'Application', application.id, str(application), comment)
+            return {'status': 200, 'result': 'rejected'}
+        if outcome['result'] == 'advanced':
+            log_action(
+                request, 'approve', 'Application', application.id, str(application),
+                f'Advanced to {outcome["next_step"]}',
+            )
+            _notify_next_approvers(
+                application, approval,
+                f'Application — {application.first_name} {application.last_name}',
+                f'/recruitment/jobs/{application.job_id}',
+            )
+            return {'status': 200, 'result': 'advanced'}
+        if outcome['result'] == 'approved':
+            _finalize_recruitment_approval(request, application)
+            return {'status': 200, 'result': 'approved'}
+
+    if not approved:
+        application.status = 'rejected'
+        application.save()
+        return {'status': 200, 'result': 'rejected'}
+    _finalize_recruitment_approval(request, application)
+    return {'status': 200, 'result': 'approved'}
+
+
+def _finalize_recruitment_approval(request, application):
+    if application.status == 'received':
+        application.status = 'shortlisted'
+    elif application.status in ('shortlisted', 'interviewed'):
+        application.status = 'hired'
+    application.save()
+    log_action(request, 'approve', 'Application', application.id, str(application), 'Recruitment approved')

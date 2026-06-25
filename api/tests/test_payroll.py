@@ -1,0 +1,62 @@
+from django.utils import timezone
+
+from accounts.models import AuditLog
+from payroll.models import Salary
+
+from .base import HRAPITestCase
+
+
+class PayrollAPITests(HRAPITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        now = timezone.now()
+        cls.salary = Salary.objects.create(
+            employee=cls.employee,
+            month=now.month,
+            year=now.year,
+            basic_salary=50000,
+            allowances=5000,
+            deductions=2000,
+            tax=1000,
+        )
+
+    def test_admin_lists_salaries(self):
+        self.login('admin', 'AdminPass123!')
+        response = self.client.get('/api/v1/salaries/')
+        self.assertEqual(response.status_code, 200)
+        self.assertGreaterEqual(len(response.data['results']), 1)
+
+    def test_employee_sees_own_salary_only(self):
+        self.login('employee', 'EmployeePass123!')
+        response = self.client.get('/api/v1/salaries/')
+        self.assertEqual(response.status_code, 200)
+        ids = [row['id'] for row in response.data['results']]
+        self.assertIn(self.salary.id, ids)
+
+    def test_admin_create_salary_audit_log(self):
+        self.login('admin', 'AdminPass123!')
+        now = timezone.now()
+        month = now.month - 1 if now.month > 1 else 12
+        year = now.year if now.month > 1 else now.year - 1
+        response = self.client.post(
+            '/api/v1/salaries/',
+            {
+                'employee': self.employee.id,
+                'month': month,
+                'year': year,
+                'basic_salary': '60000.00',
+                'allowances': '3000.00',
+                'deductions': '1000.00',
+                'tax': '500.00',
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(
+            AuditLog.objects.filter(
+                action='create',
+                model_name='Salary',
+                object_id=response.data['id'],
+            ).exists()
+        )

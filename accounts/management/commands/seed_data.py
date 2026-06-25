@@ -144,11 +144,18 @@ class Command(BaseCommand):
             if created:
                 employees_created += 1
 
+        from django.core.management import call_command
+        from leave_policies.services import sync_all_employees
+
+        call_command('seed_workflows')
+        sync_summary = sync_all_employees()
+
         self.stdout.write(self.style.SUCCESS('Seed data ready.'))
         if dept_created:
             self.stdout.write(f'  Department created: {dept.name}')
         if employees_created:
             self.stdout.write(f'  Sample employees created: {employees_created}')
+        self.stdout.write(f'  Leave policy allocations synced: {sync_summary["allocations"]}')
         if created_users:
             self.stdout.write(f'  Users created: {", ".join(created_users)}')
         if updated_users:
