@@ -50,9 +50,11 @@ router.register('kin', viewsets.KinViewSet, basename='kin')
 router.register('surveys', viewsets.SurveyViewSet, basename='survey')
 router.register('survey-questions', viewsets.SurveyQuestionViewSet, basename='survey-question')
 router.register('survey-responses', viewsets.SurveyResponseViewSet, basename='survey-response')
+router.register('audit-logs', viewsets.AuditLogViewSet, basename='audit-log')
 
 urlpatterns = [
     path('auth/csrf/', views.CsrfView.as_view(), name='api-csrf'),
+    path('auth/config/', views.AuthConfigView.as_view(), name='api-auth-config'),
     path('auth/login/', views.LoginView.as_view(), name='api-login'),
     path('auth/logout/', views.LogoutView.as_view(), name='api-logout'),
     path('auth/register/', views.RegisterView.as_view(), name='api-register'),

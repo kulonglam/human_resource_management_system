@@ -18,8 +18,16 @@ export default function Register() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    api.getRoles().then(setRoles).catch(() => {});
-  }, []);
+    api.getAuthConfig()
+      .then((data) => {
+        if (!data.allow_registration) {
+          navigate('/login', { replace: true });
+          return;
+        }
+        api.getRoles().then(setRoles).catch(() => {});
+      })
+      .catch(() => navigate('/login', { replace: true }));
+  }, [navigate]);
 
   if (user) {
     return <Navigate to="/dashboard" replace />;

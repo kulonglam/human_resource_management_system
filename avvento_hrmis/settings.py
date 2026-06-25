@@ -123,15 +123,22 @@ if os.environ.get('DATABASE_URL'):
             ssl_require=not DEBUG,
         )
     }
-else:
+elif os.environ.get('POSTGRES_NAME'):
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
-            'NAME': 'avvento_hrmis',
-            'USER': 'postgres',
-            'PASSWORD': 'Makhol@5627',
-            'HOST': 'localhost',
-            'PORT': '5432',
+            'NAME': os.environ['POSTGRES_NAME'],
+            'USER': os.environ.get('POSTGRES_USER', 'postgres'),
+            'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
+            'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
+            'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+        }
+    }
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
 
@@ -184,6 +191,20 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Auth
 AUTH_USER_MODEL = 'accounts.CustomUser'
 LOGIN_URL = '/login'
+ALLOW_PUBLIC_REGISTRATION = os.environ.get('ALLOW_PUBLIC_REGISTRATION', 'False') == 'True'
+
+# Email
+EMAIL_BACKEND = os.environ.get(
+    'EMAIL_BACKEND',
+    'django.core.mail.backends.console.EmailBackend',
+)
+EMAIL_HOST = os.environ.get('EMAIL_HOST', '')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@hrmis.local')
+HR_NOTIFY_EMAIL = os.environ.get('HR_NOTIFY_EMAIL', '')
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [

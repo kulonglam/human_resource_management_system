@@ -10,7 +10,7 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
 from accounts.access_control import can_access_employee, get_user_accessible_employees
-from accounts.models import CustomUser
+from accounts.models import AuditLog, CustomUser
 from assets.models import Asset, AssetAssignment
 from attendance.models import Attendance
 from benefits.models import Benefit, EmployeeBenefit
@@ -44,9 +44,16 @@ from training.models import (
     TrainingRecord,
 )
 
+from .audit import log_action
 from .mixins import EmployeeQuerysetMixin
+from .notifications import notify_leave_decision, notify_leave_submitted
 from .permissions import IsAdmin, IsAdminOrManager, IsAdminOrManagerOrReadOnly, IsAdminOrReadOnly
-from .serializers import DepartmentSerializer, EmployeeSerializer, EmployeeTerminateSerializer
+from .serializers import (
+    AuditLogSerializer,
+    DepartmentSerializer,
+    EmployeeSerializer,
+    EmployeeTerminateSerializer,
+)
 from .serializers_hr import (
     ApplicationSerializer,
     AssetAssignmentSerializer,
@@ -182,6 +189,11 @@ class LeaveViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
             balance.save()
         except LeaveBalance.DoesNotExist:
             pass
+        log_action(
+            self.request, 'create', 'Leave', leave.id, str(leave),
+            f'Leave submitted for {leave.employee.full_name}',
+        )
+        notify_leave_submitted(leave)
 
     @action(detail=True, methods=['post'], permission_classes=[IsAdminOrManager])
     def approve(self, request, pk=None):
@@ -202,6 +214,8 @@ class LeaveViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
         leave.reviewed_by = request.user.get_full_name() or request.user.username
         leave.reviewed_on = timezone.now()
         leave.save()
+        log_action(request, 'approve', 'Leave', leave.id, str(leave), 'Leave approved')
+        notify_leave_decision(leave, 'approved')
         return Response(LeaveSerializer(leave).data)
 
     @action(detail=True, methods=['post'], permission_classes=[IsAdminOrManager])
@@ -222,6 +236,8 @@ class LeaveViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
         leave.reviewed_by = request.user.get_full_name() or request.user.username
         leave.reviewed_on = timezone.now()
         leave.save()
+        log_action(request, 'reject', 'Leave', leave.id, str(leave), 'Leave rejected')
+        notify_leave_decision(leave, 'rejected')
         return Response(LeaveSerializer(leave).data)
 
 
@@ -603,6 +619,7 @@ class ExpenseViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
         expense.status = 'approved'
         expense.approved_date = timezone.now()
         expense.save()
+        log_action(request, 'approve', 'Expense', expense.id, expense.description, 'Expense approved')
         return Response(ExpenseSerializer(expense).data)
 
     @action(detail=True, methods=['post'], permission_classes=[IsAdminOrManager])
@@ -611,7 +628,16 @@ class ExpenseViewSet(EmployeeQuerysetMixin, viewsets.ModelViewSet):
         expense.status = 'rejected'
         expense.rejection_reason = request.data.get('reason', '')
         expense.save()
+        log_action(request, 'reject', 'Expense', expense.id, expense.description, 'Expense rejected')
         return Response(ExpenseSerializer(expense).data)
+
+
+class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = AuditLogSerializer
+    permission_classes = [IsAdmin]
+
+    def get_queryset(self):
+        return AuditLog.objects.select_related('user').order_by('-timestamp')
 
 
 class BenefitViewSet(viewsets.ModelViewSet):

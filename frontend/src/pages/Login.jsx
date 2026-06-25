@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
@@ -11,6 +12,13 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [allowRegistration, setAllowRegistration] = useState(false);
+
+  useEffect(() => {
+    api.getAuthConfig()
+      .then((data) => setAllowRegistration(Boolean(data.allow_registration)))
+      .catch(() => setAllowRegistration(false));
+  }, []);
 
   if (user) {
     return <Navigate to="/dashboard" replace />;
@@ -88,9 +96,11 @@ export default function Login() {
             </div>
           </form>
 
-          <p className="text-center mt-3 mb-0">
-            No account? <Link to="/register">Register</Link>
-          </p>
+          {allowRegistration && (
+            <p className="text-center mt-3 mb-0">
+              No account? <Link to="/register">Register</Link>
+            </p>
+          )}
         </div>
       </div>
     </div>

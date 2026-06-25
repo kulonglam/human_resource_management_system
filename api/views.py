@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.conf import settings
 from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.utils.decorators import method_decorator
@@ -24,7 +25,8 @@ from training.models import (
 )
 from attendance.models import Attendance
 
-from .permissions import IsAdminOrManager
+from .audit import log_action
+from .permissions import IsAdmin, IsAdminOrManager
 from .serializers import (
     LoginSerializer,
     RegisterSerializer,
@@ -49,24 +51,50 @@ class LoginView(APIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data['user']
         login(request, user)
+        log_action(request, 'login', 'CustomUser', user.id, user.username, 'User logged in')
         return Response(UserSerializer(user).data)
 
 
 class LogoutView(APIView):
     def post(self, request):
+        if request.user.is_authenticated:
+            log_action(
+                request, 'logout', 'CustomUser', request.user.id,
+                request.user.username, 'User logged out',
+            )
         logout(request)
         return Response({'detail': 'Logged out.'})
 
 
-class RegisterView(generics.CreateAPIView):
+class AuthConfigView(APIView):
     permission_classes = [AllowAny]
+
+    def get(self, request):
+        return Response({'allow_registration': settings.ALLOW_PUBLIC_REGISTRATION})
+
+
+class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
 
+    def get_permissions(self):
+        if settings.ALLOW_PUBLIC_REGISTRATION:
+            return [AllowAny()]
+        return [IsAdmin()]
+
     def create(self, request, *args, **kwargs):
+        if not settings.ALLOW_PUBLIC_REGISTRATION and not (
+            request.user.is_authenticated and getattr(request.user, 'is_admin', False)
+        ):
+            return Response(
+                {'detail': 'Registration is disabled.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
-        login(request, user)
+        log_action(request, 'create', 'CustomUser', user.id, user.username, 'User registered')
+        if settings.ALLOW_PUBLIC_REGISTRATION:
+            login(request, user)
         return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
 
 
@@ -76,9 +104,16 @@ class CurrentUserView(APIView):
 
 
 class RoleListView(generics.ListAPIView):
-    permission_classes = [AllowAny]
-    queryset = Role.objects.all()
     serializer_class = RoleSerializer
+
+    def get_permissions(self):
+        from django.conf import settings
+        if settings.ALLOW_PUBLIC_REGISTRATION:
+            return [AllowAny()]
+        return [IsAdmin()]
+
+    def get_queryset(self):
+        return Role.objects.all()
 
 
 class UserListView(generics.ListAPIView):

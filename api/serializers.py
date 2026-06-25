@@ -1,6 +1,7 @@
+from django.conf import settings
 from rest_framework import serializers
 from django.contrib.auth import authenticate
-from accounts.models import CustomUser, Role
+from accounts.models import CustomUser, Role, AuditLog
 from employees.models import Employee
 from departments.models import Department
 
@@ -50,8 +51,13 @@ class RegisterSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, attrs):
+        if not settings.ALLOW_PUBLIC_REGISTRATION:
+            raise serializers.ValidationError('Registration is disabled.')
         if attrs['password1'] != attrs['password2']:
             raise serializers.ValidationError({'password2': 'Passwords do not match.'})
+        employee_role = Role.objects.filter(name=Role.EMPLOYEE).first()
+        if employee_role:
+            attrs['role'] = employee_role
         return attrs
 
     def create(self, validated_data):
@@ -110,3 +116,16 @@ class EmployeeSerializer(serializers.ModelSerializer):
 class EmployeeTerminateSerializer(serializers.Serializer):
     exit_reason = serializers.ChoiceField(choices=Employee.EXIT_REASON_CHOICES)
     exit_notes = serializers.CharField(required=False, allow_blank=True)
+
+
+class AuditLogSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='user.username', read_only=True, default=None)
+    action_display = serializers.CharField(source='get_action_display', read_only=True)
+
+    class Meta:
+        model = AuditLog
+        fields = [
+            'id', 'username', 'action', 'action_display', 'model_name',
+            'object_id', 'object_description', 'details', 'ip_address', 'timestamp',
+        ]
+        read_only_fields = fields

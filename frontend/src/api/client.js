@@ -54,6 +54,7 @@ export const api = {
   getMe: () => request('/auth/me/'),
   getRoles: () => request('/roles/'),
   getDashboard: () => request('/dashboard/'),
+  getAuthConfig: () => request('/auth/config/'),
   getReportsAnalytics: () => request('/reports/analytics/'),
   getReportFilters: () => request('/reports/filters/'),
   getReport: (type, query = '') =>

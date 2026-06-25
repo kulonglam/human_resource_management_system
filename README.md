@@ -91,6 +91,12 @@ python manage.py seed_data --reset-password
 | `SEED_ADMIN_PASSWORD` | Admin password for seed command (Render) |
 | `SEED_MANAGER_PASSWORD` | Manager password for seed command |
 | `SEED_EMPLOYEE_PASSWORD` | Employee password for seed command |
+| `ALLOW_PUBLIC_REGISTRATION` | Set `True` to allow public sign-up (default: `False`) |
+| `HR_NOTIFY_EMAIL` | HR inbox for new leave request alerts |
+| `EMAIL_BACKEND` | Django email backend (default: console for dev) |
+| `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` | SMTP settings for production email |
+
+Local dev uses **SQLite** when `DATABASE_URL` is unset. For PostgreSQL locally, set `POSTGRES_NAME`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, etc.
 
 ## Deploy on Render
 
@@ -114,10 +120,18 @@ Push to your connected Git branch; Render handles the rest.
 
 ```powershell
 python manage.py check
+python manage.py test api
 python manage.py createsuperuser
 python manage.py collectstatic --noinput
 cd frontend && npm run build
 ```
+
+## Security notes
+
+- Public registration is **disabled by default**. Only admins can create users unless `ALLOW_PUBLIC_REGISTRATION=True`.
+- Self-registration always assigns the **employee** role.
+- Login, logout, leave, and expense actions are written to the **audit log** (viewable at `/api/v1/audit-logs/` for admins).
+- Leave submit/approve/reject triggers **email notifications** when SMTP is configured.
 
 ## Notes
 
