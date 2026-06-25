@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { api } from '../api/client';
 import ResourceManager from '../components/ResourceManager';
 
-export default function ModulePage({ title, icon, tabs }) {
+export default function ModulePage({ title, icon, tabs, headerExtra, passUser = false }) {
+  const { user } = useAuth();
   const [lookupOptions, setLookupOptions] = useState({});
 
   useEffect(() => {
@@ -48,5 +50,14 @@ export default function ModulePage({ title, icon, tabs }) {
     loadLookups();
   }, []);
 
-  return <ResourceManager title={title} icon={icon} tabs={tabs} lookupOptions={lookupOptions} />;
+  return (
+    <ResourceManager
+      title={title}
+      icon={icon}
+      tabs={tabs}
+      lookupOptions={lookupOptions}
+      user={passUser ? user : undefined}
+      headerExtra={headerExtra}
+    />
+  );
 }

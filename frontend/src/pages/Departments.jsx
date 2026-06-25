@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 
-function DepartmentModal({ department, onClose, onSaved }) {
+function DepartmentModal({ department, departments, onClose, onSaved }) {
   const isEdit = Boolean(department);
   const [form, setForm] = useState({
     name: department?.name || '',
@@ -9,9 +9,14 @@ function DepartmentModal({ department, onClose, onSaved }) {
     history: department?.history || '',
     manager_name: department?.manager_name || '',
     manager_contact: department?.manager_contact || '',
+    parent: department?.parent ?? '',
   });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const parentOptions = departments.filter(
+    (d) => !department || d.id !== department.id,
+  );
 
   const handleChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -21,11 +26,15 @@ function DepartmentModal({ department, onClose, onSaved }) {
     e.preventDefault();
     setError('');
     setSubmitting(true);
+    const payload = {
+      ...form,
+      parent: form.parent === '' ? null : Number(form.parent),
+    };
     try {
       if (isEdit) {
-        await api.updateDepartment(department.id, form);
+        await api.updateDepartment(department.id, payload);
       } else {
-        await api.createDepartment(form);
+        await api.createDepartment(payload);
       }
       onSaved();
       onClose();
@@ -54,6 +63,15 @@ function DepartmentModal({ department, onClose, onSaved }) {
                 <div className="mb-3">
                   <label className="form-label">Name</label>
                   <input name="name" className="form-control" value={form.name} onChange={handleChange} required />
+                </div>
+                <div className="mb-3">
+                  <label className="form-label">Parent department</label>
+                  <select name="parent" className="form-select" value={form.parent} onChange={handleChange}>
+                    <option value="">None (top level)</option>
+                    {parentOptions.map((d) => (
+                      <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="mb-3">
                   <label className="form-label">Location</label>
@@ -152,6 +170,7 @@ export default function Departments() {
               <thead>
                 <tr>
                   <th>Name</th>
+                  <th>Parent</th>
                   <th>Location</th>
                   <th>Manager</th>
                   <th>Employees</th>
@@ -162,6 +181,7 @@ export default function Departments() {
                 {departments.map((dept) => (
                   <tr key={dept.id}>
                     <td className="fw-semibold">{dept.name}</td>
+                    <td>{dept.parent_name || '—'}</td>
                     <td>{dept.location}</td>
                     <td>{dept.manager_name || '—'}</td>
                     <td>{dept.employee_count}</td>
@@ -185,7 +205,7 @@ export default function Departments() {
                 ))}
                 {!departments.length && (
                   <tr>
-                    <td colSpan="5" className="text-center py-4 text-muted">
+                    <td colSpan="6" className="text-center py-4 text-muted">
                       No departments found.
                     </td>
                   </tr>
@@ -199,6 +219,7 @@ export default function Departments() {
       {showModal && (
         <DepartmentModal
           department={modalDepartment}
+          departments={departments}
           onClose={() => setShowModal(false)}
           onSaved={loadDepartments}
         />

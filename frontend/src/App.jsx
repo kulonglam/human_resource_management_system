@@ -2,20 +2,24 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import {
-  attendanceTabs, leaveTabs, recruitmentTabs, payrollTabs,
+  attendanceTabs, payrollTabs,
 } from './config/hrModules';
 import {
   exitTabs, assetTabs, shiftTabs,
-  expenseTabs, benefitTabs, leavePolicyTabs, disciplineTabs, kinTabs,
+  expenseTabs, benefitTabs, disciplineTabs, kinTabs,
 } from './config/opsModules';
+import ComplianceSettings from './pages/ComplianceSettings';
 import Documents from './pages/Documents';
 import DashboardPage from './pages/DashboardPage';
 import Departments from './pages/Departments';
 import EmployeeDetail from './pages/EmployeeDetail';
 import EmployeeForm from './pages/EmployeeForm';
 import Employees from './pages/Employees';
+import Approvals from './pages/Approvals';
 import AuditLogs from './pages/AuditLogs';
 import IntegrationsSettings from './pages/IntegrationsSettings';
+import LeavePolicies from './pages/LeavePolicies';
+import Leaves from './pages/Leaves';
 import Login from './pages/Login';
 import OrgChart from './pages/OrgChart';
 import ModulePage from './pages/ModulePage';
@@ -23,28 +27,39 @@ import Performance from './pages/Performance';
 import RecordDetail from './pages/RecordDetail';
 import Register from './pages/Register';
 import Reports from './pages/Reports';
+import UsersSettings from './pages/UsersSettings';
 import SecuritySettings from './pages/SecuritySettings';
 import Surveys from './pages/Surveys';
 import SurveyTake from './pages/SurveyTake';
 import Training from './pages/Training';
+import Recruitment from './pages/Recruitment';
+import ApplicationDetail from './pages/ApplicationDetail';
+import Careers from './pages/Careers';
+import CareerApply from './pages/CareerApply';
+import OfferSign from './pages/OfferSign';
 
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/careers" element={<Careers />} />
+      <Route path="/careers/:jobId" element={<CareerApply />} />
+      <Route path="/offers/:offerId" element={<OfferSign />} />
 
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
+        <Route path="approvals" element={<Approvals />} />
         <Route path="employees" element={<Employees />} />
         <Route path="employees/new" element={<EmployeeForm />} />
         <Route path="employees/:id" element={<EmployeeDetail />} />
         <Route path="employees/:id/edit" element={<EmployeeForm />} />
         <Route path="departments" element={<Departments />} />
         <Route path="attendance" element={<ModulePage title="Attendance" icon="bi-calendar-check" tabs={attendanceTabs} />} />
-        <Route path="leaves" element={<ModulePage title="Leaves" icon="bi-calendar-x" tabs={leaveTabs} />} />
-        <Route path="recruitment" element={<ModulePage title="Recruitment" icon="bi-briefcase" tabs={recruitmentTabs} />} />
+        <Route path="leaves" element={<Leaves />} />
+        <Route path="recruitment" element={<Recruitment />} />
+        <Route path="recruitment/applications/:id" element={<ApplicationDetail />} />
         <Route path="payroll" element={<ModulePage title="Payroll" icon="bi-cash-coin" tabs={payrollTabs} />} />
         <Route path="performance" element={<Performance />} />
         <Route path="performance/goals/:id" element={<RecordDetail configKey="performance-goals" />} />
@@ -63,13 +78,15 @@ export default function App() {
         <Route path="shifts" element={<ModulePage title="Shifts" icon="bi-clock" tabs={shiftTabs} />} />
         <Route path="expenses" element={<ModulePage title="Expenses" icon="bi-receipt" tabs={expenseTabs} />} />
         <Route path="benefits" element={<ModulePage title="Benefits" icon="bi-heart-pulse" tabs={benefitTabs} />} />
-        <Route path="leave-policies" element={<ModulePage title="Leave Policies" icon="bi-file-earmark-text" tabs={leavePolicyTabs} />} />
+        <Route path="leave-policies" element={<LeavePolicies />} />
         <Route path="discipline" element={<ModulePage title="Discipline" icon="bi-exclamation-triangle" tabs={disciplineTabs} />} />
         <Route path="surveys" element={<Surveys />} />
         <Route path="surveys/:id/take" element={<SurveyTake />} />
         <Route path="kin" element={<ModulePage title="Next of Kin" icon="bi-people" tabs={kinTabs} />} />
         <Route path="audit-logs" element={<AuditLogs />} />
+        <Route path="settings/users" element={<UsersSettings />} />
         <Route path="settings/security" element={<SecuritySettings />} />
+        <Route path="settings/compliance" element={<ComplianceSettings />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

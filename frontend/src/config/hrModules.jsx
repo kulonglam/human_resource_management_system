@@ -21,6 +21,8 @@ export const attendanceTabs = [{
 export const leaveTabs = [
   {
     id: 'requests', label: 'Leave Requests', endpoint: 'leaves',
+    selfServiceEmployee: true,
+    createLabel: 'Apply for Leave',
     columns: [
       { key: 'employee_name', label: 'Employee' }, { key: 'leave_type_display', label: 'Type' },
       { key: 'start_date', label: 'Start' }, { key: 'end_date', label: 'End' },
@@ -42,9 +44,11 @@ export const leaveTabs = [
       { name: 'reject', label: 'Reject', variant: 'danger', show: (r) => r.status === 'pending' },
     ],
     canDelete: false,
+    hideRowActionsForEmployee: true,
   },
   {
     id: 'balances', label: 'Leave Balances', endpoint: 'leave-balances',
+    canCreate: false,
     columns: [
       { key: 'employee_name', label: 'Employee' }, { key: 'leave_type_display', label: 'Type' },
       { key: 'year', label: 'Year' }, { key: 'total_days', label: 'Total' },
@@ -58,45 +62,72 @@ export const leaveTabs = [
       { name: 'year', type: 'number', default: new Date().getFullYear() },
       { name: 'total_days', type: 'number', required: true },
     ],
+    hideCreateForEmployee: true,
+    hideEditForEmployee: true,
   },
 ];
 
-export const recruitmentTabs = [
-  {
-    id: 'jobs', label: 'Job Postings', endpoint: 'jobs',
-    detailPath: '/recruitment/jobs',
-    columns: [
-      { key: 'title', label: 'Title' }, { key: 'department', label: 'Department' },
-      { key: 'deadline', label: 'Deadline' }, { key: 'application_count', label: 'Applications' },
-    ],
-    formFields: [
-      { name: 'title', required: true }, { name: 'department', required: true },
-      { name: 'description', type: 'textarea', fullWidth: true, required: true },
-      { name: 'requirements', type: 'textarea', fullWidth: true, required: true },
-      { name: 'deadline', type: 'date', required: true },
-    ],
-  },
-  {
-    id: 'applications', label: 'Applications', endpoint: 'applications',
-    columns: [
-      { key: 'full_name', label: 'Applicant' }, { key: 'job_title', label: 'Job' },
-      { key: 'email', label: 'Email' }, { key: 'status', label: 'Status', render: (r) => renderStatus(r.status) },
-      { key: 'resume_url', label: 'Resume', render: (r) => (
-        r.resume_url ? <a href={r.resume_url} target="_blank" rel="noreferrer">View</a> : '—'
-      )},
-    ],
-    formFields: [
-      { name: 'job', type: 'select' }, { name: 'first_name', required: true },
-      { name: 'last_name', required: true }, { name: 'email', type: 'email', required: true },
-      { name: 'phone', required: true },
-      { name: 'resume', type: 'file', accept: '.pdf,.doc,.docx', label: 'Resume' },
-      { name: 'status', type: 'select', choices: [
-        { value: 'received', label: 'Received' }, { value: 'shortlisted', label: 'Shortlisted' },
-        { value: 'hired', label: 'Hired' }, { value: 'rejected', label: 'Rejected' },
-      ]},
-    ],
-  },
-];
+export const recruitmentJobsTab = {
+  id: 'jobs', label: 'Job Postings', endpoint: 'jobs',
+  detailPath: '/recruitment/jobs',
+  columns: [
+    { key: 'title', label: 'Title' }, { key: 'department', label: 'Department' },
+    { key: 'deadline', label: 'Deadline' },
+    { key: 'is_open', label: 'Open', render: (r) => (r.is_open ? 'Yes' : 'No') },
+    { key: 'application_count', label: 'Applications' },
+  ],
+  formFields: [
+    { name: 'title', required: true },
+    { name: 'department', type: 'select', required: true },
+    { name: 'description', type: 'textarea', fullWidth: true, required: true },
+    { name: 'requirements', type: 'textarea', fullWidth: true, required: true },
+    { name: 'deadline', type: 'date', required: true },
+    { name: 'is_open', type: 'checkbox', label: 'Open for applications', default: true },
+  ],
+};
+
+export const recruitmentApplicationsTab = {
+  id: 'applications', label: 'Applications', endpoint: 'applications',
+  detailPath: '/recruitment/applications',
+  columns: [
+    { key: 'full_name', label: 'Applicant' }, { key: 'job_title', label: 'Job' },
+    { key: 'email', label: 'Email' },
+    { key: 'source_display', label: 'Source' },
+    { key: 'rating', label: 'Rating', render: (r) => (r.rating ? `${r.rating}/5` : '—') },
+    { key: 'status', label: 'Status', render: (r) => renderStatus(r.status) },
+    { key: 'resume_url', label: 'Resume', render: (r) => (
+      r.resume_url ? <a href={r.resume_url} target="_blank" rel="noreferrer">View</a> : '—'
+    )},
+  ],
+  formFields: [
+    { name: 'job', type: 'select' }, { name: 'first_name', required: true },
+    { name: 'last_name', required: true }, { name: 'email', type: 'email', required: true },
+    { name: 'phone', required: true },
+    { name: 'cover_letter', type: 'textarea', fullWidth: true, label: 'Cover letter' },
+    { name: 'resume', type: 'file', accept: '.pdf,.doc,.docx', label: 'Resume' },
+    { name: 'status', type: 'select', choices: [
+      { value: 'received', label: 'Received' }, { value: 'shortlisted', label: 'Shortlisted' },
+      { value: 'interviewed', label: 'Interviewed' },
+      { value: 'hired', label: 'Hired' }, { value: 'rejected', label: 'Rejected' },
+    ]},
+  ],
+  rowActions: [
+    {
+      name: 'approve',
+      label: 'Advance',
+      variant: 'outline-success',
+      show: (row) => ['received', 'shortlisted', 'interviewed'].includes(row.status),
+    },
+    {
+      name: 'reject',
+      label: 'Reject',
+      variant: 'outline-danger',
+      show: (row) => !['rejected', 'hired'].includes(row.status),
+    },
+  ],
+};
+
+export const recruitmentTabs = [recruitmentJobsTab, recruitmentApplicationsTab];
 
 export const payrollTabs = [{
   id: 'salaries', label: 'Salary Records', endpoint: 'salaries',

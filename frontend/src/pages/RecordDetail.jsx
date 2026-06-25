@@ -94,8 +94,16 @@ export default function RecordDetail({ configKey }) {
                 <tbody>
                   {related.map((row) => (
                     <tr key={row.id}>
-                      {config.related.columns.map((col) => (
-                        <td key={col.key}>{row[col.key] ?? '—'}</td>
+                      {config.related.columns.map((col, colIdx) => (
+                        <td key={col.key}>
+                          {colIdx === 0 && config.related.detailPath ? (
+                            <Link to={`${config.related.detailPath}/${row.id}`}>
+                              {row[col.key] ?? '—'}
+                            </Link>
+                          ) : (
+                            row[col.key] ?? '—'
+                          )}
+                        </td>
                       ))}
                     </tr>
                   ))}

@@ -216,14 +216,6 @@ class RoleListView(generics.ListAPIView):
         return Role.objects.all()
 
 
-class UserListView(generics.ListAPIView):
-    permission_classes = [IsAdminOrManager]
-    serializer_class = UserSerializer
-
-    def get_queryset(self):
-        return CustomUser.objects.filter(is_active=True).order_by('username')
-
-
 class DashboardView(APIView):
     def get(self, request):
         user = request.user

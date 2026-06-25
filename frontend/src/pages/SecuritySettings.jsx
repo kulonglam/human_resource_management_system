@@ -10,6 +10,7 @@ export default function SecuritySettings() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     if (user?.is_admin && !user.mfa_enabled) {
@@ -20,7 +21,45 @@ export default function SecuritySettings() {
   }, [user]);
 
   if (!user?.is_admin) {
-    return <Navigate to="/dashboard" replace />;
+    return (
+      <div className="card">
+        <div className="card-body">
+          <h5 className="card-title">
+            <i className="bi bi-shield-lock" /> Security Settings
+          </h5>
+          {user?.linked_employee_id ? (
+            <>
+              <p className="text-muted">
+                Download a copy of all personal data HRMIS holds about you (GDPR subject access).
+              </p>
+              {error && <div className="alert alert-danger">{error}</div>}
+              <button
+                type="button"
+                className="btn btn-outline-primary btn-sm"
+                disabled={exporting}
+                onClick={async () => {
+                  setExporting(true);
+                  setError('');
+                  try {
+                    await api.downloadGdprExport();
+                  } catch (err) {
+                    setError(err.message || 'Export failed.');
+                  } finally {
+                    setExporting(false);
+                  }
+                }}
+              >
+                {exporting ? 'Preparing export…' : 'Download my data'}
+              </button>
+            </>
+          ) : (
+            <div className="alert alert-info mb-0">
+              No employee profile is linked to your account.
+            </div>
+          )}
+        </div>
+      </div>
+    );
   }
 
   if (user.mfa_enabled) {
@@ -70,6 +109,22 @@ export default function SecuritySettings() {
 
         {error && <div className="alert alert-danger">{error}</div>}
         {success && <div className="alert alert-success">{success}</div>}
+
+        {!setup && !success && !error && (
+          <div className="text-center py-4">
+            <div className="spinner-border text-primary" role="status" />
+            <p className="text-muted small mt-2 mb-0">Loading MFA setup…</p>
+          </div>
+        )}
+
+        {!setup && !success && error && (
+          <button type="button" className="btn btn-outline-primary btn-sm" onClick={() => {
+            setError('');
+            api.getMfaSetup().then(setSetup).catch((err) => setError(err.data?.detail || 'Unable to load MFA setup.'));
+          }}>
+            Retry MFA setup
+          </button>
+        )}
 
         {setup && !success && (
           <>

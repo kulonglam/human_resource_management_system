@@ -26,7 +26,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get('SECRET_KEY', 'My$ecretKeyForDevelopmentOnly!ChangeMeInProduction')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG =os.environ.get('DEBUG', 'False') == 'True'
+# Default DEBUG=True for local SQLite dev; production sets DEBUG=False via env (Render).
+DEBUG = os.environ.get(
+    'DEBUG',
+    'False' if os.environ.get('DATABASE_URL') else 'True',
+) == 'True'
 
 ALLOWED_HOSTS = [ 
     'localhost',
@@ -80,6 +84,7 @@ INSTALLED_APPS = [
     'workflows',
     'documents',
     'integrations',
+    'compliance',
 ]
 
 MIDDLEWARE = [
@@ -215,7 +220,11 @@ if os.environ.get('AWS_STORAGE_BUCKET_NAME'):
 AUTH_USER_MODEL = 'accounts.CustomUser'
 LOGIN_URL = '/login'
 ALLOW_PUBLIC_REGISTRATION = os.environ.get('ALLOW_PUBLIC_REGISTRATION', 'False') == 'True'
-ENFORCE_MFA_FOR_ADMINS = os.environ.get('ENFORCE_MFA_FOR_ADMINS', 'True') == 'True'
+# Require admin MFA in production; off by default for local SQLite dev (set True to test MFA flow).
+ENFORCE_MFA_FOR_ADMINS = os.environ.get(
+    'ENFORCE_MFA_FOR_ADMINS',
+    'True' if os.environ.get('DATABASE_URL') else 'False',
+) == 'True'
 
 # Email
 EMAIL_BACKEND = os.environ.get(
@@ -248,6 +257,7 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
+        'api.permissions.RequiresMFASetupComplete',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 25,

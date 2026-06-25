@@ -31,7 +31,19 @@ from performance.models import (
     PerformanceAppraisal,
     PerformanceGoal,
 )
-from recruitment.models import Application, JobPosting
+from recruitment.models import (
+    Application,
+    ApplicationNote,
+    ApplicationScorecard,
+    HireOnboarding,
+    HiringTeamMember,
+    Interview,
+    JobOffer,
+    JobPipelineStage,
+    JobPosting,
+    OfferTemplate,
+    ScorecardCriterion,
+)
 from shifts.models import Shift, ShiftAssignment
 from surveys.models import Survey, SurveyQuestion, SurveyResponse
 from training.models import (
@@ -74,6 +86,7 @@ from .serializers import (
     EmployeeTerminateSerializer,
 )
 from .serializers_hr import (
+    ApplicationNoteSerializer,
     ApplicationSerializer,
     AssetAssignmentSerializer,
     AssetSerializer,
@@ -93,6 +106,7 @@ from .serializers_hr import (
     FeedbackRequestSerializer,
     FeedbackRoundSerializer,
     FeedbackSerializer,
+    InterviewSerializer,
     JobPostingSerializer,
     KinSerializer,
     LeaveBalanceSerializer,
@@ -110,6 +124,24 @@ from .serializers_hr import (
     SurveySerializer,
     TrainingCourseSerializer,
     TrainingRecordSerializer,
+)
+from .recruitment_enterprise import (
+    ApplicationScorecardSerializer,
+    ApplicationScorecardWriteSerializer,
+    CompleteOnboardingSerializer,
+    HireOnboardingSerializer,
+    HiringTeamMemberSerializer,
+    JobOfferCreateSerializer,
+    JobOfferSerializer,
+    JobPipelineStageSerializer,
+    OfferTemplateSerializer,
+    ScorecardCriterionSerializer,
+)
+from recruitment.services import (
+    build_offer_from_template,
+    create_hire_onboarding,
+    complete_hire_onboarding,
+    sync_application_stage,
 )
 
 
@@ -329,6 +361,9 @@ class ApplicationViewSet(AuditedModelViewSet):
         old_status = serializer.instance.status
         application = serializer.save()
         if old_status != application.status:
+            if application.status == 'hired' and not application.hired_at:
+                application.hired_at = timezone.now()
+                application.save(update_fields=['hired_at'])
             notify_application_status(application, previous_status)
 
     @action(detail=True, methods=['post'], permission_classes=[IsAdminOrManager])
@@ -337,7 +372,8 @@ class ApplicationViewSet(AuditedModelViewSet):
         outcome = process_recruitment_decision(request, application, True, request.data.get('comment', ''))
         if outcome['status'] == 403:
             return Response({'detail': outcome['detail']}, status=status.HTTP_403_FORBIDDEN)
-        if application.email and outcome['result'] == 'approved':
+        application.refresh_from_db()
+        if application.email and outcome['result'] in ('approved', 'advanced'):
             notify_application_status(application, application.get_status_display())
         return Response(ApplicationSerializer(application, context={'request': request}).data)
 
@@ -349,9 +385,209 @@ class ApplicationViewSet(AuditedModelViewSet):
         )
         if outcome['status'] == 403:
             return Response({'detail': outcome['detail']}, status=status.HTTP_403_FORBIDDEN)
+        application.refresh_from_db()
         if application.email:
-            notify_application_status(application, 'Pending')
+            notify_application_status(application, application.get_status_display())
         return Response(ApplicationSerializer(application, context={'request': request}).data)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminOrManager])
+    def move_stage(self, request, pk=None):
+        application = self.get_object()
+        stage_id = request.data.get('stage_id')
+        if not stage_id:
+            return Response({'detail': 'stage_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        stage = JobPipelineStage.objects.filter(pk=stage_id, job=application.job).first()
+        if not stage:
+            return Response({'detail': 'Invalid stage for this job.'}, status=status.HTTP_400_BAD_REQUEST)
+        sync_application_stage(application, stage)
+        if stage.stage_type == 'hired':
+            create_hire_onboarding(application)
+        return Response(ApplicationSerializer(application, context={'request': request}).data)
+
+
+class ApplicationNoteViewSet(AuditedModelViewSet):
+    serializer_class = ApplicationNoteSerializer
+    permission_classes = [IsAdminOrManagerOrReadOnly]
+
+    def get_queryset(self):
+        qs = ApplicationNote.objects.select_related('application', 'author')
+        application_id = self.request.query_params.get('application')
+        if application_id:
+            qs = qs.filter(application_id=application_id)
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user)
+
+
+class InterviewViewSet(AuditedModelViewSet):
+    serializer_class = InterviewSerializer
+    permission_classes = [IsAdminOrManagerOrReadOnly]
+
+    def get_queryset(self):
+        qs = Interview.objects.select_related('application', 'created_by')
+        application_id = self.request.query_params.get('application')
+        if application_id:
+            qs = qs.filter(application_id=application_id)
+        return qs
+
+    def perform_create(self, serializer):
+        interview = serializer.save(created_by=self.request.user)
+        application = interview.application
+        stage = application.job.pipeline_stages.filter(key='interviewed').first()
+        if stage:
+            sync_application_stage(application, stage)
+        elif application.status in ('received', 'shortlisted'):
+            application.status = 'interviewed'
+            application.save(update_fields=['status'])
+
+
+class JobPipelineStageViewSet(AuditedModelViewSet):
+    serializer_class = JobPipelineStageSerializer
+    permission_classes = [IsAdminOrManagerOrReadOnly]
+
+    def get_queryset(self):
+        qs = JobPipelineStage.objects.select_related('job')
+        job_id = self.request.query_params.get('job')
+        if job_id:
+            qs = qs.filter(job_id=job_id)
+        return qs
+
+
+class HiringTeamMemberViewSet(AuditedModelViewSet):
+    serializer_class = HiringTeamMemberSerializer
+    permission_classes = [IsAdminOrManagerOrReadOnly]
+
+    def get_queryset(self):
+        qs = HiringTeamMember.objects.select_related('user', 'job')
+        job_id = self.request.query_params.get('job')
+        if job_id:
+            qs = qs.filter(job_id=job_id)
+        return qs
+
+
+class ScorecardCriterionViewSet(AuditedModelViewSet):
+    serializer_class = ScorecardCriterionSerializer
+    permission_classes = [IsAdminOrManagerOrReadOnly]
+
+    def get_queryset(self):
+        qs = ScorecardCriterion.objects.select_related('job')
+        job_id = self.request.query_params.get('job')
+        if job_id:
+            qs = qs.filter(job_id=job_id)
+        return qs
+
+
+class ApplicationScorecardViewSet(AuditedModelViewSet):
+    permission_classes = [IsAdminOrManagerOrReadOnly]
+
+    def get_serializer_class(self):
+        if self.action in ('create', 'update', 'partial_update'):
+            return ApplicationScorecardWriteSerializer
+        return ApplicationScorecardSerializer
+
+    def get_queryset(self):
+        qs = ApplicationScorecard.objects.select_related('reviewer', 'application').prefetch_related('ratings__criterion')
+        application_id = self.request.query_params.get('application')
+        if application_id:
+            qs = qs.filter(application_id=application_id)
+        return qs
+
+
+class OfferTemplateViewSet(AuditedModelViewSet):
+    queryset = OfferTemplate.objects.filter(is_active=True).order_by('name')
+    serializer_class = OfferTemplateSerializer
+    permission_classes = [IsAdminOrManagerOrReadOnly]
+
+
+class JobOfferViewSet(AuditedModelViewSet):
+    serializer_class = JobOfferSerializer
+    permission_classes = [IsAdminOrManagerOrReadOnly]
+
+    def get_queryset(self):
+        qs = JobOffer.objects.select_related('application', 'template', 'created_by')
+        application_id = self.request.query_params.get('application')
+        if application_id:
+            qs = qs.filter(application_id=application_id)
+        return qs.order_by('-created_at')
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+    @action(detail=False, methods=['post'], url_path='from-template')
+    def from_template(self, request):
+        serializer = JobOfferCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        application = data['application']
+        offer = build_offer_from_template(
+            data['template'],
+            application,
+            request.user,
+            salary=data['salary'],
+            start_date=data['start_date'],
+            currency=data.get('currency', 'KES'),
+            job_title=data.get('job_title') or application.job.title,
+            department=data.get('department') or application.job.department,
+        )
+        offer.save()
+        return Response(JobOfferSerializer(offer).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'])
+    def submit(self, request, pk=None):
+        offer = self.get_object()
+        offer.status = 'pending_approval'
+        offer.save(update_fields=['status', 'updated_at'])
+        return Response(JobOfferSerializer(offer).data)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminOrManager])
+    def approve(self, request, pk=None):
+        offer = self.get_object()
+        if offer.status != 'pending_approval':
+            return Response({'detail': 'Offer is not pending approval.'}, status=status.HTTP_400_BAD_REQUEST)
+        offer.status = 'approved'
+        offer.save(update_fields=['status', 'updated_at'])
+        return Response(JobOfferSerializer(offer).data)
+
+    @action(detail=True, methods=['post'])
+    def send(self, request, pk=None):
+        offer = self.get_object()
+        if offer.status not in ('approved', 'draft'):
+            return Response({'detail': 'Offer must be approved before sending.'}, status=status.HTTP_400_BAD_REQUEST)
+        offer.status = 'sent'
+        offer.sent_at = timezone.now()
+        offer.save(update_fields=['status', 'sent_at', 'updated_at'])
+        stage = offer.application.job.pipeline_stages.filter(key='offer').first()
+        if stage:
+            sync_application_stage(offer.application, stage)
+        return Response(JobOfferSerializer(offer).data)
+
+
+class HireOnboardingViewSet(AuditedModelViewSet):
+    serializer_class = HireOnboardingSerializer
+    permission_classes = [IsAdminOrManagerOrReadOnly]
+    http_method_names = ['get', 'patch', 'head', 'options', 'post']
+
+    def get_queryset(self):
+        qs = HireOnboarding.objects.select_related('application', 'employee').order_by('-created_at')
+        application_id = self.request.query_params.get('application')
+        if application_id:
+            qs = qs.filter(application_id=application_id)
+        return qs
+
+    @action(detail=True, methods=['post'])
+    def complete(self, request, pk=None):
+        onboarding = self.get_object()
+        if onboarding.status == 'completed':
+            return Response({'detail': 'Onboarding already completed.'}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = CompleteOnboardingSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        employee = complete_hire_onboarding(onboarding, request.user, serializer.validated_data)
+        onboarding.refresh_from_db()
+        return Response({
+            'onboarding': HireOnboardingSerializer(onboarding).data,
+            'employee_id': employee.id,
+        })
 
 
 class SalaryViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
@@ -732,6 +968,11 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         return AuditLog.objects.select_related('user').order_by('-timestamp')
 
+    @action(detail=False, methods=['get'], url_path='export')
+    def export_logs(self, request):
+        from api.compliance_views import audit_log_export_response
+        return audit_log_export_response(request)
+
 
 class BenefitViewSet(AuditedModelViewSet):
     queryset = Benefit.objects.filter(is_active=True).order_by('name')
@@ -1040,14 +1281,125 @@ class ApprovalRequestViewSet(viewsets.ReadOnlyModelViewSet):
         from .serializers_phase2 import ApprovalRequestSerializer
         return ApprovalRequestSerializer
 
+    def get_permissions(self):
+        return [IsAdminOrManager()]
+
     def get_queryset(self):
         from workflows.models import ApprovalRequest
         from workflows.services import get_pending_for_user
 
+        status = self.request.query_params.get('status', 'pending')
         scope = self.request.query_params.get('scope', 'mine')
+
         if scope == 'all' and self.request.user.is_admin:
-            return ApprovalRequest.objects.select_related('workflow', 'content_type').prefetch_related('decisions')
-        return get_pending_for_user(self.request.user)
+            qs = ApprovalRequest.objects.select_related(
+                'workflow', 'content_type', 'submitted_by',
+            ).prefetch_related('decisions')
+        else:
+            qs = get_pending_for_user(self.request.user)
+
+        if status:
+            qs = qs.filter(status=status)
+        return qs.order_by('-submitted_at')
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminOrManager])
+    def approve(self, request, pk=None):
+        from .approval_integration import process_approval_request_decision
+        from .serializers_phase2 import ApprovalRequestSerializer
+
+        approval_request = self.get_object()
+        outcome = process_approval_request_decision(
+            request, approval_request, True, request.data.get('comment', ''),
+        )
+        if outcome.get('status') == 403:
+            return Response({'detail': outcome['detail']}, status=status.HTTP_403_FORBIDDEN)
+        if outcome.get('status') == 404:
+            return Response({'detail': outcome['detail']}, status=status.HTTP_404_NOT_FOUND)
+        if outcome.get('status') == 400:
+            return Response({'detail': outcome['detail']}, status=status.HTTP_400_BAD_REQUEST)
+
+        approval_request.refresh_from_db()
+        return Response({
+            'result': outcome.get('result'),
+            'approval_request': ApprovalRequestSerializer(approval_request, context={'request': request}).data,
+        })
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminOrManager])
+    def reject(self, request, pk=None):
+        from .approval_integration import process_approval_request_decision
+        from .serializers_phase2 import ApprovalRequestSerializer
+
+        approval_request = self.get_object()
+        comment = request.data.get('comment', request.data.get('reason', ''))
+        outcome = process_approval_request_decision(
+            request, approval_request, False, comment,
+        )
+        if outcome.get('status') == 403:
+            return Response({'detail': outcome['detail']}, status=status.HTTP_403_FORBIDDEN)
+        if outcome.get('status') == 404:
+            return Response({'detail': outcome['detail']}, status=status.HTTP_404_NOT_FOUND)
+        if outcome.get('status') == 400:
+            return Response({'detail': outcome['detail']}, status=status.HTTP_400_BAD_REQUEST)
+
+        approval_request.refresh_from_db()
+        return Response({
+            'result': outcome.get('result'),
+            'approval_request': ApprovalRequestSerializer(approval_request, context={'request': request}).data,
+        })
+
+
+class UserViewSet(viewsets.ModelViewSet):
+    http_method_names = ['get', 'post', 'patch', 'head', 'options']
+
+    def get_queryset(self):
+        qs = CustomUser.objects.select_related('role').order_by('username')
+        if self.request.user.is_admin and self.request.query_params.get('include_inactive') == '1':
+            return qs
+        return qs.filter(is_active=True)
+
+    def get_permissions(self):
+        if self.action in ('create', 'partial_update', 'update'):
+            return [IsAdmin()]
+        if self.action in ('list', 'retrieve'):
+            return [IsAdminOrManager()]
+        return [IsAdmin()]
+
+    def get_serializer_class(self):
+        from .serializers import AdminUserCreateSerializer, AdminUserUpdateSerializer, UserSerializer
+        if self.action == 'create':
+            return AdminUserCreateSerializer
+        if self.action in ('partial_update', 'update'):
+            return AdminUserUpdateSerializer
+        return UserSerializer
+
+    def create(self, request, *args, **kwargs):
+        from .serializers import UserSerializer
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        log_action(request, 'create', 'CustomUser', user.id, user.username, 'User created by admin')
+        return Response(
+            UserSerializer(user, context=self.get_serializer_context()).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    def partial_update(self, request, *args, **kwargs):
+        from .serializers import UserSerializer
+
+        user = self.get_object()
+        serializer = self.get_serializer(user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        updated = serializer.save()
+        if 'is_active' in serializer.validated_data and not updated.is_active:
+            Employee.objects.filter(email=updated.email).update(is_active=False)
+            log_action(request, 'update', 'CustomUser', updated.id, updated.username, 'User deactivated')
+        else:
+            log_action(request, 'update', 'CustomUser', updated.id, updated.username, 'User updated by admin')
+        return Response(UserSerializer(updated, context=self.get_serializer_context()).data)
+
+    def update(self, request, *args, **kwargs):
+        return self.partial_update(request, *args, **kwargs)
 
 
 class APIKeyViewSet(viewsets.ModelViewSet):
@@ -1102,6 +1454,22 @@ class WebhookEndpointViewSet(AuditedModelViewSet):
         qs = WebhookDelivery.objects.filter(endpoint=endpoint).order_by('-delivered_at')[:50]
         from .integrations_serializers import WebhookDeliverySerializer
         return Response(WebhookDeliverySerializer(qs, many=True).data)
+
+    @action(detail=False, methods=['get'], url_path='delivery-log')
+    def delivery_log(self, request):
+        from integrations.models import WebhookDelivery
+        qs = WebhookDelivery.objects.select_related('endpoint').order_by('-delivered_at')
+        endpoint_id = request.query_params.get('endpoint')
+        if endpoint_id:
+            qs = qs.filter(endpoint_id=endpoint_id)
+        success = request.query_params.get('success')
+        if success in ('1', 'true'):
+            qs = qs.filter(success=True)
+        elif success in ('0', 'false'):
+            qs = qs.filter(success=False)
+        limit = min(int(request.query_params.get('limit', 100)), 200)
+        from .integrations_serializers import WebhookDeliverySerializer
+        return Response(WebhookDeliverySerializer(qs[:limit], many=True).data)
 
     @action(detail=False, methods=['get'])
     def events(self, request):

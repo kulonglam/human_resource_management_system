@@ -13,7 +13,7 @@ from workflows.services import (
 )
 
 
-def _notify_next_approvers(obj, approval_request, title, link):
+def _notify_next_approvers(obj, approval_request, title, link='/approvals'):
     from workflows.services import _current_step
 
     step = _current_step(approval_request)
@@ -43,7 +43,7 @@ def start_leave_approval(leave, user):
             leave,
             approval,
             f'Leave request — {leave.employee.full_name}',
-            f'/leaves',
+            '/approvals',
         )
     return approval
 
@@ -55,7 +55,7 @@ def start_expense_approval(expense, user):
             expense,
             approval,
             f'Expense claim — {expense.employee.full_name}',
-            f'/expenses',
+            '/approvals',
         )
     return approval
 
@@ -73,8 +73,8 @@ def start_recruitment_approval(application, user):
             recipients,
             f'Application review — {application.first_name} {application.last_name}',
             f'Review required for {application.job.title}',
-            'recruitment',
-            f'/recruitment/jobs/{application.job_id}',
+            'approval',
+            '/approvals',
         )
     return approval
 
@@ -105,7 +105,7 @@ def process_leave_decision(request, leave, approved, comment=''):
             _notify_next_approvers(
                 leave, approval,
                 f'Leave request — {leave.employee.full_name}',
-                '/leaves',
+                '/approvals',
             )
             _notify_submitter(
                 approval.submitted_by,
@@ -206,7 +206,7 @@ def process_expense_decision(request, expense, approved, comment=''):
             _notify_next_approvers(
                 expense, approval,
                 f'Expense — {expense.employee.full_name}',
-                '/expenses',
+                '/approvals',
             )
             return {'status': 200, 'result': 'advanced'}
         if outcome['result'] == 'approved':
@@ -270,7 +270,7 @@ def process_recruitment_decision(request, application, approved, comment=''):
             _notify_next_approvers(
                 application, approval,
                 f'Application — {application.first_name} {application.last_name}',
-                f'/recruitment/jobs/{application.job_id}',
+                '/approvals',
             )
             return {'status': 200, 'result': 'advanced'}
         if outcome['result'] == 'approved':
@@ -286,9 +286,37 @@ def process_recruitment_decision(request, application, approved, comment=''):
 
 
 def _finalize_recruitment_approval(request, application):
+    from recruitment.services import create_hire_onboarding, sync_application_stage
+
     if application.status == 'received':
-        application.status = 'shortlisted'
-    elif application.status in ('shortlisted', 'interviewed'):
-        application.status = 'hired'
-    application.save()
+        stage = application.job.pipeline_stages.filter(key='shortlisted').first()
+        if stage:
+            sync_application_stage(application, stage)
+        else:
+            application.status = 'shortlisted'
+            application.save(update_fields=['status'])
+    elif application.status in ('shortlisted', 'interviewed', 'offer'):
+        stage = application.job.pipeline_stages.filter(stage_type='hired').first()
+        if stage:
+            sync_application_stage(application, stage)
+        else:
+            application.status = 'hired'
+            application.hired_at = timezone.now()
+            application.save(update_fields=['status', 'hired_at'])
+        create_hire_onboarding(application)
     log_action(request, 'approve', 'Application', application.id, str(application), 'Recruitment approved')
+
+
+def process_approval_request_decision(http_request, approval_request, approved, comment=''):
+    obj = approval_request.content_object
+    if obj is None:
+        return {'status': 404, 'detail': 'Referenced item no longer exists.'}
+
+    workflow_type = approval_request.workflow.workflow_type
+    if workflow_type == 'leave':
+        return process_leave_decision(http_request, obj, approved, comment)
+    if workflow_type == 'expense':
+        return process_expense_decision(http_request, obj, approved, comment)
+    if workflow_type == 'recruitment':
+        return process_recruitment_decision(http_request, obj, approved, comment)
+    return {'status': 400, 'detail': f'Unsupported workflow type: {workflow_type}'}

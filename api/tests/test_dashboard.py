@@ -15,6 +15,13 @@ class DashboardTests(HRAPITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('total_employees', response.data)
         self.assertIn('pending_leaves', response.data)
+        self.assertIn('hero_kpis', response.data)
+        self.assertIn('chart', response.data)
+        self.assertIn('pending_items', response.data)
+        self.assertIn('recent_activity', response.data)
+        self.assertIn('attention_items', response.data)
+        self.assertIn('exec_analytics', response.data)
+        self.assertIn('exec_brief', response.data)
 
     def test_reports_analytics(self):
         self.login('admin', 'AdminPass123!')

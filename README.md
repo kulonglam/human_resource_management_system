@@ -28,6 +28,28 @@ accounts/ … discipline/   HR domain apps (models, admin, migrations only)
 
 ## Local development
 
+**Quick start (recommended):**
+
+```powershell
+python -m venv hrmis_env
+hrmis_env\Scripts\activate
+pip install -r requirements.txt
+.\setup-local.ps1
+```
+
+Then open **two terminals**:
+
+| Terminal | Command |
+|----------|---------|
+| Backend | `.\start-backend.ps1` |
+| Frontend | `cd frontend` → `npm install` → `npm run dev` |
+
+Open **http://localhost:5173** — Vite proxies API requests to Django on port 8000.
+
+Both servers must be running. If the frontend shows connection errors, start the backend first.
+
+### Manual setup
+
 ### 1. Backend
 
 ```powershell
@@ -36,6 +58,7 @@ hrmis_env\Scripts\activate
 pip install -r requirements.txt
 python manage.py migrate
 python manage.py seed_data --reset-password
+python manage.py seed_workflows
 ```
 
 ### 2. Frontend (hot reload)
@@ -92,7 +115,7 @@ python manage.py seed_data --reset-password
 | `SEED_MANAGER_PASSWORD` | Manager password for seed command |
 | `SEED_EMPLOYEE_PASSWORD` | Employee password for seed command |
 | `ALLOW_PUBLIC_REGISTRATION` | Set `True` to allow public sign-up (default: `False`) |
-| `ENFORCE_MFA_FOR_ADMINS` | Require TOTP MFA for admin accounts (default: `True`) |
+| `ENFORCE_MFA_FOR_ADMINS` | Require TOTP MFA for admin accounts (default: `True` on Render/production, `False` for local SQLite) |
 | `HR_NOTIFY_EMAIL` | HR inbox for new leave/expense alerts |
 | `EMAIL_BACKEND` | Django email backend (default: console for dev) |
 | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` | SMTP settings for production email |
@@ -155,7 +178,7 @@ cd frontend && npm run build
 
 - Public registration is **disabled by default**. Only admins can create users unless `ALLOW_PUBLIC_REGISTRATION=True`.
 - Self-registration always assigns the **employee** role.
-- **Admin MFA (TOTP)** is enforced by default. Admins must enable MFA at `/settings/security` before using the app. Set `ENFORCE_MFA_FOR_ADMINS=False` only for local testing.
+- **Admin MFA (TOTP)** is enforced on production (when `DATABASE_URL` is set). Locally it is **off by default** so you can log in immediately; use `.\start-backend.ps1` or set `ENFORCE_MFA_FOR_ADMINS=True` to test MFA at `/settings/security`.
 - All API write operations (create/update/delete) are logged to the **audit trail** (viewable at `/audit-logs` in the SPA or `/api/v1/audit-logs/`).
 - Leave, expense, performance appraisal, discipline appeal, recruitment, and benefit enrollment flows send **templated email notifications** when SMTP is configured.
 - CI enforces **≥60% API test coverage** (see `.coveragerc`).
@@ -186,6 +209,32 @@ Default workflows (seeded via `python manage.py seed_workflows`):
 - **Payroll export** — CSV/Excel/JSON at `GET /api/v1/payroll/export/?month=&year=&format=` (Export Excel on Reports → Payroll)
 - **Org chart** — department hierarchy with parent/child relationships (`/org-chart`)
 - **Role-based dashboards** — tailored views for employees, managers, and HR/admins on `/dashboard`
+
+### Executive dashboard (C-suite / HR)
+
+- **Executive command center** — hero KPIs with month-over-month deltas (headcount, joiners, payroll)
+- **Attention banner** — urgent approvals, leave backlog, expenses, expiring certifications
+- **Executive summary brief** — auto-generated narrative for leadership reviews
+- **12-month trend charts** — workforce headcount and payroll outflow (Recharts area charts)
+- **Hiring pipeline funnel** — received → shortlisted → interviewed → hired
+- **Leave utilisation trend** — approved leave days over 6 months
+- **PDF export** — “Export PDF” button (browser print-to-PDF, landscape A4)
+
+## Phase 4 features (compliance & data governance)
+
+- **GDPR subject access export** — employees download their data at `/settings/security`; admins export from employee profiles or `GET /api/v1/compliance/data-export/employees/{id}/`
+- **Right to erasure** — admins anonymize employee PII via `/settings/compliance` (`POST /api/v1/compliance/erasure/{id}/`)
+- **Audit log export** — CSV/Excel from the Audit Log page or `GET /api/v1/audit-logs/export/?format=csv|xlsx`
+- **Data retention policies** — configurable retention for audit logs, webhook deliveries, and notifications at `/settings/compliance`
+- **Scheduled purge** — `python manage.py apply_retention_policies` (add `--dry-run` to preview)
+
+Default retention (seeded on migrate):
+
+| Category | Default retention |
+|----------|-------------------|
+| Audit logs | 730 days (2 years) |
+| Webhook deliveries | 90 days |
+| Notifications | 180 days |
 
 ## Notes
 

@@ -12,6 +12,8 @@ class UserSerializer(serializers.ModelSerializer):
     is_manager = serializers.BooleanField(read_only=True)
     mfa_enabled = serializers.BooleanField(read_only=True)
     mfa_setup_required = serializers.SerializerMethodField()
+    linked_employee_id = serializers.SerializerMethodField()
+    linked_employee_name = serializers.SerializerMethodField()
 
     class Meta:
         model = CustomUser
@@ -19,6 +21,8 @@ class UserSerializer(serializers.ModelSerializer):
             'id', 'username', 'email', 'first_name', 'last_name',
             'role', 'role_name', 'is_admin', 'is_manager',
             'mfa_enabled', 'mfa_setup_required',
+            'linked_employee_id', 'linked_employee_name',
+            'is_active', 'date_joined', 'last_login',
         ]
         read_only_fields = fields
 
@@ -26,6 +30,18 @@ class UserSerializer(serializers.ModelSerializer):
         if not getattr(settings, 'ENFORCE_MFA_FOR_ADMINS', True):
             return False
         return obj.is_admin and not obj.mfa_enabled
+
+    def get_linked_employee_id(self, obj):
+        try:
+            return Employee.objects.get(email=obj.email).pk
+        except Employee.DoesNotExist:
+            return None
+
+    def get_linked_employee_name(self, obj):
+        try:
+            return Employee.objects.get(email=obj.email).full_name
+        except Employee.DoesNotExist:
+            return None
 
 
 class LoginSerializer(serializers.Serializer):
@@ -81,13 +97,52 @@ class RoleSerializer(serializers.ModelSerializer):
         fields = ['id', 'name']
 
 
+class AdminUserCreateSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, min_length=8)
+
+    class Meta:
+        model = CustomUser
+        fields = ['username', 'email', 'first_name', 'last_name', 'role', 'password']
+
+    def validate_email(self, value):
+        if CustomUser.objects.filter(email=value).exists():
+            raise serializers.ValidationError('This email is already registered.')
+        return value
+
+    def validate_username(self, value):
+        if CustomUser.objects.filter(username=value).exists():
+            raise serializers.ValidationError('This username is already taken.')
+        return value
+
+    def create(self, validated_data):
+        password = validated_data.pop('password')
+        return CustomUser.objects.create_user(password=password, **validated_data)
+
+
+class AdminUserUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomUser
+        fields = ['email', 'first_name', 'last_name', 'role', 'is_active']
+
+    def validate(self, attrs):
+        request = self.context.get('request')
+        instance = self.instance
+        if request and instance and instance.pk == request.user.pk:
+            if attrs.get('is_active') is False:
+                raise serializers.ValidationError({'is_active': 'You cannot deactivate your own account.'})
+            if 'role' in attrs and attrs['role'] != instance.role:
+                raise serializers.ValidationError({'role': 'You cannot change your own role.'})
+        return attrs
+
+
 class DepartmentSerializer(serializers.ModelSerializer):
     employee_count = serializers.SerializerMethodField()
+    parent_name = serializers.CharField(source='parent.name', read_only=True, default=None)
 
     class Meta:
         model = Department
         fields = [
-            'id', 'name', 'location', 'history', 'parent',
+            'id', 'name', 'location', 'history', 'parent', 'parent_name',
             'manager_name', 'manager_contact', 'created_at', 'employee_count',
         ]
 

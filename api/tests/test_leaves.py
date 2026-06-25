@@ -73,6 +73,56 @@ class LeaveWorkflowTests(HRAPITestCase):
         response = self.client.post(f'/api/v1/leaves/{leave_id}/approve/', {}, format='json')
         self.assertEqual(response.status_code, 403)
 
+    def test_employee_applies_leave_for_self(self):
+        self.login('employee', 'EmployeePass123!')
+        year = timezone.now().year
+        response = self.client.post(
+            '/api/v1/leaves/',
+            {
+                'leave_type': 'annual',
+                'start_date': f'{year}-09-01',
+                'end_date': f'{year}-09-02',
+                'reason': 'Personal day',
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['employee'], self.employee.id)
+
+    def test_employee_cannot_apply_leave_for_other(self):
+        from employees.models import Employee
+
+        other = Employee.objects.create(
+            first_name='Jane',
+            last_name='Other',
+            date_of_birth='1992-01-01',
+            gender='Female',
+            email='other@test.local',
+            mobile='0700000001',
+            address='Nairobi',
+            emergency_contact='0711111112',
+            job_title='Analyst',
+            department=self.department,
+            date_joined='2024-01-01',
+            account_number='9876543210',
+            bank='Test Bank',
+            salary=40000,
+        )
+        self.login('employee', 'EmployeePass123!')
+        year = timezone.now().year
+        response = self.client.post(
+            '/api/v1/leaves/',
+            {
+                'employee': other.id,
+                'leave_type': 'annual',
+                'start_date': f'{year}-09-01',
+                'end_date': f'{year}-09-02',
+                'reason': 'Invalid',
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, 400)
+
     @override_settings(HR_NOTIFY_EMAIL='hr@test.local')
     @patch('api.viewsets.notify_leave_submitted')
     def test_leave_submitted_email(self, mock_notify):

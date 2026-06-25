@@ -10,8 +10,10 @@ export function statusBadge(val) {
 
 export function renderStatus(val) {
   const color =
-    ['approved', 'active', 'completed', 'assigned'].includes(val) ? 'success'
-    : ['pending', 'draft', 'initiated'].includes(val) ? 'warning'
-    : ['rejected', 'expired'].includes(val) ? 'danger' : 'secondary';
+    ['approved', 'active', 'completed', 'assigned', 'hired'].includes(val) ? 'success'
+    : ['pending', 'draft', 'initiated', 'received'].includes(val) ? 'warning'
+    : ['rejected', 'expired'].includes(val) ? 'danger'
+    : ['shortlisted', 'interviewed'].includes(val) ? 'info'
+    : 'secondary';
   return <span className={`badge bg-${color}`}>{val}</span>;
 }

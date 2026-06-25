@@ -25,13 +25,15 @@ class WebhookEndpointSerializer(serializers.ModelSerializer):
 
 class WebhookDeliverySerializer(serializers.ModelSerializer):
     endpoint_name = serializers.CharField(source='endpoint.name', read_only=True)
+    endpoint_id = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = WebhookDelivery
         fields = [
-            'id', 'endpoint_name', 'event', 'success', 'status_code',
-            'error_message', 'delivered_at',
+            'id', 'endpoint_id', 'endpoint_name', 'event', 'success', 'status_code',
+            'error_message', 'payload', 'delivered_at',
         ]
+        read_only_fields = fields
 
 
 class WebhookEventsSerializer(serializers.Serializer):

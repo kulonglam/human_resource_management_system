@@ -3,6 +3,21 @@ from rest_framework.routers import DefaultRouter
 
 from . import views, viewsets
 from .payroll_views import PayrollExportView
+from .compliance_views import (
+    DataRetentionPolicyViewSet,
+    GDPRDataExportView,
+    GDPRErasureView,
+    RetentionPreviewView,
+    RetentionRunView,
+)
+from .careers_views import PublicApplyView, PublicJobDetailView, PublicJobListView
+from .recruitment_views import RecruitmentSummaryView
+from .recruitment_enterprise_views import (
+    InterviewCalendarView,
+    PublicOfferDetailView,
+    PublicOfferSignView,
+    RecruitmentEEOReportView,
+)
 from .sso_views import SSOCallbackView, SSOConfigView, SSOStartView
 from .report_views import (
     AttendanceReportView,
@@ -21,6 +36,15 @@ router.register('leave-balances', viewsets.LeaveBalanceViewSet, basename='leave-
 router.register('attendance', viewsets.AttendanceViewSet, basename='attendance')
 router.register('jobs', viewsets.JobPostingViewSet, basename='job')
 router.register('applications', viewsets.ApplicationViewSet, basename='application')
+router.register('application-notes', viewsets.ApplicationNoteViewSet, basename='application-note')
+router.register('interviews', viewsets.InterviewViewSet, basename='interview')
+router.register('pipeline-stages', viewsets.JobPipelineStageViewSet, basename='pipeline-stage')
+router.register('hiring-team', viewsets.HiringTeamMemberViewSet, basename='hiring-team')
+router.register('scorecard-criteria', viewsets.ScorecardCriterionViewSet, basename='scorecard-criterion')
+router.register('scorecards', viewsets.ApplicationScorecardViewSet, basename='scorecard')
+router.register('offer-templates', viewsets.OfferTemplateViewSet, basename='offer-template')
+router.register('offers', viewsets.JobOfferViewSet, basename='offer')
+router.register('hire-onboarding', viewsets.HireOnboardingViewSet, basename='hire-onboarding')
 router.register('salaries', viewsets.SalaryViewSet, basename='salary')
 router.register('performance-goals', viewsets.PerformanceGoalViewSet, basename='performance-goal')
 router.register('performance-appraisals', viewsets.PerformanceAppraisalViewSet, basename='performance-appraisal')
@@ -59,6 +83,8 @@ router.register('approval-workflows', viewsets.ApprovalWorkflowViewSet, basename
 router.register('approval-requests', viewsets.ApprovalRequestViewSet, basename='approval-request')
 router.register('api-keys', viewsets.APIKeyViewSet, basename='api-key')
 router.register('webhooks', viewsets.WebhookEndpointViewSet, basename='webhook')
+router.register('compliance/retention-policies', DataRetentionPolicyViewSet, basename='retention-policy')
+router.register('users', viewsets.UserViewSet, basename='user')
 
 urlpatterns = [
     path('auth/csrf/', views.CsrfView.as_view(), name='api-csrf'),
@@ -73,8 +99,15 @@ urlpatterns = [
     path('auth/register/', views.RegisterView.as_view(), name='api-register'),
     path('auth/me/', views.CurrentUserView.as_view(), name='api-me'),
     path('roles/', views.RoleListView.as_view(), name='api-roles'),
-    path('users/', views.UserListView.as_view(), name='api-users'),
     path('dashboard/', views.DashboardView.as_view(), name='api-dashboard'),
+    path('recruitment/summary/', RecruitmentSummaryView.as_view(), name='api-recruitment-summary'),
+    path('recruitment/eeo-report/', RecruitmentEEOReportView.as_view(), name='api-recruitment-eeo'),
+    path('interviews/<int:interview_id>/calendar.ics', InterviewCalendarView.as_view(), name='api-interview-ics'),
+    path('offers/<int:offer_id>/public/', PublicOfferDetailView.as_view(), name='api-offer-public'),
+    path('offers/<int:offer_id>/sign/', PublicOfferSignView.as_view(), name='api-offer-sign'),
+    path('careers/jobs/', PublicJobListView.as_view(), name='api-careers-jobs'),
+    path('careers/jobs/<int:job_id>/', PublicJobDetailView.as_view(), name='api-careers-job-detail'),
+    path('careers/jobs/<int:job_id>/apply/', PublicApplyView.as_view(), name='api-careers-apply'),
     path('health/', views.HealthCheckView.as_view(), name='api-health'),
     path('reports/analytics/', views.ReportsAnalyticsView.as_view(), name='api-reports-analytics'),
     path('reports/filters/', ReportFiltersView.as_view(), name='api-reports-filters'),
@@ -84,5 +117,10 @@ urlpatterns = [
     path('reports/performance/', PerformanceReportView.as_view(), name='api-reports-performance'),
     path('reports/recruitment/', RecruitmentReportView.as_view(), name='api-reports-recruitment'),
     path('payroll/export/', PayrollExportView.as_view(), name='api-payroll-export'),
+    path('compliance/data-export/me/', GDPRDataExportView.as_view(), name='api-gdpr-export-me'),
+    path('compliance/data-export/employees/<int:employee_id>/', GDPRDataExportView.as_view(), name='api-gdpr-export-employee'),
+    path('compliance/erasure/<int:employee_id>/', GDPRErasureView.as_view(), name='api-gdpr-erasure'),
+    path('compliance/retention-policies/preview/', RetentionPreviewView.as_view(), name='api-retention-preview'),
+    path('compliance/retention-policies/run/', RetentionRunView.as_view(), name='api-retention-run'),
     path('', include(router.urls)),
 ]

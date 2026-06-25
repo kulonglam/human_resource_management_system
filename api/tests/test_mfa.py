@@ -55,3 +55,12 @@ class MFATests(HRAPITestCase):
         user = CustomUser.objects.get(pk=self.admin_user.pk)
         self.assertTrue(user.mfa_enabled)
         self.assertEqual(user.mfa_secret, secret)
+
+    def test_admin_without_mfa_blocked_from_api(self):
+        self.login('admin', 'AdminPass123!')
+        response = self.client.get('/api/v1/dashboard/')
+        self.assertEqual(response.status_code, 403)
+
+        me = self.client.get('/api/v1/auth/me/')
+        self.assertEqual(me.status_code, 200)
+        self.assertTrue(me.data['mfa_setup_required'])

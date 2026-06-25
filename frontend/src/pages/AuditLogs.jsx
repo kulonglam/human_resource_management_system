@@ -24,8 +24,24 @@ export default function AuditLogs() {
   return (
     <div className="card">
       <div className="card-body">
-        <h5 className="card-title">
-          <i className="bi bi-journal-text" /> Audit Log
+        <h5 className="card-title d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <span><i className="bi bi-journal-text" /> Audit Log</span>
+          <span className="d-flex gap-2">
+            <button
+              type="button"
+              className="btn btn-outline-secondary btn-sm"
+              onClick={() => api.downloadAuditLog('csv')}
+            >
+              Export CSV
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline-secondary btn-sm"
+              onClick={() => api.downloadAuditLog('xlsx')}
+            >
+              Export Excel
+            </button>
+          </span>
         </h5>
 
         {error && <div className="alert alert-danger">{error}</div>}

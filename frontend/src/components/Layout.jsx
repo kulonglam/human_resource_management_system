@@ -26,11 +26,18 @@ const navItems = [
   { to: '/kin', icon: 'bi-person-hearts', label: 'Next of Kin' },
 ];
 
+const managerNavItems = [
+  { to: '/approvals', icon: 'bi-inbox', label: 'Approvals' },
+];
+
 const adminNavItems = [
+  { to: '/approvals', icon: 'bi-inbox', label: 'Approvals' },
+  { to: '/settings/users', icon: 'bi-people-fill', label: 'Users' },
   { to: '/org-chart', icon: 'bi-diagram-3', label: 'Org Chart' },
   { to: '/audit-logs', icon: 'bi-journal-text', label: 'Audit Log' },
   { to: '/settings/security', icon: 'bi-shield-lock', label: 'Security' },
   { to: '/settings/integrations', icon: 'bi-plug', label: 'Integrations' },
+  { to: '/settings/compliance', icon: 'bi-shield-check', label: 'Compliance' },
 ];
 
 export default function Layout() {
@@ -65,6 +72,25 @@ export default function Layout() {
             </NavLink>
           ))}
 
+          {user?.is_manager && !user?.is_admin && (
+            <>
+              <div className="sidebar-section-label px-3 py-2 small text-muted text-uppercase">
+                Management
+              </div>
+              {managerNavItems.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  className={({ isActive }) => (isActive ? 'active' : undefined)}
+                  onClick={closeSidebar}
+                >
+                  <i className={`bi ${item.icon}`} />
+                  <span>{item.label}</span>
+                </NavLink>
+              ))}
+            </>
+          )}
+
           {user?.is_admin && (
             <>
               <div className="sidebar-section-label px-3 py-2 small text-muted text-uppercase">
@@ -84,13 +110,6 @@ export default function Layout() {
             </>
           )}
         </nav>
-
-        <div className="sidebar-logout">
-          <button type="button" className="btn btn-danger btn-sm" onClick={handleLogout}>
-            <i className="bi bi-box-arrow-right" />
-            <span>Logout</span>
-          </button>
-        </div>
       </div>
 
       {sidebarOpen && (
@@ -113,9 +132,17 @@ export default function Layout() {
           </button>
           <div className="top-bar-user d-flex align-items-center gap-2">
             <NotificationBell />
-            <span>
+            <span className="top-bar-username">
               <i className="bi bi-person-circle" /> {user?.username}
             </span>
+            <button
+              type="button"
+              className="btn btn-danger btn-sm top-bar-logout"
+              onClick={handleLogout}
+            >
+              <i className="bi bi-box-arrow-right" />
+              <span className="top-bar-logout-label">Logout</span>
+            </button>
           </div>
         </div>
 

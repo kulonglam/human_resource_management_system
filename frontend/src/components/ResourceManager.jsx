@@ -56,6 +56,24 @@ function FormField({ field, value, onChange, options = {}, existingUrl }) {
     );
   }
 
+  if (type === 'checkbox') {
+    return (
+      <div className="form-check mb-3">
+        <input
+          type="checkbox"
+          className="form-check-input"
+          name={name}
+          id={`field-${name}`}
+          checked={!!value}
+          onChange={(e) => onChange({ target: { name, value: e.target.checked, type: 'checkbox' } })}
+        />
+        <label className="form-check-label" htmlFor={`field-${name}`}>
+          {label || defaultLabel(name)}
+        </label>
+      </div>
+    );
+  }
+
   return (
     <div className="mb-3">
       <label className="form-label">{label || defaultLabel(name)}</label>
@@ -69,6 +87,9 @@ export default function ResourceManager({
   icon,
   tabs,
   lookupOptions = {},
+  user,
+  headerExtra,
+  embedded = false,
 }) {
   const [activeTab, setActiveTab] = useState(tabs[0]?.id);
   const [rows, setRows] = useState([]);
@@ -81,6 +102,18 @@ export default function ResourceManager({
   const [submitting, setSubmitting] = useState(false);
 
   const tab = tabs.find((t) => t.id === activeTab) || tabs[0];
+  const isEmployeeUser = user && !user.is_admin && !user.is_manager;
+
+  const canUseTabCreate = tab?.canCreate !== false && tab?.formFields?.length > 0
+    && !(isEmployeeUser && tab?.hideCreateForEmployee);
+  const canUseTabEdit = !(isEmployeeUser && tab?.hideEditForEmployee);
+
+  const visibleFormFields = tab?.formFields?.filter((field) => {
+    if (tab.selfServiceEmployee && isEmployeeUser && field.name === 'employee') {
+      return false;
+    }
+    return true;
+  }) || [];
 
   const load = useCallback(async () => {
     if (!tab) return;
@@ -103,8 +136,11 @@ export default function ResourceManager({
   const openCreate = () => {
     const initial = {};
     tab.formFields?.forEach((f) => {
-      initial[f.name] = f.default ?? '';
+      initial[f.name] = f.default ?? (f.type === 'checkbox' ? false : '');
     });
+    if (tab.selfServiceEmployee && isEmployeeUser && user?.linked_employee_id) {
+      initial.employee = user.linked_employee_id;
+    }
     setForm(initial);
     setFiles({});
     setEditing(null);
@@ -115,7 +151,7 @@ export default function ResourceManager({
     const initial = {};
     tab.formFields?.forEach((f) => {
       if (f.type !== 'file') {
-        initial[f.name] = row[f.name] ?? '';
+        initial[f.name] = f.type === 'checkbox' ? Boolean(row[f.name]) : (row[f.name] ?? '');
       }
     });
     setForm(initial);
@@ -134,10 +170,14 @@ export default function ResourceManager({
   };
 
   const buildPayload = () => {
-    const hasFiles = tab.formFields?.some((f) => f.type === 'file' && files[f.name]);
+    const fields = visibleFormFields.length ? visibleFormFields : tab.formFields;
+    const hasFiles = fields?.some((f) => f.type === 'file' && files[f.name]);
     if (!hasFiles) {
       const payload = { ...form };
-      tab.formFields?.forEach((f) => {
+      if (tab.selfServiceEmployee && isEmployeeUser && user?.linked_employee_id) {
+        payload.employee = user.linked_employee_id;
+      }
+      fields?.forEach((f) => {
         if (f.type === 'number' && payload[f.name] !== '') {
           payload[f.name] = Number(payload[f.name]);
         }
@@ -146,12 +186,15 @@ export default function ResourceManager({
             ? Number(payload[f.name])
             : payload[f.name];
         }
+        if (f.type === 'checkbox') {
+          payload[f.name] = Boolean(payload[f.name]);
+        }
       });
       return payload;
     }
 
     const formData = new FormData();
-    tab.formFields?.forEach((f) => {
+    fields?.forEach((f) => {
       if (f.type === 'file') {
         if (files[f.name]) formData.append(f.name, files[f.name]);
         return;
@@ -159,6 +202,7 @@ export default function ResourceManager({
       let val = form[f.name];
       if (f.type === 'number' && val !== '') val = Number(val);
       if (f.type === 'select' && val !== '' && /^\d+$/.test(String(val))) val = Number(val);
+      if (f.type === 'checkbox') val = val ? 'true' : 'false';
       if (val !== '' && val != null) formData.append(f.name, val);
     });
     return formData;
@@ -214,16 +258,28 @@ export default function ResourceManager({
 
   return (
     <>
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <h4 className="page-heading mb-0">
-          {icon && <i className={`bi ${icon}`} style={{ color: 'var(--fca-lime)' }} />} {title}
-        </h4>
-        {tab.canCreate !== false && tab.formFields?.length > 0 && (
+      {!embedded && (
+        <div className="d-flex justify-content-between align-items-center mb-4">
+          <h4 className="page-heading mb-0">
+            {icon && <i className={`bi ${icon}`} style={{ color: 'var(--fca-lime)' }} />} {title}
+          </h4>
+          {canUseTabCreate && (
+            <button type="button" className="btn btn-primary btn-sm" onClick={openCreate}>
+              <i className="bi bi-plus-lg" /> {tab.createLabel || 'Add'}
+            </button>
+          )}
+        </div>
+      )}
+
+      {embedded && canUseTabCreate && (
+        <div className="d-flex justify-content-end mb-3">
           <button type="button" className="btn btn-primary btn-sm" onClick={openCreate}>
-            <i className="bi bi-plus-lg" /> Add
+            <i className="bi bi-plus-lg" /> {tab.createLabel || 'Add'}
           </button>
-        )}
-      </div>
+        </div>
+      )}
+
+      {headerExtra}
 
       {tabs.length > 1 && (
         <ul className="nav nav-tabs mb-3">
@@ -257,7 +313,7 @@ export default function ResourceManager({
                     {columns.map((col) => (
                       <th key={col.key || col}>{typeof col === 'string' ? defaultLabel(col) : col.label}</th>
                     ))}
-                    {(tab.formFields?.length || tab.rowActions?.length || tab.detailPath) && <th>Actions</th>}
+                    {(visibleFormFields.length || tab.rowActions?.length || tab.detailPath) && <th>Actions</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -268,7 +324,7 @@ export default function ResourceManager({
                         const val = col.render ? col.render(row) : row[key];
                         return <td key={key}>{val ?? '—'}</td>;
                       })}
-                      {(tab.formFields?.length || tab.rowActions?.length || tab.detailPath) && (
+                      {(visibleFormFields.length || tab.rowActions?.length || tab.detailPath) && (
                         <td className="text-nowrap">
                           {tab.detailPath && (
                             <Link
@@ -278,7 +334,7 @@ export default function ResourceManager({
                               <i className="bi bi-eye" />
                             </Link>
                           )}
-                          {tab.formFields?.length > 0 && (
+                          {canUseTabEdit && visibleFormFields.length > 0 && (
                             <button
                               type="button"
                               className="btn btn-outline-primary btn-sm me-1"
@@ -287,7 +343,7 @@ export default function ResourceManager({
                               <i className="bi bi-pencil" />
                             </button>
                           )}
-                          {tab.canDelete !== false && tab.formFields?.length > 0 && (
+                          {canUseTabEdit && tab.canDelete !== false && visibleFormFields.length > 0 && (
                             <button
                               type="button"
                               className="btn btn-outline-danger btn-sm me-1"
@@ -297,7 +353,7 @@ export default function ResourceManager({
                             </button>
                           )}
                           {tab.rowActions?.map((action) =>
-                            (!action.show || action.show(row)) ? (
+                            (!action.show || action.show(row)) && !(isEmployeeUser && tab.hideRowActionsForEmployee) ? (
                               <button
                                 key={action.name}
                                 type="button"
@@ -314,7 +370,7 @@ export default function ResourceManager({
                   ))}
                   {!rows.length && (
                     <tr>
-                      <td colSpan={columns.length + (tab.formFields?.length || tab.rowActions?.length || tab.detailPath ? 1 : 0)} className="text-center py-4 text-muted">
+                      <td colSpan={columns.length + (visibleFormFields.length || tab.rowActions?.length || tab.detailPath ? 1 : 0)} className="text-center py-4 text-muted">
                         No records found.
                       </td>
                     </tr>
@@ -337,8 +393,13 @@ export default function ResourceManager({
                     <button type="button" className="btn-close" onClick={() => setShowModal(false)} />
                   </div>
                   <div className="modal-body">
+                    {tab.selfServiceEmployee && isEmployeeUser && user?.linked_employee_name && (
+                      <div className="alert alert-light border mb-3">
+                        Applying as <strong>{user.linked_employee_name}</strong>
+                      </div>
+                    )}
                     <div className="row">
-                      {tab.formFields?.map((field) => (
+                      {visibleFormFields.map((field) => (
                         <div className={field.fullWidth ? 'col-12' : 'col-md-6'} key={field.name}>
                           <FormField
                             field={field}

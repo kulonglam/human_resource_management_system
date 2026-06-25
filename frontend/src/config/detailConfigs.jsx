@@ -126,6 +126,7 @@ export const DETAIL_CONFIGS = {
       title: 'Applications',
       endpoint: 'applications',
       queryKey: 'job',
+      detailPath: '/recruitment/applications',
       columns: [
         { key: 'full_name', label: 'Applicant' },
         { key: 'email', label: 'Email' },

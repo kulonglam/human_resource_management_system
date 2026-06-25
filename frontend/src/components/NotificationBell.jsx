@@ -38,18 +38,17 @@ export default function NotificationBell() {
   };
 
   return (
-    <div className="dropdown">
+    <div className="notification-bell">
       <button
         type="button"
-        className="btn btn-link position-relative text-decoration-none"
+        className="notification-bell-btn"
         onClick={() => { setOpen((v) => !v); if (!open) load(); }}
         aria-label="Notifications"
+        aria-expanded={open}
       >
-        <i className="bi bi-bell fs-5" />
+        <i className="bi bi-bell" />
         {unread > 0 && (
-          <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-            {unread}
-          </span>
+          <span className="notification-bell-badge">{unread > 99 ? '99+' : unread}</span>
         )}
       </button>
 
@@ -59,11 +58,16 @@ export default function NotificationBell() {
           <div className="notification-panel card shadow">
             <div className="card-header d-flex justify-content-between align-items-center py-2">
               <strong>Notifications</strong>
-              {unread > 0 && (
-                <button type="button" className="btn btn-link btn-sm" onClick={markAllRead}>
-                  Mark all read
-                </button>
-              )}
+              <div className="d-flex gap-2 align-items-center">
+                <Link to="/approvals" className="btn btn-link btn-sm" onClick={() => setOpen(false)}>
+                  Approval inbox
+                </Link>
+                {unread > 0 && (
+                  <button type="button" className="btn btn-link btn-sm" onClick={markAllRead}>
+                    Mark all read
+                  </button>
+                )}
+              </div>
             </div>
             <div className="list-group list-group-flush notification-list">
               {loading ? (
@@ -78,11 +82,11 @@ export default function NotificationBell() {
                     className={`list-group-item list-group-item-action text-start ${item.is_read ? '' : 'fw-semibold'}`}
                     onClick={() => {
                       markRead(item.id);
-                      if (item.link) setOpen(false);
+                      setOpen(false);
                     }}
                   >
                     {item.link ? (
-                      <Link to={item.link} className="text-decoration-none text-body stretched-link">
+                      <Link to={item.category === 'approval' ? '/approvals' : item.link} className="text-decoration-none text-body stretched-link">
                         {item.title}
                       </Link>
                     ) : (

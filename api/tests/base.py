@@ -1,4 +1,4 @@
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -8,6 +8,7 @@ from employees.models import Employee
 from leaves.models import LeaveBalance
 
 
+@override_settings(ENFORCE_MFA_FOR_ADMINS=False)
 class HRAPITestCase(TestCase):
     @classmethod
     def setUpTestData(cls):

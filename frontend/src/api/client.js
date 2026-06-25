@@ -32,9 +32,14 @@ async function request(path, options = {}) {
   const data = isJson ? await response.json() : await response.text();
 
   if (!response.ok) {
-    const error = new Error(data?.detail || 'Request failed');
+    const message = typeof data === 'string'
+      ? (data.trimStart().startsWith('<')
+        ? `Server error (${response.status}). If this persists, ensure database migrations are applied.`
+        : data)
+      : (data?.detail || 'Request failed');
+    const error = new Error(message);
     error.status = response.status;
-    error.data = data;
+    error.data = typeof data === 'object' ? data : null;
     throw error;
   }
 
@@ -59,11 +64,87 @@ export const api = {
   getMe: () => request('/auth/me/'),
   getRoles: () => request('/roles/'),
   getDashboard: () => request('/dashboard/'),
+  getRecruitmentSummary: (query = '') =>
+    request(`/recruitment/summary/${query ? `?${query}` : ''}`),
+  getRecruitmentEEOReport: (query = '') =>
+    request(`/recruitment/eeo-report/${query ? `?${query}` : ''}`),
+  createOfferFromTemplate: (payload) =>
+    request('/offers/from-template/', { method: 'POST', body: payload }),
+  offerAction: (id, action) =>
+    request(`/offers/${id}/${action}/`, { method: 'POST', body: {} }),
+  getPublicOffer: (id) => request(`/offers/${id}/public/`),
+  signOffer: (id, payload) =>
+    request(`/offers/${id}/sign/`, { method: 'POST', body: payload }),
+  moveApplicationStage: (applicationId, stageId) =>
+    request(`/applications/${applicationId}/move_stage/`, { method: 'POST', body: { stage_id: stageId } }),
+  completeOnboarding: (id, payload) =>
+    request(`/hire-onboarding/${id}/complete/`, { method: 'POST', body: payload }),
+  getCareersJobs: () => request('/careers/jobs/'),
+  getCareersJob: (id) => request(`/careers/jobs/${id}/`),
+  applyToCareersJob: (id, formData) =>
+    request(`/careers/jobs/${id}/apply/`, { method: 'POST', body: formData }),
   getAuthConfig: () => request('/auth/config/'),
   getSsoConfig: () => request('/auth/sso/config/'),
   startSso: (provider) => request(`/auth/sso/${provider}/start/`),
   getOrgChart: () => request('/departments/org_chart/'),
   getWebhookEvents: () => request('/webhooks/events/'),
+  getWebhookDeliveries: (id) => request(`/webhooks/${id}/deliveries/`),
+  getWebhookDeliveryLog: (query = '') => request(`/webhooks/delivery-log/${query ? `?${query}` : ''}`),
+  getApprovalWorkflows: () => request('/approval-workflows/'),
+  getRetentionPolicies: () => request('/compliance/retention-policies/'),
+  getRetentionPreview: () => request('/compliance/retention-policies/preview/'),
+  updateRetentionPolicy: (id, payload) => api.update('compliance/retention-policies', id, payload),
+  runRetentionPolicies: (dryRun = false) =>
+    request('/compliance/retention-policies/run/', { method: 'POST', body: { dry_run: dryRun } }),
+  downloadGdprExport: async (employeeId = null) => {
+    const path = employeeId
+      ? `/compliance/data-export/employees/${employeeId}/?download=1`
+      : '/compliance/data-export/me/?download=1';
+    const csrfToken = document.cookie.match(/(^| )csrftoken=([^;]+)/)?.[2];
+    const response = await fetch(`/api/v1${path}`, {
+      credentials: 'include',
+      headers: csrfToken ? { 'X-CSRFToken': decodeURIComponent(csrfToken) } : {},
+    });
+    if (!response.ok) throw new Error('GDPR export failed');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = employeeId ? `gdpr_export_${employeeId}.json` : 'my_data_export.json';
+    link.click();
+    window.URL.revokeObjectURL(url);
+  },
+  requestGDPRErasure: (employeeId, confirmEmail) =>
+    request(`/compliance/erasure/${employeeId}/`, {
+      method: 'POST',
+      body: { confirm: confirmEmail },
+    }),
+  downloadAuditLog: async (format = 'csv', query = '') => {
+    const params = new URLSearchParams(query);
+    const csrfToken = document.cookie.match(/(^| )csrftoken=([^;]+)/)?.[2];
+    const suffix = format === 'xlsx' ? '.xlsx' : '.csv';
+    const response = await fetch(`/api/v1/audit-logs/export${suffix}/`, {
+      credentials: 'include',
+      headers: csrfToken ? { 'X-CSRFToken': decodeURIComponent(csrfToken) } : {},
+    });
+    if (!response.ok) throw new Error('Audit log export failed');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `audit_log.${format}`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+  },
+  getApprovalRequests: (query = '') =>
+    request(`/approval-requests/${query ? `?${query}` : ''}`),
+  approvalAction: (id, action, comment = '') =>
+    request(`/approval-requests/${id}/${action}/`, {
+      method: 'POST',
+      body: { comment },
+    }),
+  syncLeavePolicies: (payload) =>
+    request('/leave-policy-allocations/sync/', { method: 'POST', body: payload }),
   downloadPayroll: async (query = '', format = 'xlsx') => {
     const params = new URLSearchParams(query);
     params.set('format', format);
@@ -134,6 +215,9 @@ export const api = {
     }),
 
   getUsers: () => request('/users/'),
+  getRoles: () => request('/roles/'),
+  createUser: (payload) => api.create('users', payload),
+  updateUser: (id, payload) => api.update('users', id, payload),
   getMyFeedbackRequests: () => request('/feedback-requests/mine/'),
   submitFeedback: (requestId, payload) =>
     api.action('feedback-requests', requestId, 'submit', payload),

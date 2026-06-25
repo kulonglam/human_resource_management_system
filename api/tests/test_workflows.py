@@ -46,3 +46,23 @@ class WorkflowTests(HRAPITestCase):
         self.assertEqual(response.status_code, 200)
         rows = response.data.get('results', response.data)
         self.assertGreaterEqual(len(rows), 1)
+        self.assertIn('summary', rows[0])
+        self.assertIn('workflow_type', rows[0])
+
+    def test_approve_via_approval_inbox(self):
+        create = self._create_leave()
+        self.assertEqual(create.status_code, 201)
+        list_resp = self.client.get('/api/v1/approval-requests/')
+        req_id = list_resp.data['results'][0]['id']
+        approve = self.client.post(
+            f'/api/v1/approval-requests/{req_id}/approve/',
+            {'comment': 'Approved from inbox'},
+            format='json',
+        )
+        self.assertEqual(approve.status_code, 200)
+        self.assertIn(approve.data['result'], ('approved', 'advanced'))
+
+    def test_employee_cannot_access_approval_inbox(self):
+        self.login('employee', 'EmployeePass123!')
+        response = self.client.get('/api/v1/approval-requests/')
+        self.assertEqual(response.status_code, 403)

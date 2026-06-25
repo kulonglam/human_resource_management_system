@@ -9,7 +9,7 @@ export default function EmployeeDetail() {
   const { user } = useAuth();
   const [employee, setEmployee] = useState(null);
   const [error, setError] = useState('');
-  const [terminating, setTerminating] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [exitReason, setExitReason] = useState('resignation');
   const [exitNotes, setExitNotes] = useState('');
 
@@ -18,6 +18,18 @@ export default function EmployeeDetail() {
       .then(setEmployee)
       .catch((err) => setError(err.message));
   }, [id]);
+
+  const handleExport = async () => {
+    setExporting(true);
+    setError('');
+    try {
+      await api.downloadGdprExport(id);
+    } catch (err) {
+      setError(err.message || 'Export failed.');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const handleTerminate = async (e) => {
     e.preventDefault();
@@ -44,6 +56,16 @@ export default function EmployeeDetail() {
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h4 className="page-heading">{employee.full_name}</h4>
         <div className="d-flex gap-2">
+          {(user?.is_admin || user?.is_manager) && (
+            <button
+              type="button"
+              className="btn btn-outline-secondary btn-sm"
+              onClick={handleExport}
+              disabled={exporting}
+            >
+              {exporting ? 'Exporting…' : 'GDPR Export'}
+            </button>
+          )}
           <Link to={`/employees/${id}/edit`} className="btn btn-primary btn-sm">
             Edit
           </Link>
