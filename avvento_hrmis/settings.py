@@ -32,16 +32,26 @@ DEBUG = os.environ.get(
     'False' if os.environ.get('DATABASE_URL') else 'True',
 ) == 'True'
 
-ALLOWED_HOSTS = [ 
-    'localhost',
-    '127.0.0.1',
-    'human-resource-management-system-i1d3.onrender.com']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+
+_extra_hosts = os.environ.get('ALLOWED_HOSTS', '')
+if _extra_hosts:
+    ALLOWED_HOSTS.extend(host.strip() for host in _extra_hosts.split(',') if host.strip())
+
+_render_hostname = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
+if _render_hostname:
+    ALLOWED_HOSTS.append(_render_hostname)
 
 CSRF_TRUSTED_ORIGINS = [
-    'https://human-resource-management-system-i1d3.onrender.com',
     'http://localhost:5173',
     'http://127.0.0.1:5173',
 ]
+if _render_hostname:
+    CSRF_TRUSTED_ORIGINS.append(f'https://{_render_hostname}')
+
+_extra_csrf = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
+if _extra_csrf:
+    CSRF_TRUSTED_ORIGINS.extend(origin.strip() for origin in _extra_csrf.split(',') if origin.strip())
 
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:5173',

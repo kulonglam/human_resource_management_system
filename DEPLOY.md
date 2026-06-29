@@ -90,6 +90,10 @@ Set these in the Render dashboard for **production** and **staging** separately.
 | `ENFORCE_MFA_FOR_ADMINS` | `True` | `True` |
 | `RENDER_SERVICE_NAME` | `production` | `staging` |
 
+Render also sets `RENDER_EXTERNAL_HOSTNAME` automatically (e.g. `your-service.onrender.com`). The app uses it for `ALLOWED_HOSTS` and CSRF — no manual host entry needed for the default `*.onrender.com` URL.
+
+For a **custom domain**, add it to the `ALLOWED_HOSTS` env var (comma-separated) and `CSRF_TRUSTED_ORIGINS` (comma-separated `https://…` URLs).
+
 ### SMTP (required for email notifications)
 
 | Variable | Example |
