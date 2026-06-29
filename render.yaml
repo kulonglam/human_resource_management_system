@@ -3,10 +3,7 @@ services:
     name: human-resource-management-system
     runtime: python
     plan: free
-    buildCommand: >-
-      pip install -r requirements.txt &&
-      cd frontend && npm install && npm run build && cd .. &&
-      python manage.py collectstatic --noinput
+    buildCommand: bash scripts/render-build.sh
     preDeployCommand: >-
       python manage.py migrate --noinput &&
       python manage.py seed_data --reset-password &&
@@ -53,10 +50,7 @@ services:
     runtime: python
     plan: free
     branch: main
-    buildCommand: >-
-      pip install -r requirements.txt &&
-      cd frontend && npm install && npm run build && cd .. &&
-      python manage.py collectstatic --noinput
+    buildCommand: bash scripts/render-build.sh
     preDeployCommand: >-
       python manage.py migrate --noinput &&
       python manage.py seed_data --reset-password &&

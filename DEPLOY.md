@@ -12,6 +12,28 @@ Use this guide to sync **staging** and **production** on Render after pushing co
    - `human-resource-management-system-staging` (staging)
    - `avvento-hrmis-db` / `avvento-hrmis-db-staging`
 
+### Build command (required)
+
+The React SPA must be built during deploy (`frontend/dist`). If you see:
+
+`React frontend is not built. Run: cd frontend && npm install && npm run build`
+
+your Render service is missing the frontend build step.
+
+**Blueprint / `render.yaml` services** use:
+
+```bash
+bash scripts/render-build.sh
+```
+
+**Manually created services** — open Render → your web service → **Settings** → **Build Command** and set:
+
+```bash
+bash scripts/render-build.sh && python manage.py migrate --noinput
+```
+
+(or keep `migrate` in **Pre-Deploy Command** as in `render.yaml` instead of the build step).
+
 ## 2. Configure environment variables (both services)
 
 Set these in the Render dashboard for **production** and **staging** separately.
