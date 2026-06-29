@@ -10,6 +10,12 @@ body {
   background: var(--fca-white);
 }
 
+#root {
+  flex: 1;
+  width: 100%;
+  min-height: 100vh;
+}
+
 body.sidebar-open {
   overflow: hidden;
 }
@@ -162,16 +168,19 @@ body.sidebar-open {
 }
 
 .auth-page {
+  width: 100%;
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--fca-sage-muted);
   padding: 1rem;
+  box-sizing: border-box;
 }
 
 .auth-page .card {
   border-top: 4px solid var(--fca-lime);
+  margin: 0 auto;
 }
 
 .auth-page .card-title {
