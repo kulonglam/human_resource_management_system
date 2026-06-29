@@ -8,7 +8,7 @@ services:
       python manage.py migrate --noinput &&
       python manage.py seed_data --reset-password &&
       python manage.py seed_workflows
-    startCommand: gunicorn avvento_hrmis.wsgi:application
+    startCommand: gunicorn avvento_hrmis.wsgi:application --bind 0.0.0.0:$PORT
     healthCheckPath: /api/v1/health/
     envVars:
       - key: PYTHON_VERSION
@@ -55,7 +55,7 @@ services:
       python manage.py migrate --noinput &&
       python manage.py seed_data --reset-password &&
       python manage.py seed_workflows
-    startCommand: gunicorn avvento_hrmis.wsgi:application
+    startCommand: gunicorn avvento_hrmis.wsgi:application --bind 0.0.0.0:$PORT
     healthCheckPath: /api/v1/health/
     envVars:
       - key: PYTHON_VERSION

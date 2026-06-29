@@ -34,6 +34,41 @@ bash scripts/render-build.sh && python manage.py migrate --noinput
 
 (or keep `migrate` in **Pre-Deploy Command** as in `render.yaml` instead of the build step).
 
+### Start command (required)
+
+The start command only launches the web server. It does **not** build the frontend or run migrations.
+
+**Blueprint / `render.yaml` services** use:
+
+```bash
+gunicorn avvento_hrmis.wsgi:application --bind 0.0.0.0:$PORT
+```
+
+**Manually created services** — Render → your web service → **Settings** → **Start Command**:
+
+```bash
+gunicorn avvento_hrmis.wsgi:application --bind 0.0.0.0:$PORT
+```
+
+Do **not** use `python manage.py runserver` in production, and do not put `npm run build` or `migrate` in the start command.
+
+### Pre-deploy command (recommended)
+
+If you are not using the blueprint, set **Pre-Deploy Command** to:
+
+```bash
+python manage.py migrate --noinput && python manage.py seed_data --reset-password && python manage.py seed_workflows
+```
+
+### Quick reference (manual Render service)
+
+| Setting | Command |
+|---------|---------|
+| **Build** | `bash scripts/render-build.sh` |
+| **Pre-Deploy** | `python manage.py migrate --noinput && python manage.py seed_data --reset-password && python manage.py seed_workflows` |
+| **Start** | `gunicorn avvento_hrmis.wsgi:application --bind 0.0.0.0:$PORT` |
+| **Health check path** | `/api/v1/health/` |
+
 ## 2. Configure environment variables (both services)
 
 Set these in the Render dashboard for **production** and **staging** separately.
