@@ -14,13 +14,22 @@ export default function ComplianceSettings() {
   const [erasureEmail, setErasureEmail] = useState('');
   const [erasureId, setErasureId] = useState('');
   const [erasing, setErasing] = useState(false);
+  const [evidence, setEvidence] = useState([]);
+  const [vulns, setVulns] = useState([]);
 
   const load = () => {
     setLoading(true);
-    Promise.all([api.getRetentionPolicies(), api.getRetentionPreview()])
-      .then(([policyData, previewData]) => {
+    Promise.all([
+      api.getRetentionPolicies(),
+      api.getRetentionPreview(),
+      api.getEvidencePacks().catch(() => []),
+      api.getVulnerabilities().catch(() => []),
+    ])
+      .then(([policyData, previewData, evidenceData, vulnData]) => {
         setPolicies(policyData.results || policyData);
         setPreview(previewData);
+        setEvidence(evidenceData.results || evidenceData);
+        setVulns(vulnData.results || vulnData);
       })
       .catch((err) => setError(err.data?.detail || 'Failed to load compliance settings.'))
       .finally(() => setLoading(false));
@@ -215,6 +224,58 @@ export default function ComplianceSettings() {
               Schedule automated purges with{' '}
               <code>python manage.py apply_retention_policies</code> (e.g. nightly cron).
             </p>
+
+            <h6 className="mt-4">Evidence pack (audit)</h6>
+            <p className="small text-muted">Control catalogue for SOC2/ISO-style evidence reviews.</p>
+            {evidence.length === 0 ? (
+              <p className="small text-muted">No evidence packs yet. Create via API <code>/compliance/evidence-packs/</code>.</p>
+            ) : (
+              <div className="table-responsive mb-3">
+                <table className="table table-sm">
+                  <thead>
+                    <tr><th>Control</th><th>Title</th><th>Status</th><th>Next review</th></tr>
+                  </thead>
+                  <tbody>
+                    {evidence.map((row) => (
+                      <tr key={row.id}>
+                        <td>{row.control_label}</td>
+                        <td>{row.title}</td>
+                        <td><span className="badge bg-secondary">{row.status}</span></td>
+                        <td className="small">{row.next_review_at || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <h6>Vulnerability SLAs</h6>
+            {vulns.length === 0 ? (
+              <p className="small text-muted mb-0">No open findings tracked.</p>
+            ) : (
+              <div className="table-responsive">
+                <table className="table table-sm">
+                  <thead>
+                    <tr><th>Finding</th><th>Severity</th><th>Due</th><th>Status</th><th>SLA</th></tr>
+                  </thead>
+                  <tbody>
+                    {vulns.map((row) => (
+                      <tr key={row.id}>
+                        <td>{row.title}</td>
+                        <td>{row.severity}</td>
+                        <td className="small">{row.due_at || '—'}</td>
+                        <td>{row.status}</td>
+                        <td>
+                          {row.sla_breached
+                            ? <span className="badge bg-danger">Breached</span>
+                            : <span className="badge bg-success">On track</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </>
         )}
       </div>

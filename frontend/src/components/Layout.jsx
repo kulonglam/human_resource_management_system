@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import NotificationBell from './NotificationBell';
 import { useAuth } from '../context/AuthContext';
+import { canManageReports, canViewPayroll } from '../utils/permissions';
 
 const navItems = [
   { to: '/dashboard', icon: 'bi-house-door', label: 'Dashboard' },
@@ -10,17 +11,17 @@ const navItems = [
   { to: '/attendance', icon: 'bi-calendar-check', label: 'Attendance' },
   { to: '/leaves', icon: 'bi-calendar-x', label: 'Leaves' },
   { to: '/recruitment', icon: 'bi-briefcase', label: 'Recruitment' },
-  { to: '/payroll', icon: 'bi-cash-coin', label: 'Payroll' },
+  { to: '/payroll', icon: 'bi-cash-coin', label: 'Payroll', requiresPayroll: true },
   { to: '/performance', icon: 'bi-graph-up-arrow', label: 'Performance' },
   { to: '/training', icon: 'bi-book', label: 'Training' },
-  { to: '/reports', icon: 'bi-bar-chart', label: 'Reports' },
+  { to: '/reports', icon: 'bi-bar-chart', label: 'Reports', requiresReports: true },
   { to: '/documents', icon: 'bi-folder2-open', label: 'Documents' },
   { to: '/exits', icon: 'bi-door-closed', label: 'Exit Management' },
   { to: '/assets', icon: 'bi-laptop', label: 'Assets' },
   { to: '/shifts', icon: 'bi-clock', label: 'Shifts' },
   { to: '/expenses', icon: 'bi-receipt', label: 'Expenses' },
   { to: '/benefits', icon: 'bi-heart-pulse', label: 'Benefits' },
-  { to: '/leave-policies', icon: 'bi-file-earmark-text', label: 'Leave Policies' },
+  { to: '/leave-policies', icon: 'bi-file-earmark-text', label: 'Leave Policies', managerOnly: true },
   { to: '/discipline', icon: 'bi-exclamation-triangle', label: 'Discipline' },
   { to: '/surveys', icon: 'bi-clipboard-data', label: 'Surveys' },
   { to: '/kin', icon: 'bi-person-hearts', label: 'Next of Kin' },
@@ -28,17 +29,28 @@ const navItems = [
 
 const managerNavItems = [
   { to: '/approvals', icon: 'bi-inbox', label: 'Approvals' },
+  { to: '/workforce-structure', icon: 'bi-diagram-3', label: 'Workforce Structure' },
 ];
 
 const adminNavItems = [
   { to: '/approvals', icon: 'bi-inbox', label: 'Approvals' },
   { to: '/settings/users', icon: 'bi-people-fill', label: 'Users' },
   { to: '/org-chart', icon: 'bi-diagram-3', label: 'Org Chart' },
+  { to: '/workforce-structure', icon: 'bi-person-workspace', label: 'Workforce Structure' },
   { to: '/audit-logs', icon: 'bi-journal-text', label: 'Audit Log' },
+  { to: '/settings/sensitive-access', icon: 'bi-shield-exclamation', label: 'Sensitive Access' },
+  { to: '/settings/ops', icon: 'bi-hdd-rack', label: 'Operations' },
   { to: '/settings/security', icon: 'bi-shield-lock', label: 'Security' },
   { to: '/settings/integrations', icon: 'bi-plug', label: 'Integrations' },
   { to: '/settings/compliance', icon: 'bi-shield-check', label: 'Compliance' },
 ];
+
+function canSeeNavItem(item, user) {
+  if (item.requiresReports && !canManageReports(user)) return false;
+  if (item.requiresPayroll && !canViewPayroll(user)) return false;
+  if (item.managerOnly && !user?.is_admin && !user?.is_manager) return false;
+  return true;
+}
 
 export default function Layout() {
   const { user, logout } = useAuth();
@@ -60,7 +72,9 @@ export default function Layout() {
         </Link>
 
         <nav className="sidebar-nav">
-          {navItems.map((item) => (
+          {navItems
+            .filter((item) => canSeeNavItem(item, user))
+            .map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -70,7 +84,7 @@ export default function Layout() {
               <i className={`bi ${item.icon}`} />
               <span>{item.label}</span>
             </NavLink>
-          ))}
+            ))}
 
           {user?.is_manager && !user?.is_admin && (
             <>
@@ -150,6 +164,16 @@ export default function Layout() {
           <Outlet />
         </div>
       </div>
+
+      <nav className="mobile-bottom-nav d-md-none" aria-label="Quick manager actions">
+        <NavLink to="/dashboard" onClick={closeSidebar}><i className="bi bi-house" /><span>Home</span></NavLink>
+        <NavLink to="/approvals" onClick={closeSidebar}><i className="bi bi-inbox" /><span>Approvals</span></NavLink>
+        <NavLink to="/leaves" onClick={closeSidebar}><i className="bi bi-calendar-x" /><span>Leave</span></NavLink>
+        {canViewPayroll(user) && (
+          <NavLink to="/payroll" onClick={closeSidebar}><i className="bi bi-cash-coin" /><span>Payroll</span></NavLink>
+        )}
+        <NavLink to="/employees" onClick={closeSidebar}><i className="bi bi-people" /><span>People</span></NavLink>
+      </nav>
     </>
   );
 }

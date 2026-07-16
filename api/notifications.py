@@ -76,7 +76,7 @@ def notify_expense_submitted(expense):
         'employee_name': employee.full_name,
         'category': expense.category.name if expense.category else 'Uncategorized',
         'amount': expense.amount,
-        'currency': 'KES',
+        'currency': 'UGX',
         'description': expense.description,
         'expense_date': expense.expense_date,
     })
@@ -93,7 +93,7 @@ def notify_expense_decision(expense, decision):
         'decision': decision,
         'category': expense.category.name if expense.category else 'Uncategorized',
         'amount': expense.amount,
-        'currency': 'KES',
+        'currency': 'UGX',
         'description': expense.description,
         'rejection_reason': expense.rejection_reason if decision == 'rejected' else '',
         'reviewed_on': expense.approved_date or expense.updated_at,

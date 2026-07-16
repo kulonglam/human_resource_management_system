@@ -9,13 +9,21 @@ class APIKeyAuthentication(BaseAuthentication):
 
     def authenticate(self, request):
         auth_header = request.META.get('HTTP_AUTHORIZATION', '')
-        if not auth_header.startswith(f'{self.keyword} '):
+        # Support Api-Key and Bearer (for SCIM IdPs)
+        raw_key = None
+        if auth_header.startswith(f'{self.keyword} '):
+            raw_key = auth_header[len(self.keyword) + 1:].strip()
+        elif auth_header.startswith('Bearer '):
+            raw_key = auth_header[7:].strip()
+
+        if not raw_key:
             return None
 
-        raw_key = auth_header[len(self.keyword) + 1:].strip()
-        user = APIKey.authenticate(raw_key)
-        if not user:
+        api_key = APIKey.authenticate(raw_key)
+        if not api_key:
             raise AuthenticationFailed('Invalid API key.')
+        user = api_key.user
         if not user.is_active:
             raise AuthenticationFailed('User account is disabled.')
-        return user, None
+        request.auth_api_key = api_key
+        return user, api_key

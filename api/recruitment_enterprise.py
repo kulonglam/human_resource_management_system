@@ -126,7 +126,7 @@ class JobOfferCreateSerializer(serializers.Serializer):
     template = serializers.PrimaryKeyRelatedField(queryset=OfferTemplate.objects.filter(is_active=True))
     salary = serializers.DecimalField(max_digits=14, decimal_places=2)
     start_date = serializers.DateField()
-    currency = serializers.CharField(max_length=3, default='KES', required=False)
+    currency = serializers.CharField(max_length=3, default='UGX', required=False)
     job_title = serializers.CharField(max_length=100, required=False)
     department = serializers.CharField(max_length=100, required=False)
 

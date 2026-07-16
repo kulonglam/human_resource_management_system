@@ -96,6 +96,19 @@ export const api = {
   updateRetentionPolicy: (id, payload) => api.update('compliance/retention-policies', id, payload),
   runRetentionPolicies: (dryRun = false) =>
     request('/compliance/retention-policies/run/', { method: 'POST', body: { dry_run: dryRun } }),
+  getEvidencePacks: () => request('/compliance/evidence-packs/').then(unwrapList),
+  getVulnerabilities: () => request('/compliance/vulnerabilities/').then(unwrapList),
+  getOpsStatus: () => request('/ops/status/'),
+  getSLOMetrics: () => request('/ops/slos/'),
+  getAPIChangelog: () => request('/api-changelog/'),
+  getPayrollReconciliation: ({ month, year } = {}) => {
+    const params = new URLSearchParams();
+    if (month) params.set('month', String(month));
+    if (year) params.set('year', String(year));
+    return request(`/payroll/reconciliation/?${params.toString()}`);
+  },
+  retryWebhookDelivery: (deliveryId) =>
+    request('/webhooks/retry-delivery/', { method: 'POST', body: { delivery_id: deliveryId } }),
   downloadGdprExport: async (employeeId = null) => {
     const path = employeeId
       ? `/compliance/data-export/employees/${employeeId}/?download=1`
@@ -147,7 +160,7 @@ export const api = {
     request('/leave-policy-allocations/sync/', { method: 'POST', body: payload }),
   downloadPayroll: async (query = '', format = 'xlsx') => {
     const params = new URLSearchParams(query);
-    params.set('format', format);
+    params.set('export_format', format);
     const csrfToken = document.cookie.match(/(^| )csrftoken=([^;]+)/)?.[2];
     const response = await fetch(`/api/v1/payroll/export/?${params.toString()}`, {
       credentials: 'include',
@@ -169,7 +182,7 @@ export const api = {
 
   downloadReport: async (type, query = '', format = 'xlsx') => {
     const params = new URLSearchParams(query);
-    params.set('format', format);
+    params.set('export_format', format);
     const csrfToken = document.cookie.match(/(^| )csrftoken=([^;]+)/)?.[2];
     const response = await fetch(`/api/v1/reports/${type}/?${params.toString()}`, {
       credentials: 'include',
@@ -181,6 +194,62 @@ export const api = {
     const link = document.createElement('a');
     link.href = url;
     link.download = `${type}_report.${format}`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+  },
+
+  getSavedReports: () => request('/saved-reports/').then(unwrapList),
+  createSavedReport: (payload) => request('/saved-reports/', { method: 'POST', body: payload }),
+  runSavedReport: (id) => request(`/saved-reports/${id}/run/`, { method: 'POST', body: {} }),
+  getReportSnapshots: (query = '') => request(`/report-snapshots/${query ? `?${query}` : ''}`).then(unwrapList),
+  createReportSnapshot: (payload) => request('/report-snapshots/', { method: 'POST', body: payload }),
+  getScheduledReports: () => request('/scheduled-reports/').then(unwrapList),
+  createScheduledReport: (payload) => request('/scheduled-reports/', { method: 'POST', body: payload }),
+  updateScheduledReport: (id, payload) => request(`/scheduled-reports/${id}/`, { method: 'PATCH', body: payload }),
+  runScheduledReport: (id) => request(`/scheduled-reports/${id}/run_now/`, { method: 'POST', body: {} }),
+  getSensitiveAccessLogs: () => request('/sensitive-access-logs/').then(unwrapList),
+  importAttendanceCsv: async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const csrfToken = document.cookie.match(/(^| )csrftoken=([^;]+)/)?.[2];
+    const response = await fetch('/api/v1/attendance/import_csv/', {
+      method: 'POST',
+      credentials: 'include',
+      headers: csrfToken ? { 'X-CSRFToken': decodeURIComponent(csrfToken) } : {},
+      body: formData,
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data?.detail || 'Import failed');
+    return data;
+  },
+  acknowledgeDocument: (id) => request(`/documents/${id}/acknowledge/`, { method: 'POST', body: {} }),
+
+  accrueLeaveBalances: (payload = {}) =>
+    request('/leave-balances/accrue/', { method: 'POST', body: payload }),
+  carryForwardLeave: (payload = {}) =>
+    request('/leave-balances/carry_forward/', { method: 'POST', body: payload }),
+
+  updateRole: (id, payload) => request(`/roles/${id}/`, { method: 'PATCH', body: payload }),
+
+  downloadStatutoryPayroll: async ({ month, year, return_type = 'paye', export_format = 'csv' } = {}) => {
+    const params = new URLSearchParams({
+      month: String(month),
+      year: String(year),
+      return_type,
+      export_format,
+    });
+    const csrfToken = document.cookie.match(/(^| )csrftoken=([^;]+)/)?.[2];
+    const response = await fetch(`/api/v1/payroll/statutory-export/?${params.toString()}`, {
+      credentials: 'include',
+      headers: csrfToken ? { 'X-CSRFToken': decodeURIComponent(csrfToken) } : {},
+    });
+    if (!response.ok) throw new Error('Statutory export failed');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const ext = export_format === 'xlsx' ? 'xlsx' : 'csv';
+    link.download = `${return_type}_return_${month}_${year}.${ext}`;
     link.click();
     window.URL.revokeObjectURL(url);
   },

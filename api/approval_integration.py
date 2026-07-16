@@ -142,8 +142,8 @@ def _finalize_leave_approval(request, leave):
         balance = LeaveBalance.objects.get(
             employee=leave.employee, leave_type=leave.leave_type, year=current_year,
         )
-        balance.pending_days -= leave.duration
-        balance.used_days += leave.duration
+        balance.pending_days -= leave.working_days
+        balance.used_days += leave.working_days
         balance.save()
     except LeaveBalance.DoesNotExist:
         pass
@@ -171,7 +171,7 @@ def _reject_leave(request, leave, comment=''):
         balance = LeaveBalance.objects.get(
             employee=leave.employee, leave_type=leave.leave_type, year=current_year,
         )
-        balance.pending_days -= leave.duration
+        balance.pending_days -= leave.working_days
         balance.save()
     except LeaveBalance.DoesNotExist:
         pass

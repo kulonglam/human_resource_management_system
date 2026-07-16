@@ -71,7 +71,7 @@ def generate_salary_slip_pdf(salary_record):
     # Company and Employee Info Header
     header_data = [
         [
-            f"<b>Company:</b> Avvento Media",
+            f"<b>Company:</b> Finn Church Aid Uganda",
             f"<b>Month:</b> {salary_record.month_name} {salary_record.year}"
         ],
         [
@@ -111,7 +111,7 @@ def generate_salary_slip_pdf(salary_record):
     # Earnings and Deductions Table
     salary_details = [
         ['EARNINGS', '', 'DEDUCTIONS', ''],
-        ['Description', 'Amount (KES)', 'Description', 'Amount (KES)'],
+        ['Description', 'Amount (UGX)', 'Description', 'Amount (UGX)'],
     ]
     
     # Earnings side
@@ -125,13 +125,27 @@ def generate_salary_slip_pdf(salary_record):
     salary_details.append([
         'Allowances',
         f"{salary_record.allowances:,.2f}",
-        'Tax',
+        'PAYE',
         f"{salary_record.tax:,.2f}"
     ])
     
     salary_details.append([
-        'Total Earnings',
-        f"{salary_record.total_earnings:,.2f}",
+        'Taxable Benefits',
+        f"{salary_record.taxable_benefits:,.2f}",
+        'Employee NSSF (5%)',
+        f"{salary_record.nssf_employee:,.2f}"
+    ])
+
+    salary_details.append([
+        'GROSS SALARY',
+        f"{salary_record.gross_salary:,.2f}",
+        'Local Service Tax',
+        f"{salary_record.local_service_tax:,.2f}"
+    ])
+
+    salary_details.append([
+        '',
+        '',
         'Total Deductions',
         f"{salary_record.total_deductions:,.2f}"
     ])
@@ -163,10 +177,10 @@ def generate_salary_slip_pdf(salary_record):
         ('ROWBACKGROUNDS', (0, 2), (3, -3), [colors.white, colors.HexColor('#f5f5f5')]),
         
         # Total row styling
-        ('BACKGROUND', (0, -2), (3, -2), colors.HexColor('#1a3a52')),
-        ('TEXTCOLOR', (0, -2), (3, -2), colors.whitesmoke),
-        ('FONTNAME', (0, -2), (3, -2), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, -2), (3, -2), 11),
+        ('BACKGROUND', (0, -1), (3, -1), colors.HexColor('#1a3a52')),
+        ('TEXTCOLOR', (0, -1), (3, -1), colors.whitesmoke),
+        ('FONTNAME', (0, -1), (3, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, -1), (3, -1), 11),
         
         # Borders
         ('GRID', (0, 0), (3, -1), 1, colors.black),
@@ -184,12 +198,19 @@ def generate_salary_slip_pdf(salary_record):
     
     # Payment Status
     status = "PAID" if salary_record.is_paid else "PENDING"
-    status_color = colors.HexColor('#28a745') if salary_record.is_paid else colors.HexColor('#ffc107')
+    status_color = '#28a745' if salary_record.is_paid else '#9a6700'
     
     paid_date = salary_record.paid_on.strftime('%d-%m-%Y') if salary_record.paid_on else 'Not yet paid'
     
-    status_text = f"<b>Payment Status:</b> <font color='{status_color}>{status}</font> | <b>Payment Date:</b> {paid_date}"
+    status_text = (
+        f'<b>Payment Status:</b> <font color="{status_color}">{status}</font>'
+        f' | <b>Payment Date:</b> {paid_date}'
+    )
     elements.append(Paragraph(status_text, normal_style))
+    elements.append(Paragraph(
+        f'<b>Employer NSSF contribution (10%):</b> UGX {salary_record.nssf_employer:,.2f}',
+        normal_style,
+    ))
     
     elements.append(Spacer(1, 0.2*inch))
     

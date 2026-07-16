@@ -121,7 +121,7 @@ class LeaveWorkflowTests(HRAPITestCase):
             },
             format='json',
         )
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 403)
 
     @override_settings(HR_NOTIFY_EMAIL='hr@test.local')
     @patch('api.viewsets.notify_leave_submitted')

@@ -99,7 +99,7 @@ class Command(BaseCommand):
         dept, dept_created = Department.objects.get_or_create(
             name='Human Resources',
             defaults={
-                'location': 'Nairobi HQ',
+                'location': 'Kampala HQ',
                 'history': 'Core HR department.',
                 'manager_name': 'Jane Manager',
                 'manager_contact': '0700000001',
@@ -131,13 +131,13 @@ class Command(BaseCommand):
                     'date_of_birth': date(1990, 5, 15),
                     'gender': 'Female' if emp_data['first_name'] == 'Jane' else 'Male',
                     'mobile': '0700000000',
-                    'address': 'Nairobi, Kenya',
+                    'address': 'Kampala, Uganda',
                     'emergency_contact': '0700000009',
                     'job_title': emp_data['job_title'],
                     'department': dept,
                     'date_joined': date(2022, 1, 10),
                     'account_number': '1234567890',
-                    'bank': 'KCB Bank',
+                    'bank': 'Centenary Bank',
                     'salary': 85000,
                 },
             )

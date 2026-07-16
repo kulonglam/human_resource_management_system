@@ -1,14 +1,25 @@
 from django.urls import include, path
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework.routers import DefaultRouter
 
 from . import views, viewsets
-from .payroll_views import PayrollExportView
+from .payroll_views import PayrollExportView, StatutoryPayrollExportView
 from .compliance_views import (
+    ComplianceEvidencePackViewSet,
     DataRetentionPolicyViewSet,
     GDPRDataExportView,
     GDPRErasureView,
     RetentionPreviewView,
     RetentionRunView,
+    VulnerabilityFindingViewSet,
+)
+from .enterprise_views import (
+    APIChangelogView,
+    OpsStatusView,
+    OrganizationViewSet,
+    ScimUsersView,
+    SLOMetricsView,
+    StatutoryReconciliationView,
 )
 from .careers_views import PublicApplyView, PublicJobDetailView, PublicJobListView
 from .recruitment_views import RecruitmentSummaryView
@@ -30,10 +41,17 @@ from .report_views import (
 
 router = DefaultRouter()
 router.register('employees', viewsets.EmployeeViewSet, basename='employee')
+router.register('job-grades', viewsets.JobGradeViewSet, basename='job-grade')
+router.register('positions', viewsets.PositionViewSet, basename='position')
+router.register('employment-contracts', viewsets.EmploymentContractViewSet, basename='employment-contract')
+router.register('employment-history', viewsets.EmploymentHistoryViewSet, basename='employment-history')
 router.register('departments', viewsets.DepartmentViewSet, basename='department')
 router.register('leaves', viewsets.LeaveViewSet, basename='leave')
 router.register('leave-balances', viewsets.LeaveBalanceViewSet, basename='leave-balance')
 router.register('attendance', viewsets.AttendanceViewSet, basename='attendance')
+router.register('public-holidays', viewsets.PublicHolidayViewSet, basename='public-holiday')
+router.register('timesheets', viewsets.TimesheetViewSet, basename='timesheet')
+router.register('overtime-records', viewsets.OvertimeRecordViewSet, basename='overtime-record')
 router.register('jobs', viewsets.JobPostingViewSet, basename='job')
 router.register('applications', viewsets.ApplicationViewSet, basename='application')
 router.register('application-notes', viewsets.ApplicationNoteViewSet, basename='application-note')
@@ -45,6 +63,7 @@ router.register('scorecards', viewsets.ApplicationScorecardViewSet, basename='sc
 router.register('offer-templates', viewsets.OfferTemplateViewSet, basename='offer-template')
 router.register('offers', viewsets.JobOfferViewSet, basename='offer')
 router.register('hire-onboarding', viewsets.HireOnboardingViewSet, basename='hire-onboarding')
+router.register('payroll-runs', viewsets.PayrollRunViewSet, basename='payroll-run')
 router.register('salaries', viewsets.SalaryViewSet, basename='salary')
 router.register('performance-goals', viewsets.PerformanceGoalViewSet, basename='performance-goal')
 router.register('performance-appraisals', viewsets.PerformanceAppraisalViewSet, basename='performance-appraisal')
@@ -79,12 +98,21 @@ router.register('survey-responses', viewsets.SurveyResponseViewSet, basename='su
 router.register('audit-logs', viewsets.AuditLogViewSet, basename='audit-log')
 router.register('notifications', viewsets.NotificationViewSet, basename='notification')
 router.register('documents', viewsets.HRDocumentViewSet, basename='document')
+router.register('saved-reports', viewsets.SavedReportViewSet, basename='saved-report')
+router.register('report-snapshots', viewsets.ReportSnapshotViewSet, basename='report-snapshot')
+router.register('scheduled-reports', viewsets.ScheduledReportViewSet, basename='scheduled-report')
+router.register('sensitive-access-logs', viewsets.SensitiveDataAccessLogViewSet, basename='sensitive-access-log')
+router.register('document-access-rules', viewsets.DocumentAccessRuleViewSet, basename='document-access-rule')
 router.register('approval-workflows', viewsets.ApprovalWorkflowViewSet, basename='approval-workflow')
 router.register('approval-requests', viewsets.ApprovalRequestViewSet, basename='approval-request')
 router.register('api-keys', viewsets.APIKeyViewSet, basename='api-key')
 router.register('webhooks', viewsets.WebhookEndpointViewSet, basename='webhook')
 router.register('compliance/retention-policies', DataRetentionPolicyViewSet, basename='retention-policy')
+router.register('compliance/evidence-packs', ComplianceEvidencePackViewSet, basename='evidence-pack')
+router.register('compliance/vulnerabilities', VulnerabilityFindingViewSet, basename='vulnerability')
+router.register('organizations', OrganizationViewSet, basename='organization')
 router.register('users', viewsets.UserViewSet, basename='user')
+router.register('roles', viewsets.RoleViewSet, basename='role')
 
 urlpatterns = [
     path('auth/csrf/', views.CsrfView.as_view(), name='api-csrf'),
@@ -98,7 +126,6 @@ urlpatterns = [
     path('auth/logout/', views.LogoutView.as_view(), name='api-logout'),
     path('auth/register/', views.RegisterView.as_view(), name='api-register'),
     path('auth/me/', views.CurrentUserView.as_view(), name='api-me'),
-    path('roles/', views.RoleListView.as_view(), name='api-roles'),
     path('dashboard/', views.DashboardView.as_view(), name='api-dashboard'),
     path('recruitment/summary/', RecruitmentSummaryView.as_view(), name='api-recruitment-summary'),
     path('recruitment/eeo-report/', RecruitmentEEOReportView.as_view(), name='api-recruitment-eeo'),
@@ -109,6 +136,12 @@ urlpatterns = [
     path('careers/jobs/<int:job_id>/', PublicJobDetailView.as_view(), name='api-careers-job-detail'),
     path('careers/jobs/<int:job_id>/apply/', PublicApplyView.as_view(), name='api-careers-apply'),
     path('health/', views.HealthCheckView.as_view(), name='api-health'),
+    path('ops/status/', OpsStatusView.as_view(), name='api-ops-status'),
+    path('ops/slos/', SLOMetricsView.as_view(), name='api-ops-slos'),
+    path('api-changelog/', APIChangelogView.as_view(), name='api-changelog'),
+    path('scim/v2/Users', ScimUsersView.as_view(), name='api-scim-users'),
+    path('scim/v2/Users/', ScimUsersView.as_view(), name='api-scim-users-slash'),
+    path('payroll/reconciliation/', StatutoryReconciliationView.as_view(), name='api-payroll-reconciliation'),
     path('reports/analytics/', views.ReportsAnalyticsView.as_view(), name='api-reports-analytics'),
     path('reports/filters/', ReportFiltersView.as_view(), name='api-reports-filters'),
     path('reports/attendance/', AttendanceReportView.as_view(), name='api-reports-attendance'),
@@ -117,10 +150,13 @@ urlpatterns = [
     path('reports/performance/', PerformanceReportView.as_view(), name='api-reports-performance'),
     path('reports/recruitment/', RecruitmentReportView.as_view(), name='api-reports-recruitment'),
     path('payroll/export/', PayrollExportView.as_view(), name='api-payroll-export'),
+    path('payroll/statutory-export/', StatutoryPayrollExportView.as_view(), name='api-payroll-statutory-export'),
     path('compliance/data-export/me/', GDPRDataExportView.as_view(), name='api-gdpr-export-me'),
     path('compliance/data-export/employees/<int:employee_id>/', GDPRDataExportView.as_view(), name='api-gdpr-export-employee'),
     path('compliance/erasure/<int:employee_id>/', GDPRErasureView.as_view(), name='api-gdpr-erasure'),
     path('compliance/retention-policies/preview/', RetentionPreviewView.as_view(), name='api-retention-preview'),
     path('compliance/retention-policies/run/', RetentionRunView.as_view(), name='api-retention-run'),
+    path('schema/', SpectacularAPIView.as_view(), name='api-schema'),
+    path('docs/', SpectacularSwaggerView.as_view(url_name='api-schema'), name='api-docs'),
     path('', include(router.urls)),
 ]

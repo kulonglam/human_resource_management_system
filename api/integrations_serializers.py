@@ -8,12 +8,20 @@ class APIKeySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = APIKey
-        fields = ['id', 'name', 'prefix', 'created_by', 'is_active', 'last_used_at', 'created_at']
+        fields = [
+            'id', 'name', 'prefix', 'scopes', 'created_by', 'is_active',
+            'last_used_at', 'created_at',
+        ]
         read_only_fields = fields
 
 
 class APIKeyCreateSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=100)
+    scopes = serializers.ListField(
+        child=serializers.ChoiceField(choices=[c[0] for c in APIKey.SCOPE_CHOICES]),
+        required=False,
+        default=['read'],
+    )
 
 
 class WebhookEndpointSerializer(serializers.ModelSerializer):
@@ -31,7 +39,7 @@ class WebhookDeliverySerializer(serializers.ModelSerializer):
         model = WebhookDelivery
         fields = [
             'id', 'endpoint_id', 'endpoint_name', 'event', 'success', 'status_code',
-            'error_message', 'payload', 'delivered_at',
+            'attempt_count', 'error_message', 'payload', 'delivered_at',
         ]
         read_only_fields = fields
 

@@ -13,12 +13,15 @@ from payroll.models import Salary
 from performance.models import PerformanceAppraisal, PerformanceGoal
 from recruitment.models import Application, JobPosting
 
-from .report_exports import export_key_value_xlsx, export_rows_csv, export_rows_xlsx
+from .permissions import IsAdminOrManager
+from .report_exports import export_key_value_xlsx, export_rows_csv, export_rows_pdf, export_rows_xlsx
 
 
 def _maybe_export(request, payload, columns, filename_prefix):
-    export_format = request.query_params.get('format', '').lower()
-    if export_format not in ('csv', 'xlsx'):
+    export_format = request.query_params.get(
+        'export_format', request.query_params.get('format', '')
+    ).lower()
+    if export_format not in ('csv', 'xlsx', 'pdf'):
         return None
     rows = payload.get('rows') or payload.get('records') or []
     if not rows and payload.get('funnel'):
@@ -26,6 +29,8 @@ def _maybe_export(request, payload, columns, filename_prefix):
         columns = [{'key': 'status', 'label': 'Stage'}, {'key': 'count', 'label': 'Count'}]
     if export_format == 'csv':
         return export_rows_csv(rows, columns, filename_prefix)
+    if export_format == 'pdf':
+        return export_rows_pdf(rows, columns, filename_prefix, filename_prefix.replace('_', ' ').title())
     return export_rows_xlsx(rows, columns, filename_prefix)
 
 
@@ -56,6 +61,8 @@ def _date_range(params):
 
 
 class AttendanceReportView(APIView):
+    permission_classes = [IsAdminOrManager]
+
     def get(self, request):
         start_date, end_date = _date_range(request.query_params)
         query = Attendance.objects.filter(date__range=[start_date, end_date])
@@ -69,15 +76,19 @@ class AttendanceReportView(APIView):
             query = query.filter(status=status)
 
         stats = query.values('status').annotate(count=Count('id'))
-        records = list(
-            query.annotate(
-                employee_name=Concat(F('employee__first_name'), Value(' '), F('employee__last_name'))
-            ).values('employee_name', 'date', 'status', 'time_in', 'time_out')[:500]
-        )
-
+        records_query = query.annotate(
+            employee_name=Concat(F('employee__first_name'), Value(' '), F('employee__last_name'))
+        ).values('employee_name', 'date', 'status', 'time_in', 'time_out')
+        total_records = query.count()
+        export_requested = request.query_params.get(
+            'export_format', request.query_params.get('format', '')
+        ).lower() in ('csv', 'xlsx')
+        records = list(records_query if export_requested else records_query[:500])
         payload = {
             'period': f'{start_date} to {end_date}',
-            'total_records': query.count(),
+            'total_records': total_records,
+            'shown_records': len(records),
+            'truncated': not export_requested and total_records > len(records),
             'status_breakdown': {s['status']: s['count'] for s in stats},
             'records': records,
         }
@@ -98,6 +109,8 @@ class AttendanceReportView(APIView):
 
 
 class LeaveReportView(APIView):
+    permission_classes = [IsAdminOrManager]
+
     def get(self, request):
         report_type = request.query_params.get('report_type', 'summary')
         year = int(request.query_params.get('year', timezone.now().year))
@@ -185,6 +198,8 @@ class LeaveReportView(APIView):
 
 
 class PayrollReportView(APIView):
+    permission_classes = [IsAdminOrManager]
+
     def get(self, request):
         month = int(request.query_params.get('month', timezone.now().month))
         year = int(request.query_params.get('year', timezone.now().year))
@@ -197,26 +212,38 @@ class PayrollReportView(APIView):
         salaries = list(
             query.annotate(
                 employee_name=Concat(F('employee__first_name'), Value(' '), F('employee__last_name')),
-                gross_salary=F('basic_salary') + F('allowances'),
-            ).values('employee_name', 'basic_salary', 'allowances', 'deductions', 'tax', 'net_salary', 'gross_salary')
+            ).values(
+                'employee_name', 'basic_salary', 'allowances', 'taxable_benefits',
+                'gross_salary', 'chargeable_income', 'tax', 'nssf_employee',
+                'nssf_employer', 'local_service_tax', 'deductions', 'net_salary', 'status',
+            )
         )
 
         payload = {
             'period': f'{month}/{year}',
             'total_employees': query.count(),
-            'total_gross': query.aggregate(v=Sum(F('basic_salary') + F('allowances')))['v'] or 0,
+            'total_gross': query.aggregate(v=Sum('gross_salary'))['v'] or 0,
             'total_net': query.aggregate(v=Sum('net_salary'))['v'] or 0,
             'total_tax': query.aggregate(v=Sum('tax'))['v'] or 0,
+            'total_nssf_employee': query.aggregate(v=Sum('nssf_employee'))['v'] or 0,
+            'total_nssf_employer': query.aggregate(v=Sum('nssf_employer'))['v'] or 0,
+            'total_local_service_tax': query.aggregate(v=Sum('local_service_tax'))['v'] or 0,
             'rows': salaries,
         }
         exported = _maybe_export(request, payload, [
             {'key': 'employee_name', 'label': 'Employee'},
             {'key': 'basic_salary', 'label': 'Basic'},
             {'key': 'allowances', 'label': 'Allowances'},
-            {'key': 'deductions', 'label': 'Deductions'},
-            {'key': 'tax', 'label': 'Tax'},
-            {'key': 'net_salary', 'label': 'Net'},
+            {'key': 'taxable_benefits', 'label': 'Taxable Benefits'},
             {'key': 'gross_salary', 'label': 'Gross'},
+            {'key': 'chargeable_income', 'label': 'PAYE Chargeable Income'},
+            {'key': 'tax', 'label': 'PAYE'},
+            {'key': 'nssf_employee', 'label': 'Employee NSSF (5%)'},
+            {'key': 'nssf_employer', 'label': 'Employer NSSF (10%)'},
+            {'key': 'local_service_tax', 'label': 'Local Service Tax'},
+            {'key': 'deductions', 'label': 'Deductions'},
+            {'key': 'net_salary', 'label': 'Net'},
+            {'key': 'status', 'label': 'Status'},
         ], 'payroll_report')
         if exported:
             return exported
@@ -224,6 +251,8 @@ class PayrollReportView(APIView):
 
 
 class PerformanceReportView(APIView):
+    permission_classes = [IsAdminOrManager]
+
     def get(self, request):
         report_type = request.query_params.get('report_type', 'appraisal_summary')
         department = request.query_params.get('department')
@@ -270,6 +299,8 @@ class PerformanceReportView(APIView):
 
 
 class RecruitmentReportView(APIView):
+    permission_classes = [IsAdminOrManager]
+
     def get(self, request):
         report_type = request.query_params.get('report_type', 'job_summary')
         department = request.query_params.get('department')
@@ -316,7 +347,9 @@ class RecruitmentReportView(APIView):
             'open_positions': jobs.filter(is_open=True).count(),
             'closed_positions': jobs.filter(is_open=False).count(),
         }
-        export_format = request.query_params.get('format', '').lower()
+        export_format = request.query_params.get(
+            'export_format', request.query_params.get('format', '')
+        ).lower()
         if export_format == 'xlsx':
             return export_key_value_xlsx({
                 'Total jobs': payload['total_jobs'],
@@ -328,6 +361,8 @@ class RecruitmentReportView(APIView):
 
 class ReportFiltersView(APIView):
     """Metadata for report filter dropdowns."""
+
+    permission_classes = [IsAdminOrManager]
 
     def get(self, request):
         return Response({

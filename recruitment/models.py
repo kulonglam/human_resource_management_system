@@ -234,7 +234,7 @@ class JobOffer(models.Model):
     job_title = models.CharField(max_length=100)
     department = models.CharField(max_length=100)
     salary = models.DecimalField(max_digits=14, decimal_places=2)
-    currency = models.CharField(max_length=3, default='KES')
+    currency = models.CharField(max_length=3, default='UGX')
     start_date = models.DateField()
     body = models.TextField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')

@@ -12,9 +12,19 @@ const emptyForm = {
   address: '',
   emergency_contact: '',
   language: 'English',
+  national_id_number: '',
+  tax_identification_number: '',
+  nssf_number: '',
   job_title: '',
   department: '',
+  position: '',
+  grade: '',
+  supervisor: '',
+  employment_type: 'permanent',
   date_joined: '',
+  probation_end_date: '',
+  work_location: '',
+  cost_center: '',
   account_number: '',
   bank: '',
   salary: '',
@@ -26,12 +36,25 @@ export default function EmployeeForm() {
   const navigate = useNavigate();
   const [form, setForm] = useState(emptyForm);
   const [departments, setDepartments] = useState([]);
+  const [positions, setPositions] = useState([]);
+  const [grades, setGrades] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(isEdit);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    api.getDepartments().then((data) => setDepartments(data.results || data));
+    Promise.all([
+      api.getDepartments(),
+      api.list('positions'),
+      api.list('job-grades'),
+      api.list('employees'),
+    ]).then(([departmentData, positionData, gradeData, employeeData]) => {
+      setDepartments(departmentData.results || departmentData);
+      setPositions(positionData);
+      setGrades(gradeData);
+      setEmployees(employeeData);
+    });
   }, []);
 
   useEffect(() => {
@@ -48,9 +71,19 @@ export default function EmployeeForm() {
           address: emp.address || '',
           emergency_contact: emp.emergency_contact || '',
           language: emp.language || 'English',
+          national_id_number: emp.national_id_number || '',
+          tax_identification_number: emp.tax_identification_number || '',
+          nssf_number: emp.nssf_number || '',
           job_title: emp.job_title || '',
           department: emp.department || '',
+          position: emp.position || '',
+          grade: emp.grade || '',
+          supervisor: emp.supervisor || '',
+          employment_type: emp.employment_type || 'permanent',
           date_joined: emp.date_joined || '',
+          probation_end_date: emp.probation_end_date || '',
+          work_location: emp.work_location || '',
+          cost_center: emp.cost_center || '',
           account_number: emp.account_number || '',
           bank: emp.bank || '',
           salary: emp.salary || '',
@@ -73,6 +106,10 @@ export default function EmployeeForm() {
     const payload = {
       ...form,
       department: form.department ? Number(form.department) : null,
+      position: form.position ? Number(form.position) : null,
+      grade: form.grade ? Number(form.grade) : null,
+      supervisor: form.supervisor ? Number(form.supervisor) : null,
+      probation_end_date: form.probation_end_date || null,
       salary: form.salary,
     };
 
@@ -156,6 +193,18 @@ export default function EmployeeForm() {
               <label className="form-label">Emergency Contact</label>
               <input name="emergency_contact" className="form-control" value={form.emergency_contact} onChange={handleChange} required />
             </div>
+            <div className="col-md-4">
+              <label className="form-label">National ID Number (NIN)</label>
+              <input name="national_id_number" className="form-control" value={form.national_id_number} onChange={handleChange} />
+            </div>
+            <div className="col-md-4">
+              <label className="form-label">Tax Identification Number</label>
+              <input name="tax_identification_number" className="form-control" value={form.tax_identification_number} onChange={handleChange} />
+            </div>
+            <div className="col-md-4">
+              <label className="form-label">NSSF Number</label>
+              <input name="nssf_number" className="form-control" value={form.nssf_number} onChange={handleChange} />
+            </div>
             <div className="col-md-6">
               <label className="form-label">Job Title</label>
               <input name="job_title" className="form-control" value={form.job_title} onChange={handleChange} required />
@@ -171,9 +220,54 @@ export default function EmployeeForm() {
                 ))}
               </select>
             </div>
+            <div className="col-md-4">
+              <label className="form-label">Position</label>
+              <select name="position" className="form-select" value={form.position} onChange={handleChange}>
+                <option value="">Select position</option>
+                {positions.map((position) => <option key={position.id} value={position.id}>{position.title}</option>)}
+              </select>
+            </div>
+            <div className="col-md-4">
+              <label className="form-label">Job Grade</label>
+              <select name="grade" className="form-select" value={form.grade} onChange={handleChange}>
+                <option value="">Select grade</option>
+                {grades.map((grade) => <option key={grade.id} value={grade.id}>{grade.code} — {grade.name}</option>)}
+              </select>
+            </div>
+            <div className="col-md-4">
+              <label className="form-label">Supervisor</label>
+              <select name="supervisor" className="form-select" value={form.supervisor} onChange={handleChange}>
+                <option value="">Select supervisor</option>
+                {employees.filter((employee) => String(employee.id) !== String(id)).map((employee) => (
+                  <option key={employee.id} value={employee.id}>{employee.full_name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="col-md-4">
+              <label className="form-label">Employment Type</label>
+              <select name="employment_type" className="form-select" value={form.employment_type} onChange={handleChange}>
+                <option value="permanent">Permanent</option>
+                <option value="fixed_term">Fixed Term</option>
+                <option value="temporary">Temporary</option>
+                <option value="intern">Intern</option>
+                <option value="consultant">Consultant</option>
+              </select>
+            </div>
             <div className="col-md-6">
               <label className="form-label">Date Joined</label>
               <input type="date" name="date_joined" className="form-control" value={form.date_joined} onChange={handleChange} required />
+            </div>
+            <div className="col-md-4">
+              <label className="form-label">Probation End Date</label>
+              <input type="date" name="probation_end_date" className="form-control" value={form.probation_end_date} onChange={handleChange} />
+            </div>
+            <div className="col-md-4">
+              <label className="form-label">Work Location</label>
+              <input name="work_location" className="form-control" value={form.work_location} onChange={handleChange} />
+            </div>
+            <div className="col-md-4">
+              <label className="form-label">Cost Centre</label>
+              <input name="cost_center" className="form-control" value={form.cost_center} onChange={handleChange} />
             </div>
             <div className="col-md-4">
               <label className="form-label">Account Number</label>

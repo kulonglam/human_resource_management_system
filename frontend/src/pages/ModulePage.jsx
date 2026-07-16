@@ -10,7 +10,7 @@ export default function ModulePage({ title, icon, tabs, headerExtra, passUser = 
   useEffect(() => {
     async function loadLookups() {
       try {
-        const [employees, departments, jobs, courses, skills, assets, shifts, categories, benefits, exitProcesses, certifications, policies, disciplineRecords] =
+        const [employees, departments, jobs, courses, skills, assets, shifts, categories, benefits, exitProcesses, certifications, policies, disciplineRecords, positions, grades] =
           await Promise.all([
             api.list('employees'),
             api.list('departments'),
@@ -25,11 +25,15 @@ export default function ModulePage({ title, icon, tabs, headerExtra, passUser = 
             api.list('certifications').catch(() => []),
             api.list('leave-policies').catch(() => []),
             api.list('discipline-records').catch(() => []),
+            api.list('positions').catch(() => []),
+            api.list('job-grades').catch(() => []),
           ]);
 
         setLookupOptions({
           employee: employees.map((e) => ({ value: e.id, label: e.full_name })),
           department: departments.map((d) => ({ value: d.id, label: d.name })),
+          previous_department: departments.map((d) => ({ value: d.id, label: d.name })),
+          new_department: departments.map((d) => ({ value: d.id, label: d.name })),
           job: jobs.map((j) => ({ value: j.id, label: j.title })),
           course: courses.map((c) => ({ value: c.id, label: c.title })),
           skill: skills.map((s) => ({ value: s.id, label: s.name })),
@@ -41,6 +45,13 @@ export default function ModulePage({ title, icon, tabs, headerExtra, passUser = 
           certification: certifications.map((c) => ({ value: c.id, label: c.name })),
           policy: policies.map((p) => ({ value: p.id, label: p.name })),
           discipline: disciplineRecords.map((d) => ({ value: d.id, label: `${d.employee_name} — ${d.reason}` })),
+          position: positions.map((p) => ({ value: p.id, label: p.title })),
+          previous_position: positions.map((p) => ({ value: p.id, label: p.title })),
+          new_position: positions.map((p) => ({ value: p.id, label: p.title })),
+          reports_to: positions.map((p) => ({ value: p.id, label: p.title })),
+          grade: grades.map((g) => ({ value: g.id, label: `${g.code} — ${g.name}` })),
+          previous_grade: grades.map((g) => ({ value: g.id, label: `${g.code} — ${g.name}` })),
+          new_grade: grades.map((g) => ({ value: g.id, label: `${g.code} — ${g.name}` })),
           survey: [],
         });
       } catch {

@@ -10,6 +10,7 @@ export default function EmployeeDetail() {
   const [employee, setEmployee] = useState(null);
   const [error, setError] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [terminating, setTerminating] = useState(false);
   const [exitReason, setExitReason] = useState('resignation');
   const [exitNotes, setExitNotes] = useState('');
 
@@ -34,11 +35,15 @@ export default function EmployeeDetail() {
   const handleTerminate = async (e) => {
     e.preventDefault();
     if (!window.confirm(`Terminate ${employee.full_name}?`)) return;
+    setTerminating(true);
+    setError('');
     try {
       await api.terminateEmployee(id, { exit_reason: exitReason, exit_notes: exitNotes });
       navigate('/employees');
     } catch (err) {
       setError(err.data?.detail || err.message);
+    } finally {
+      setTerminating(false);
     }
   };
 
@@ -101,10 +106,24 @@ export default function EmployeeDetail() {
             <div className="card-body">
               <h5 className="card-title">Employment</h5>
               <dl className="row mb-0">
+                <dt className="col-sm-4">Employee Number</dt>
+                <dd className="col-sm-8">{employee.employee_number}</dd>
                 <dt className="col-sm-4">Job Title</dt>
                 <dd className="col-sm-8">{employee.job_title}</dd>
+                <dt className="col-sm-4">Position</dt>
+                <dd className="col-sm-8">{employee.position_title || '—'}</dd>
+                <dt className="col-sm-4">Job Grade</dt>
+                <dd className="col-sm-8">{employee.grade_name || '—'}</dd>
+                <dt className="col-sm-4">Supervisor</dt>
+                <dd className="col-sm-8">{employee.supervisor_name || '—'}</dd>
                 <dt className="col-sm-4">Department</dt>
                 <dd className="col-sm-8">{employee.department_name || '—'}</dd>
+                <dt className="col-sm-4">Employment Type</dt>
+                <dd className="col-sm-8">{employee.employment_type?.replace('_', ' ')}</dd>
+                <dt className="col-sm-4">Work Location</dt>
+                <dd className="col-sm-8">{employee.work_location || '—'}</dd>
+                <dt className="col-sm-4">Cost Centre</dt>
+                <dd className="col-sm-8">{employee.cost_center || '—'}</dd>
                 <dt className="col-sm-4">Date Joined</dt>
                 <dd className="col-sm-8">{employee.date_joined}</dd>
                 <dt className="col-sm-4">Status</dt>
@@ -150,7 +169,7 @@ export default function EmployeeDetail() {
                     />
                   </div>
                   <button type="submit" className="btn btn-danger btn-sm" disabled={terminating}>
-                    Terminate
+                    {terminating ? 'Terminating…' : 'Terminate'}
                   </button>
                 </form>
               </div>

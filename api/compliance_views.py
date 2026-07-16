@@ -8,10 +8,15 @@ from accounts.access_control import can_access_employee, get_user_accessible_emp
 from accounts.models import AuditLog
 from api.audit import log_action
 from api.compliance_export import anonymize_employee, build_employee_data_export, export_json_response
-from api.compliance_serializers import DataRetentionPolicySerializer, RetentionPreviewSerializer
+from api.compliance_serializers import (
+    ComplianceEvidencePackSerializer,
+    DataRetentionPolicySerializer,
+    RetentionPreviewSerializer,
+    VulnerabilityFindingSerializer,
+)
 from api.permissions import IsAdmin
 from api.report_exports import export_rows_csv, export_rows_xlsx
-from compliance.models import DataRetentionPolicy
+from compliance.models import ComplianceEvidencePack, DataRetentionPolicy, VulnerabilityFinding
 from compliance.retention import apply_all_retention_policies, preview_retention
 from employees.models import Employee
 
@@ -29,6 +34,18 @@ class DataRetentionPolicyViewSet(viewsets.ModelViewSet):
             policy.get_category_display(),
             f'retention_days={policy.retention_days}, active={policy.is_active}',
         )
+
+
+class ComplianceEvidencePackViewSet(viewsets.ModelViewSet):
+    queryset = ComplianceEvidencePack.objects.all()
+    serializer_class = ComplianceEvidencePackSerializer
+    permission_classes = [IsAdmin]
+
+
+class VulnerabilityFindingViewSet(viewsets.ModelViewSet):
+    queryset = VulnerabilityFinding.objects.all()
+    serializer_class = VulnerabilityFindingSerializer
+    permission_classes = [IsAdmin]
 
 
 class RetentionPreviewView(APIView):

@@ -70,7 +70,7 @@ def _approval_summary(req):
             f'({target.start_date} to {target.end_date})'
         )
     if workflow_type == 'expense':
-        return f'{target.employee.full_name} — {target.description} (KES {target.amount})'
+        return f'{target.employee.full_name} — {target.description} (UGX {target.amount})'
     if workflow_type == 'recruitment':
         return f'{target.first_name} {target.last_name} — {target.job.title}'
     return str(target)
@@ -276,7 +276,7 @@ def build_exec_brief(role, base_data, role_data):
     if joiners:
         sentences.append(f'{joiners} new joiner{"s" if joiners != 1 else ""} in the last 30 days.')
     if payroll:
-        sentences.append(f'Current-month payroll outflow: KES {payroll:,} (net).')
+        sentences.append(f'Current-month payroll outflow: UGX {payroll:,} (net).')
     if open_roles:
         sentences.append(f'{open_roles} open position{"s" if open_roles != 1 else ""} in the hiring pipeline.')
     if pending_approvals or pending_leaves:
@@ -354,7 +354,7 @@ def build_hero_kpis(role, base_data, role_data):
             'icon': 'bi-inbox', 'link': '/approvals',
         },
         {
-            'label': 'Payroll (net)', 'value': f'KES {payroll:,}', 'icon': 'bi-cash-stack', 'link': '/payroll',
+            'label': 'Payroll (net)', 'value': f'UGX {payroll:,}', 'icon': 'bi-cash-stack', 'link': '/payroll',
             'delta': _metric_delta(payroll, int(prev_payroll)),
         },
     ]
@@ -488,7 +488,7 @@ def build_role_dashboard(user, base_data):
             },
             'payroll_trend': {
                 'title': 'Payroll outflow',
-                'subtitle': 'Net salary paid per month (KES)',
+                'subtitle': 'Net salary paid per month (UGX)',
                 'points': build_payroll_series(12),
             },
             'leave_trend': {

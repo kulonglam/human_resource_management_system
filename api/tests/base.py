@@ -1,14 +1,36 @@
+from django.conf import settings
+from django.core.cache import cache
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 from accounts.models import CustomUser, Role
+from accounts.security import clear_failed_logins
 from departments.models import Department
 from employees.models import Employee
 from leaves.models import LeaveBalance
 
+_TEST_REST_FRAMEWORK = {
+    **settings.REST_FRAMEWORK,
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '10000/minute',
+        'user': '10000/minute',
+        'login': '10000/minute',
+        'mfa': '10000/minute',
+        'export': '10000/minute',
+        'scim': '10000/minute',
+    },
+}
 
-@override_settings(ENFORCE_MFA_FOR_ADMINS=False)
+
+@override_settings(
+    ENFORCE_MFA_FOR_ADMINS=False,
+    ENFORCE_MFA_FOR_MANAGERS=False,
+    ENFORCE_MFA_FOR_PAYROLL=False,
+    REQUIRE_FIELD_ENCRYPTION_KEY=False,
+    SESSION_IDLE_TIMEOUT_SECONDS=0,
+    REST_FRAMEWORK=_TEST_REST_FRAMEWORK,
+)
 class HRAPITestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -61,6 +83,11 @@ class HRAPITestCase(TestCase):
 
     def setUp(self):
         self.client = APIClient()
+        cache.clear()
+        clear_failed_logins('admin')
+        clear_failed_logins('manager')
+        clear_failed_logins('employee')
+        clear_failed_logins('lockout-user')
 
     def login(self, username, password):
         return self.client.post(

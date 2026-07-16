@@ -1,5 +1,6 @@
 from accounts.access_control import can_access_employee, get_user_accessible_employees
 from rest_framework import viewsets
+from rest_framework.exceptions import PermissionDenied
 
 from .audit import log_action
 
@@ -66,7 +67,7 @@ class AuditedModelViewSet(AuditLogMixin, viewsets.ModelViewSet):
 
 
 class EmployeeQuerysetMixin:
-    """Filter querysets to employees the current user may access."""
+    """Enforce employee scope for both reads and writes."""
 
     employee_field = 'employee'
 
@@ -78,3 +79,22 @@ class EmployeeQuerysetMixin:
 
     def employee_allowed(self, employee):
         return can_access_employee(self.request.user, employee)
+
+    def _validate_employee_write_scope(self, request):
+        employee_id = request.data.get(self.employee_field)
+        if employee_id in (None, ''):
+            return
+        try:
+            is_allowed = self.get_accessible_employee_ids().filter(pk=employee_id).exists()
+        except (TypeError, ValueError):
+            is_allowed = False
+        if not is_allowed:
+            raise PermissionDenied('You cannot modify records for this employee.')
+
+    def create(self, request, *args, **kwargs):
+        self._validate_employee_write_scope(request)
+        return super().create(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        self._validate_employee_write_scope(request)
+        return super().update(request, *args, **kwargs)

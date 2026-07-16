@@ -9,7 +9,7 @@ import {
 } from 'recharts';
 
 function formatTooltipValue(value, isCurrency) {
-  if (isCurrency) return `KES ${Number(value).toLocaleString()}`;
+  if (isCurrency) return `UGX ${Number(value).toLocaleString('en-UG')}`;
   return Number(value).toLocaleString();
 }
 

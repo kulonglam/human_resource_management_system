@@ -1,8 +1,10 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+import PermissionRoute from './components/PermissionRoute';
+import { canManageReports, canViewPayroll } from './utils/permissions';
 import {
-  attendanceTabs, payrollTabs,
+  attendanceTabs, workforceStructureTabs,
 } from './config/hrModules';
 import {
   exitTabs, assetTabs, shiftTabs,
@@ -23,11 +25,14 @@ import Leaves from './pages/Leaves';
 import Login from './pages/Login';
 import OrgChart from './pages/OrgChart';
 import ModulePage from './pages/ModulePage';
+import Payroll from './pages/Payroll';
 import Performance from './pages/Performance';
 import RecordDetail from './pages/RecordDetail';
 import Register from './pages/Register';
 import Reports from './pages/Reports';
 import UsersSettings from './pages/UsersSettings';
+import SensitiveAccessLogs from './pages/SensitiveAccessLogs';
+import OpsCenter from './pages/OpsCenter';
 import SecuritySettings from './pages/SecuritySettings';
 import Surveys from './pages/Surveys';
 import SurveyTake from './pages/SurveyTake';
@@ -50,9 +55,9 @@ export default function App() {
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
-        <Route path="approvals" element={<Approvals />} />
+        <Route path="approvals" element={<PermissionRoute check={(u) => u.is_admin || u.is_manager}><Approvals /></PermissionRoute>} />
         <Route path="employees" element={<Employees />} />
-        <Route path="employees/new" element={<EmployeeForm />} />
+        <Route path="employees/new" element={<PermissionRoute check={(u) => u.is_admin}><EmployeeForm /></PermissionRoute>} />
         <Route path="employees/:id" element={<EmployeeDetail />} />
         <Route path="employees/:id/edit" element={<EmployeeForm />} />
         <Route path="departments" element={<Departments />} />
@@ -60,7 +65,8 @@ export default function App() {
         <Route path="leaves" element={<Leaves />} />
         <Route path="recruitment" element={<Recruitment />} />
         <Route path="recruitment/applications/:id" element={<ApplicationDetail />} />
-        <Route path="payroll" element={<ModulePage title="Payroll" icon="bi-cash-coin" tabs={payrollTabs} />} />
+        <Route path="payroll" element={<PermissionRoute check={canViewPayroll}><Payroll /></PermissionRoute>} />
+        <Route path="workforce-structure" element={<PermissionRoute check={(u) => u.is_admin || u.is_manager}><ModulePage title="Workforce Structure" icon="bi-diagram-3" tabs={workforceStructureTabs} passUser /></PermissionRoute>} />
         <Route path="performance" element={<Performance />} />
         <Route path="performance/goals/:id" element={<RecordDetail configKey="performance-goals" />} />
         <Route path="performance/appraisals/:id" element={<RecordDetail configKey="performance-appraisals" />} />
@@ -69,24 +75,26 @@ export default function App() {
         <Route path="recruitment/jobs/:id" element={<RecordDetail configKey="jobs" />} />
         <Route path="exits/:id" element={<RecordDetail configKey="exit-processes" />} />
         <Route path="training" element={<Training />} />
-        <Route path="reports" element={<Reports />} />
+        <Route path="reports" element={<PermissionRoute check={canManageReports}><Reports /></PermissionRoute>} />
         <Route path="documents" element={<Documents />} />
-        <Route path="org-chart" element={<OrgChart />} />
-        <Route path="settings/integrations" element={<IntegrationsSettings />} />
+        <Route path="org-chart" element={<PermissionRoute check={(u) => u.is_admin}><OrgChart /></PermissionRoute>} />
+        <Route path="settings/integrations" element={<PermissionRoute check={(u) => u.is_admin}><IntegrationsSettings /></PermissionRoute>} />
         <Route path="exits" element={<ModulePage title="Exit Management" icon="bi-door-closed" tabs={exitTabs} />} />
         <Route path="assets" element={<ModulePage title="Assets" icon="bi-laptop" tabs={assetTabs} />} />
         <Route path="shifts" element={<ModulePage title="Shifts" icon="bi-clock" tabs={shiftTabs} />} />
         <Route path="expenses" element={<ModulePage title="Expenses" icon="bi-receipt" tabs={expenseTabs} />} />
         <Route path="benefits" element={<ModulePage title="Benefits" icon="bi-heart-pulse" tabs={benefitTabs} />} />
-        <Route path="leave-policies" element={<LeavePolicies />} />
+        <Route path="leave-policies" element={<PermissionRoute check={(u) => u.is_admin || u.is_manager}><LeavePolicies /></PermissionRoute>} />
         <Route path="discipline" element={<ModulePage title="Discipline" icon="bi-exclamation-triangle" tabs={disciplineTabs} />} />
         <Route path="surveys" element={<Surveys />} />
         <Route path="surveys/:id/take" element={<SurveyTake />} />
         <Route path="kin" element={<ModulePage title="Next of Kin" icon="bi-people" tabs={kinTabs} />} />
-        <Route path="audit-logs" element={<AuditLogs />} />
-        <Route path="settings/users" element={<UsersSettings />} />
+        <Route path="audit-logs" element={<PermissionRoute check={(u) => u.is_admin}><AuditLogs /></PermissionRoute>} />
+        <Route path="settings/sensitive-access" element={<SensitiveAccessLogs />} />
+        <Route path="settings/ops" element={<PermissionRoute check={(u) => u.is_admin}><OpsCenter /></PermissionRoute>} />
+        <Route path="settings/users" element={<PermissionRoute check={(u) => u.is_admin}><UsersSettings /></PermissionRoute>} />
         <Route path="settings/security" element={<SecuritySettings />} />
-        <Route path="settings/compliance" element={<ComplianceSettings />} />
+        <Route path="settings/compliance" element={<PermissionRoute check={(u) => u.is_admin}><ComplianceSettings /></PermissionRoute>} />
       </Route>
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

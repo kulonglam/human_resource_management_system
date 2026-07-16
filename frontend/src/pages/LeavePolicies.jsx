@@ -13,6 +13,8 @@ export default function LeavePolicies() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [syncing, setSyncing] = useState(false);
+  const [accrueBusy, setAccrueBusy] = useState(false);
+  const [carryBusy, setCarryBusy] = useState(false);
 
   useEffect(() => {
     api.list('employees').then(setEmployees).catch(() => setEmployees([]));
@@ -44,15 +46,43 @@ export default function LeavePolicies() {
     }
   };
 
+  const runAccrue = async () => {
+    setAccrueBusy(true);
+    setError('');
+    setMessage('');
+    try {
+      const result = await api.accrueLeaveBalances({ year: Number(syncYear) });
+      setMessage(`Monthly accrual applied for ${result.updated} employee(s) in ${result.year}.`);
+    } catch (err) {
+      setError(err.data?.detail || err.message);
+    } finally {
+      setAccrueBusy(false);
+    }
+  };
+
+  const runCarryForward = async () => {
+    setCarryBusy(true);
+    setError('');
+    setMessage('');
+    try {
+      const fromYear = Number(syncYear) - 1;
+      const result = await api.carryForwardLeave({ from_year: fromYear, to_year: Number(syncYear) });
+      setMessage(`Carried forward leave for ${result.carried} employee(s) from ${fromYear} to ${syncYear}.`);
+    } catch (err) {
+      setError(err.data?.detail || err.message);
+    } finally {
+      setCarryBusy(false);
+    }
+  };
+
   const syncToolbar = (
     <div className="card mb-4">
       <div className="card-body">
         <h6 className="card-title mb-3">
-          <i className="bi bi-arrow-repeat" /> Sync leave policies to balances
+          <i className="bi bi-arrow-repeat" /> Leave balance operations
         </h6>
         <p className="text-muted small mb-3">
-          Applies active leave policies to employee allocations and updates leave balances for the selected year.
-          Leave employee blank to sync all active employees.
+          Sync policies to allocations, run monthly accrual, or carry forward unused annual leave into the selected year.
         </p>
         <div className="row g-2 align-items-end">
           <div className="col-md-2">
@@ -65,7 +95,7 @@ export default function LeavePolicies() {
             />
           </div>
           <div className="col-md-4">
-            <label className="form-label small">Employee (optional)</label>
+            <label className="form-label small">Employee (optional, sync only)</label>
             <select
               className="form-select form-select-sm"
               value={syncEmployee}
@@ -77,15 +107,18 @@ export default function LeavePolicies() {
               ))}
             </select>
           </div>
-          <div className="col-md-auto">
-            <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              onClick={runSync}
-              disabled={syncing}
-            >
+          <div className="col-md-auto d-flex flex-wrap gap-2">
+            <button type="button" className="btn btn-primary btn-sm" onClick={runSync} disabled={syncing}>
               {syncing ? 'Syncing…' : 'Sync policies'}
             </button>
+            <button type="button" className="btn btn-outline-primary btn-sm" onClick={runAccrue} disabled={accrueBusy}>
+              {accrueBusy ? 'Accruing…' : 'Monthly accrual'}
+            </button>
+            {user?.is_admin && (
+              <button type="button" className="btn btn-outline-secondary btn-sm" onClick={runCarryForward} disabled={carryBusy}>
+                {carryBusy ? 'Processing…' : 'Carry forward'}
+              </button>
+            )}
           </div>
         </div>
         {message && <div className="alert alert-success mt-3 mb-0 py-2">{message}</div>}

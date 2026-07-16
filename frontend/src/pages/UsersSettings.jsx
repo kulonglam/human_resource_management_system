@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { ALL_PERMISSIONS, PERMISSION_LABELS } from '../utils/permissions';
 
 const EMPTY_FORM = {
   username: '',
@@ -12,7 +13,7 @@ const EMPTY_FORM = {
   password: '',
 };
 
-function UserModal({ user, roles, onClose, onSaved }) {
+function UserModal({ user, roles, departments, onClose, onSaved }) {
   const isEdit = Boolean(user);
   const [form, setForm] = useState(
     isEdit
@@ -21,10 +22,13 @@ function UserModal({ user, roles, onClose, onSaved }) {
           first_name: user.first_name || '',
           last_name: user.last_name || '',
           role: user.role || '',
+          managed_department: user.managed_department || '',
           is_active: user.is_active !== false,
         }
-      : { ...EMPTY_FORM },
+      : { ...EMPTY_FORM, managed_department: '' },
   );
+  const selectedRole = roles.find((r) => String(r.id) === String(form.role));
+  const isManagerRole = selectedRole?.name === 'manager';
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -44,6 +48,7 @@ function UserModal({ user, roles, onClose, onSaved }) {
       const payload = { ...form };
       if (isEdit) {
         if (payload.role === '') payload.role = null;
+        if (!payload.managed_department) payload.managed_department = null;
         await api.updateUser(user.id, payload);
       } else {
         await api.createUser(payload);
@@ -101,6 +106,23 @@ function UserModal({ user, roles, onClose, onSaved }) {
                     ))}
                   </select>
                 </div>
+                {isManagerRole && (
+                  <div className="mb-3">
+                    <label className="form-label">Managed department</label>
+                    <select
+                      name="managed_department"
+                      className="form-select"
+                      value={form.managed_department}
+                      onChange={handleChange}
+                    >
+                      <option value="">None (use linked employee profile)</option>
+                      {departments.map((dept) => (
+                        <option key={dept.id} value={dept.id}>{dept.name}</option>
+                      ))}
+                    </select>
+                    <div className="form-text">Scopes manager access when no employee profile is linked.</div>
+                  </div>
+                )}
                 {!isEdit && (
                   <div className="mb-3">
                     <label className="form-label">Password</label>
@@ -136,10 +158,104 @@ function UserModal({ user, roles, onClose, onSaved }) {
   );
 }
 
+function RolePermissionsPanel({ roles, onSaved }) {
+  const [selectedRoleId, setSelectedRoleId] = useState('');
+  const [permissions, setPermissions] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  const editableRoles = roles.filter((role) => role.name !== 'admin');
+
+  useEffect(() => {
+    const role = editableRoles.find((r) => String(r.id) === String(selectedRoleId));
+    if (role) {
+      setPermissions(role.permissions?.length ? role.permissions : []);
+    }
+  }, [selectedRoleId, roles]);
+
+  const togglePermission = (perm) => {
+    setPermissions((prev) => (
+      prev.includes(perm) ? prev.filter((p) => p !== perm) : [...prev, perm]
+    ));
+  };
+
+  const savePermissions = async () => {
+    if (!selectedRoleId) return;
+    setSaving(true);
+    setError('');
+    setMessage('');
+    try {
+      await api.updateRole(selectedRoleId, { permissions });
+      setMessage('Role permissions updated.');
+      onSaved();
+    } catch (err) {
+      setError(err.data?.detail || err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="card mt-4">
+      <div className="card-body">
+        <h6 className="card-title mb-3">
+          <i className="bi bi-shield-check" /> Role permissions
+        </h6>
+        <div className="row g-3">
+          <div className="col-md-4">
+            <label className="form-label small">Role</label>
+            <select
+              className="form-select form-select-sm"
+              value={selectedRoleId}
+              onChange={(e) => setSelectedRoleId(e.target.value)}
+            >
+              <option value="">Select role…</option>
+              {editableRoles.map((role) => (
+                <option key={role.id} value={role.id}>{role.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="col-md-8">
+            {selectedRoleId ? (
+              <div className="d-flex flex-wrap gap-3">
+                {ALL_PERMISSIONS.map((perm) => (
+                  <div className="form-check" key={perm}>
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      id={`perm-${perm}`}
+                      checked={permissions.includes(perm)}
+                      onChange={() => togglePermission(perm)}
+                    />
+                    <label className="form-check-label small" htmlFor={`perm-${perm}`}>
+                      {PERMISSION_LABELS[perm]}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted small mb-0">Select a role to edit granular permissions.</p>
+            )}
+          </div>
+        </div>
+        {selectedRoleId && (
+          <button type="button" className="btn btn-primary btn-sm mt-3" onClick={savePermissions} disabled={saving}>
+            {saving ? 'Saving…' : 'Save permissions'}
+          </button>
+        )}
+        {message && <div className="alert alert-success mt-3 mb-0 py-2">{message}</div>}
+        {error && <div className="alert alert-danger mt-3 mb-0 py-2">{error}</div>}
+      </div>
+    </div>
+  );
+}
+
 export default function UsersSettings() {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
+  const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [includeInactive, setIncludeInactive] = useState(false);
@@ -151,12 +267,14 @@ export default function UsersSettings() {
     setError('');
     try {
       const params = includeInactive ? 'include_inactive=1' : '';
-      const [userData, roleData] = await Promise.all([
+      const [userData, roleData, deptData] = await Promise.all([
         api.listRaw('users', params),
         api.getRoles(),
+        api.getDepartments(),
       ]);
       setUsers(userData.results || userData);
       setRoles(roleData.results || roleData);
+      setDepartments(deptData);
     } catch (err) {
       setError(err.data?.detail || err.message);
     } finally {
@@ -257,10 +375,13 @@ export default function UsersSettings() {
         <UserModal
           user={modalUser}
           roles={roles}
+          departments={departments}
           onClose={() => setShowModal(false)}
           onSaved={load}
         />
       )}
+
+      <RolePermissionsPanel roles={roles} onSaved={load} />
     </>
   );
 }

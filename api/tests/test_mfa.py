@@ -34,10 +34,11 @@ class MFATests(HRAPITestCase):
         self.assertEqual(verify.status_code, 200)
         self.assertEqual(verify.data['username'], 'admin')
 
-    def test_mfa_setup_requires_admin(self):
+    def test_mfa_setup_available_to_authenticated_users(self):
         self.login('employee', 'EmployeePass123!')
         response = self.client.get('/api/v1/auth/mfa/setup/')
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('secret', response.data)
 
     def test_mfa_setup_and_enable(self):
         self.login('admin', 'AdminPass123!')

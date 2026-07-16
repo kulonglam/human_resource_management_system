@@ -346,3 +346,44 @@ body.sidebar-open {
   letter-spacing: 0.05em;
   font-size: 0.7rem;
 }
+
+.mobile-bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1040;
+  display: flex;
+  justify-content: space-around;
+  gap: 0.25rem;
+  background: var(--fca-green, #1b4332);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 0.35rem 0.25rem calc(0.35rem + env(safe-area-inset-bottom));
+}
+
+.mobile-bottom-nav a {
+  color: rgba(255, 255, 255, 0.75);
+  text-decoration: none;
+  font-size: 0.65rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.25rem 0.4rem;
+  min-width: 3.25rem;
+}
+
+.mobile-bottom-nav a i {
+  font-size: 1.1rem;
+}
+
+.mobile-bottom-nav a.active,
+.mobile-bottom-nav a:hover {
+  color: #fff;
+}
+
+@media (max-width: 767.98px) {
+  .main-content .content {
+    padding-bottom: 4.5rem;
+  }
+}

@@ -87,7 +87,7 @@ def build_offer_from_template(template, application, created_by, **overrides):
         job_title=overrides.get('job_title', application.job.title),
         department=overrides.get('department', application.job.department),
         salary=overrides.get('salary', 0),
-        currency=overrides.get('currency', 'KES'),
+        currency=overrides.get('currency', 'UGX'),
         start_date=overrides.get('start_date', timezone.now().date() + timedelta(days=30)),
         created_by=created_by,
         body='',

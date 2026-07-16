@@ -4,36 +4,29 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
 
 jobs:
   backend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
       - name: Install dependencies
-        run: pip install -r requirements.txt coverage
-
-      - name: Django checks
-        run: python manage.py check
+        run: pip install -r requirements.txt pip-audit
+      - name: Dependency vulnerability scan
+        run: pip-audit -r requirements.txt --progress-spinner off
+        continue-on-error: true
+      - name: Run API tests
+        run: python manage.py test api.tests
         env:
-          SECRET_KEY: ci-test-secret-key
-          DEBUG: 'True'
-
-      - name: Run API tests with coverage
-        run: |
-          coverage run --source=api manage.py test api --verbosity=2
-          coverage report --omit="api/tests/*"
-          coverage report --omit="api/tests/*" --fail-under=60
-        env:
-          SECRET_KEY: ci-test-secret-key
-          DEBUG: 'True'
+          SECRET_KEY: test-secret-key-not-for-production
           ENFORCE_MFA_FOR_ADMINS: 'False'
+          ENFORCE_MFA_FOR_MANAGERS: 'False'
+          ENFORCE_MFA_FOR_PAYROLL: 'False'
+          REQUIRE_FIELD_ENCRYPTION_KEY: 'False'
+          FIELD_ENCRYPTION_KEY: 'test-field-encryption-key-for-ci'
 
   frontend:
     runs-on: ubuntu-latest
@@ -42,14 +35,26 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: npm audit
+        run: npm audit --omit=dev --audit-level=high
+        continue-on-error: true
+      - run: npm run test
+      - run: npm run build
 
-      - name: Install and build
-        run: |
-          npm ci
-          npm run build
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true

@@ -10,19 +10,19 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
 from accounts.access_control import can_access_employee, get_user_accessible_employees
-from accounts.models import AuditLog, CustomUser
+from accounts.models import AuditLog, CustomUser, Role
 from assets.models import Asset, AssetAssignment
-from attendance.models import Attendance
+from attendance.models import Attendance, OvertimeRecord, PublicHoliday, Timesheet
 from benefits.models import Benefit, EmployeeBenefit
 from departments.models import Department
 from discipline.models import Discipline, DisciplineAppeal
-from employees.models import Employee
+from employees.models import Employee, EmploymentContract, EmploymentHistory, JobGrade, Position
 from exits.models import ExitChecklist, ExitProcess
 from expenses.models import Expense, ExpenseCategory
 from kin.models import Kin
 from leave_policies.models import LeavePolicy, LeavePolicyAllocation
 from leaves.models import Leave, LeaveBalance
-from payroll.models import Salary
+from payroll.models import PayrollRun, Salary
 from payroll.utils import generate_salary_slip_pdf
 from performance.models import (
     Feedback,
@@ -78,12 +78,27 @@ from .notifications import (
     notify_leave_decision,
     notify_leave_submitted,
 )
-from .permissions import IsAdmin, IsAdminOrManager, IsAdminOrManagerOrReadOnly, IsAdminOrReadOnly
+from .permissions import (
+    CanApproveAttendance,
+    CanManageReports,
+    IsAdmin,
+    IsAdminOrManager,
+    IsAdminOrManagerOrReadOnly,
+    IsAdminOrReadOnly,
+    IsPayrollManager,
+    IsPayrollUser,
+    RequiresMFAForPayroll,
+)
+from .serializers_reports import ReportSnapshotSerializer, SavedReportSerializer, ScheduledReportSerializer
 from .serializers import (
     AuditLogSerializer,
     DepartmentSerializer,
     EmployeeSerializer,
     EmployeeTerminateSerializer,
+    EmploymentContractSerializer,
+    EmploymentHistorySerializer,
+    JobGradeSerializer,
+    PositionSerializer,
 )
 from .serializers_hr import (
     ApplicationNoteSerializer,
@@ -113,8 +128,11 @@ from .serializers_hr import (
     LeavePolicyAllocationSerializer,
     LeavePolicySerializer,
     LeaveSerializer,
+    OvertimeRecordSerializer,
     PerformanceAppraisalSerializer,
     PerformanceGoalSerializer,
+    PayrollRunSerializer,
+    PublicHolidaySerializer,
     SalarySerializer,
     ShiftAssignmentSerializer,
     ShiftSerializer,
@@ -122,6 +140,7 @@ from .serializers_hr import (
     SurveyQuestionSerializer,
     SurveyResponseSerializer,
     SurveySerializer,
+    TimesheetSerializer,
     TrainingCourseSerializer,
     TrainingRecordSerializer,
 )
@@ -164,6 +183,11 @@ class EmployeeViewSet(AuditedModelViewSet):
         employee = self.get_object()
         if not can_access_employee(request.user, employee):
             return Response({'detail': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+        from accounts.access_control import can_view_sensitive_data
+        from api.sensitive_access import log_sensitive_employee_access
+
+        if can_view_sensitive_data(request.user):
+            log_sensitive_employee_access(request, employee)
         return super().retrieve(request, *args, **kwargs)
 
     def create(self, request, *args, **kwargs):
@@ -216,6 +240,9 @@ class EmployeeViewSet(AuditedModelViewSet):
 
     def perform_create(self, serializer):
         employee = serializer.save()
+        if getattr(self.request.user, 'organization_id', None) and not employee.organization_id:
+            employee.organization_id = self.request.user.organization_id
+            employee.save(update_fields=['organization_id'])
         from integrations.services import dispatch_webhook
         dispatch_webhook('employee.created', {
             'id': employee.id,
@@ -224,6 +251,43 @@ class EmployeeViewSet(AuditedModelViewSet):
             'department_id': employee.department_id,
             'job_title': employee.job_title,
         })
+
+
+class JobGradeViewSet(AuditedModelViewSet):
+    queryset = JobGrade.objects.all()
+    serializer_class = JobGradeSerializer
+    permission_classes = [IsAdminOrManagerOrReadOnly]
+
+
+class PositionViewSet(AuditedModelViewSet):
+    queryset = Position.objects.select_related('department', 'grade', 'reports_to').all()
+    serializer_class = PositionSerializer
+    permission_classes = [IsAdminOrManagerOrReadOnly]
+
+
+class EmploymentContractViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
+    serializer_class = EmploymentContractSerializer
+    permission_classes = [IsAdminOrManagerOrReadOnly]
+
+    def get_queryset(self):
+        qs = EmploymentContract.objects.select_related('employee').all()
+        if not self.request.user.is_admin:
+            qs = self.filter_by_accessible_employees(qs)
+        return qs
+
+
+class EmploymentHistoryViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
+    serializer_class = EmploymentHistorySerializer
+    permission_classes = [IsAdminOrManagerOrReadOnly]
+
+    def get_queryset(self):
+        qs = EmploymentHistory.objects.select_related('employee').all()
+        if not self.request.user.is_admin:
+            qs = self.filter_by_accessible_employees(qs)
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(recorded_by=self.request.user)
 
 
 class DepartmentViewSet(AuditedModelViewSet):
@@ -258,12 +322,12 @@ class LeaveViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
                 leave_type=leave.leave_type,
                 year=current_year,
             )
-            if balance.available_days < leave.duration:
+            if balance.available_days < leave.working_days:
                 leave.delete()
                 raise serializers.ValidationError(
                     f'Insufficient leave balance. Available: {balance.available_days} days.'
                 )
-            balance.pending_days += leave.duration
+            balance.pending_days += leave.working_days
             balance.save()
         except LeaveBalance.DoesNotExist:
             pass
@@ -321,21 +385,180 @@ class LeaveBalanceViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
             qs = self.filter_by_accessible_employees(qs)
         return qs
 
+    @action(detail=False, methods=['post'], permission_classes=[IsAdminOrManager])
+    def accrue(self, request):
+        from leaves.services import accrue_monthly_balances
+
+        result = accrue_monthly_balances(request.data.get('year'), request.data.get('month'))
+        return Response(result)
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAdmin])
+    def carry_forward(self, request):
+        from leaves.services import carry_forward_balances
+
+        from_year = int(request.data.get('from_year', timezone.now().year - 1))
+        to_year = int(request.data.get('to_year', timezone.now().year))
+        return Response(carry_forward_balances(from_year, to_year))
+
 
 class AttendanceViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
     serializer_class = AttendanceSerializer
 
     def get_queryset(self):
-        qs = Attendance.objects.select_related('employee').order_by('-date')
+        qs = Attendance.objects.select_related(
+            'employee', 'approved_by', 'shift_assignment__shift',
+        ).order_by('-date')
         if not self.request.user.is_admin:
             qs = self.filter_by_accessible_employees(qs)
         date_from = self.request.query_params.get('from')
         date_to = self.request.query_params.get('to')
+        approval_status = self.request.query_params.get('approval_status')
         if date_from:
             qs = qs.filter(date__gte=date_from)
         if date_to:
             qs = qs.filter(date__lte=date_to)
+        if approval_status:
+            qs = qs.filter(approval_status=approval_status)
         return qs
+
+    def perform_create(self, serializer):
+        from attendance.services import derive_attendance_status, match_shift_for_date
+
+        attendance = serializer.save()
+        assignment = match_shift_for_date(attendance.employee, attendance.date)
+        if assignment:
+            attendance.shift_assignment = assignment
+        if attendance.time_in or attendance.time_out:
+            attendance.status = derive_attendance_status(attendance)
+        attendance.save()
+
+    @action(detail=True, methods=['post'])
+    def submit(self, request, pk=None):
+        attendance = self.get_object()
+        if attendance.approval_status not in ('draft', 'rejected'):
+            return Response({'detail': 'Attendance is not in a submittable state.'}, status=status.HTTP_400_BAD_REQUEST)
+        attendance.approval_status = 'submitted'
+        attendance.save(update_fields=['approval_status'])
+        return Response(AttendanceSerializer(attendance, context={'request': request}).data)
+
+    @action(detail=True, methods=['post'], permission_classes=[CanApproveAttendance])
+    def approve(self, request, pk=None):
+        attendance = self.get_object()
+        if attendance.approval_status != 'submitted':
+            return Response({'detail': 'Only submitted attendance can be approved.'}, status=status.HTTP_400_BAD_REQUEST)
+        attendance.approval_status = 'approved'
+        attendance.approved_by = request.user
+        attendance.approved_at = timezone.now()
+        attendance.save()
+        log_action(request, 'approve', 'Attendance', attendance.id, str(attendance), 'Attendance approved')
+        return Response(AttendanceSerializer(attendance, context={'request': request}).data)
+
+    @action(detail=True, methods=['post'], permission_classes=[CanApproveAttendance])
+    def reject(self, request, pk=None):
+        attendance = self.get_object()
+        if attendance.approval_status != 'submitted':
+            return Response({'detail': 'Only submitted attendance can be rejected.'}, status=status.HTTP_400_BAD_REQUEST)
+        attendance.approval_status = 'rejected'
+        attendance.approved_by = request.user
+        attendance.approved_at = timezone.now()
+        attendance.notes = request.data.get('reason', attendance.notes)
+        attendance.save()
+        log_action(request, 'reject', 'Attendance', attendance.id, str(attendance), 'Attendance rejected')
+        return Response(AttendanceSerializer(attendance, context={'request': request}).data)
+
+    @action(detail=False, methods=['post'], parser_classes=[MultiPartParser, FormParser], permission_classes=[CanApproveAttendance])
+    def import_csv(self, request):
+        from attendance.services import import_attendance_csv
+        from api.uploads import validate_upload
+
+        upload = request.FILES.get('file')
+        if not upload:
+            return Response({'detail': 'CSV file is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            validate_upload(upload, kind='csv')
+        except Exception as exc:
+            detail = getattr(exc, 'detail', str(exc))
+            return Response(detail if isinstance(detail, dict) else {'detail': detail}, status=status.HTTP_400_BAD_REQUEST)
+        result = import_attendance_csv(upload)
+        log_action(request, 'create', 'Attendance', None, 'Attendance import', f'Imported {result["created"]} created, {result["updated"]} updated')
+        return Response(result)
+
+
+class PublicHolidayViewSet(AuditedModelViewSet):
+    queryset = PublicHoliday.objects.all()
+    serializer_class = PublicHolidaySerializer
+    permission_classes = [IsAdminOrManagerOrReadOnly]
+
+
+class TimesheetViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
+    serializer_class = TimesheetSerializer
+
+    def get_queryset(self):
+        qs = Timesheet.objects.select_related('employee', 'approved_by').order_by('-date')
+        if not self.request.user.is_admin:
+            qs = self.filter_by_accessible_employees(qs)
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        return qs
+
+    @action(detail=True, methods=['post'])
+    def submit(self, request, pk=None):
+        timesheet = self.get_object()
+        if timesheet.status not in ('draft', 'rejected'):
+            return Response({'detail': 'Timesheet is not in a submittable state.'}, status=status.HTTP_400_BAD_REQUEST)
+        timesheet.status = 'submitted'
+        timesheet.submitted_at = timezone.now()
+        timesheet.save()
+        return Response(TimesheetSerializer(timesheet, context={'request': request}).data)
+
+    @action(detail=True, methods=['post'], permission_classes=[CanApproveAttendance])
+    def approve(self, request, pk=None):
+        from attendance.services import sync_timesheet_to_attendance
+
+        timesheet = self.get_object()
+        if timesheet.status != 'submitted':
+            return Response({'detail': 'Only submitted timesheets can be approved.'}, status=status.HTTP_400_BAD_REQUEST)
+        timesheet.status = 'approved'
+        timesheet.approved_by = request.user
+        timesheet.approved_at = timezone.now()
+        timesheet.save()
+        sync_timesheet_to_attendance(timesheet)
+        log_action(request, 'approve', 'Timesheet', timesheet.id, str(timesheet), 'Timesheet approved')
+        return Response(TimesheetSerializer(timesheet, context={'request': request}).data)
+
+
+class OvertimeRecordViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
+    serializer_class = OvertimeRecordSerializer
+
+    def get_queryset(self):
+        qs = OvertimeRecord.objects.select_related('employee', 'approved_by').order_by('-date')
+        if not self.request.user.is_admin:
+            qs = self.filter_by_accessible_employees(qs)
+        return qs
+
+    @action(detail=True, methods=['post'], permission_classes=[CanApproveAttendance])
+    def approve(self, request, pk=None):
+        record = self.get_object()
+        if record.status != 'pending':
+            return Response({'detail': 'Overtime record is not pending.'}, status=status.HTTP_400_BAD_REQUEST)
+        record.status = 'approved'
+        record.approved_by = request.user
+        record.approved_at = timezone.now()
+        record.save()
+        log_action(request, 'approve', 'OvertimeRecord', record.id, str(record), 'Overtime approved')
+        return Response(OvertimeRecordSerializer(record, context={'request': request}).data)
+
+    @action(detail=True, methods=['post'], permission_classes=[CanApproveAttendance])
+    def reject(self, request, pk=None):
+        record = self.get_object()
+        if record.status != 'pending':
+            return Response({'detail': 'Overtime record is not pending.'}, status=status.HTTP_400_BAD_REQUEST)
+        record.status = 'rejected'
+        record.approved_by = request.user
+        record.approved_at = timezone.now()
+        record.save()
+        return Response(OvertimeRecordSerializer(record, context={'request': request}).data)
 
 
 class JobPostingViewSet(AuditedModelViewSet):
@@ -526,7 +749,7 @@ class JobOfferViewSet(AuditedModelViewSet):
             request.user,
             salary=data['salary'],
             start_date=data['start_date'],
-            currency=data.get('currency', 'KES'),
+            currency=data.get('currency', 'UGX'),
             job_title=data.get('job_title') or application.job.title,
             department=data.get('department') or application.job.department,
         )
@@ -590,9 +813,67 @@ class HireOnboardingViewSet(AuditedModelViewSet):
         })
 
 
+class PayrollRunViewSet(AuditedModelViewSet):
+    queryset = PayrollRun.objects.all()
+    serializer_class = PayrollRunSerializer
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [IsPayrollUser(), RequiresMFAForPayroll()]
+        return [IsPayrollManager(), RequiresMFAForPayroll()]
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+    def update(self, request, *args, **kwargs):
+        payroll_run = self.get_object()
+        if payroll_run.status != 'draft':
+            return Response(
+                {'detail': 'Approved or paid payroll runs are locked.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+        return super().update(request, *args, **kwargs)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAdmin])
+    def approve(self, request, pk=None):
+        payroll_run = self.get_object()
+        if payroll_run.status != 'draft':
+            return Response({'detail': 'Only draft payroll runs can be approved.'}, status=400)
+        if not payroll_run.salary_records.exists():
+            return Response({'detail': 'Add salary records before approving this run.'}, status=400)
+        payroll_run.salary_records.update(status='approved', is_paid=False)
+        payroll_run.status = 'approved'
+        payroll_run.approved_by = request.user
+        payroll_run.approved_at = timezone.now()
+        payroll_run.save(update_fields=['status', 'approved_by', 'approved_at', 'updated_at'])
+        log_action(request, 'approve', 'PayrollRun', payroll_run.id, str(payroll_run))
+        return Response(PayrollRunSerializer(payroll_run).data)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAdmin])
+    def mark_paid(self, request, pk=None):
+        payroll_run = self.get_object()
+        if payroll_run.status != 'approved':
+            return Response({'detail': 'Only approved payroll runs can be marked paid.'}, status=400)
+        paid_at = timezone.now()
+        payroll_run.salary_records.update(
+            status='paid', is_paid=True, paid_on=paid_at.date(), updated_at=paid_at,
+        )
+        payroll_run.status = 'paid'
+        payroll_run.paid_at = paid_at
+        payroll_run.save(update_fields=['status', 'paid_at', 'updated_at'])
+        log_action(request, 'update', 'PayrollRun', payroll_run.id, str(payroll_run), 'Payroll run paid.')
+        return Response(PayrollRunSerializer(payroll_run).data)
+
+
 class SalaryViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
     serializer_class = SalarySerializer
-    permission_classes = [IsAdminOrManagerOrReadOnly]
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve', 'slip'):
+            return [IsAuthenticated(), RequiresMFAForPayroll()]
+        if self.action in ('create', 'update', 'partial_update', 'destroy'):
+            return [IsPayrollManager(), RequiresMFAForPayroll()]
+        return [IsPayrollUser(), RequiresMFAForPayroll()]
 
     def get_queryset(self):
         qs = Salary.objects.select_related('employee').order_by('-year', '-month')
@@ -605,6 +886,38 @@ class SalaryViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
         if year:
             qs = qs.filter(year=year)
         return qs
+
+    def perform_create(self, serializer):
+        month = serializer.validated_data['month']
+        year = serializer.validated_data['year']
+        payroll_run, _ = PayrollRun.objects.get_or_create(
+            month=month,
+            year=year,
+            defaults={'created_by': self.request.user},
+        )
+        if payroll_run.status != 'draft':
+            raise serializers.ValidationError(
+                {'payroll_run': 'The payroll run for this period is already locked.'},
+            )
+        serializer.save(payroll_run=payroll_run)
+
+    def update(self, request, *args, **kwargs):
+        salary = self.get_object()
+        if salary.status != 'draft':
+            return Response(
+                {'detail': 'Approved or paid payroll records are locked.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        salary = self.get_object()
+        if salary.status != 'draft':
+            return Response(
+                {'detail': 'Approved or paid payroll records cannot be deleted.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+        return super().destroy(request, *args, **kwargs)
 
     @action(detail=True, methods=['get'])
     def slip(self, request, pk=None):
@@ -1238,8 +1551,11 @@ class HRDocumentViewSet(AuditedModelViewSet):
         return HRDocumentSerializer
 
     def get_queryset(self):
+        from documents.access_control import filter_documents_for_user
         from documents.models import HRDocument
+
         qs = HRDocument.objects.filter(is_active=True).select_related('employee', 'uploaded_by')
+        qs = filter_documents_for_user(qs, self.request.user)
         if not self.request.user.is_admin:
             try:
                 employee = Employee.objects.get(email=self.request.user.email)
@@ -1260,7 +1576,42 @@ class HRDocumentViewSet(AuditedModelViewSet):
         return [IsAdminOrManagerOrReadOnly()]
 
     def perform_create(self, serializer):
-        serializer.save(uploaded_by=self.request.user)
+        from documents.access_control import user_can_upload_document_category
+        from api.uploads import validate_upload
+
+        category = serializer.validated_data.get('category', 'other')
+        if not user_can_upload_document_category(self.request.user, category):
+            raise serializers.ValidationError({'category': 'You cannot upload documents in this category.'})
+        upload = serializer.validated_data.get('file')
+        if upload:
+            validate_upload(upload, kind='document')
+        org_id = getattr(self.request.user, 'organization_id', None)
+        employee = serializer.save(uploaded_by=self.request.user)
+        return employee
+
+    @action(detail=True, methods=['post'])
+    def acknowledge(self, request, pk=None):
+        from documents.models import DocumentAcknowledgement
+
+        document = self.get_object()
+        if not document.requires_acknowledgement:
+            return Response({'detail': 'This document does not require acknowledgement.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            employee = Employee.objects.get(email=request.user.email)
+        except Employee.DoesNotExist:
+            return Response({'detail': 'No employee profile linked to your account.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        acknowledgement, created = DocumentAcknowledgement.objects.get_or_create(
+            document=document,
+            employee=employee,
+            defaults={'ip_address': request.META.get('REMOTE_ADDR')},
+        )
+        from .serializers_phase2 import HRDocumentSerializer
+        return Response({
+            'acknowledged': True,
+            'created': created,
+            'document': HRDocumentSerializer(document, context={'request': request}).data,
+        })
 
 
 class ApprovalWorkflowViewSet(viewsets.ReadOnlyModelViewSet):
@@ -1348,6 +1699,35 @@ class ApprovalRequestViewSet(viewsets.ReadOnlyModelViewSet):
         })
 
 
+class RoleViewSet(viewsets.ModelViewSet):
+    queryset = Role.objects.all()
+    http_method_names = ['get', 'patch', 'head', 'options']
+
+    def get_serializer_class(self):
+        from .serializers import RoleSerializer
+        return RoleSerializer
+
+    def get_permissions(self):
+        from django.conf import settings
+        from rest_framework.permissions import AllowAny
+
+        if self.action == 'list' and getattr(settings, 'ALLOW_PUBLIC_REGISTRATION', False):
+            return [AllowAny()]
+        if self.action in ('list', 'retrieve'):
+            return [IsAdminOrManager()]
+        return [IsAdmin()]
+
+    def partial_update(self, request, *args, **kwargs):
+        role = self.get_object()
+        if role.name == Role.ADMIN:
+            return Response({'detail': 'Admin role permissions cannot be changed.'}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = self.get_serializer(role, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        log_action(request, 'update', 'Role', role.id, role.name, 'Role permissions updated')
+        return Response(serializer.data)
+
+
 class UserViewSet(viewsets.ModelViewSet):
     http_method_names = ['get', 'post', 'patch', 'head', 'options']
 
@@ -1424,7 +1804,11 @@ class APIKeyViewSet(viewsets.ModelViewSet):
 
         serializer = APIKeyCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        instance, raw_key = APIKey.generate(request.user, serializer.validated_data['name'])
+        instance, raw_key = APIKey.generate(
+            request.user,
+            serializer.validated_data['name'],
+            scopes=serializer.validated_data.get('scopes') or ['read'],
+        )
         data = APIKeySerializer(instance).data
         data['api_key'] = raw_key
         return Response(data, status=status.HTTP_201_CREATED)
@@ -1471,7 +1855,126 @@ class WebhookEndpointViewSet(AuditedModelViewSet):
         from .integrations_serializers import WebhookDeliverySerializer
         return Response(WebhookDeliverySerializer(qs[:limit], many=True).data)
 
+    @action(detail=False, methods=['post'], url_path='retry-delivery')
+    def retry_delivery(self, request):
+        from integrations.services import retry_webhook_delivery
+        from .integrations_serializers import WebhookDeliverySerializer
+
+        delivery_id = request.data.get('delivery_id')
+        if not delivery_id:
+            return Response({'detail': 'delivery_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            delivery = retry_webhook_delivery(delivery_id)
+        except Exception as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(WebhookDeliverySerializer(delivery).data)
+
     @action(detail=False, methods=['get'])
     def events(self, request):
         from integrations.models import WEBHOOK_EVENTS
         return Response({'events': WEBHOOK_EVENTS})
+
+
+class SavedReportViewSet(AuditedModelViewSet):
+    serializer_class = SavedReportSerializer
+
+    def get_queryset(self):
+        from reports.models import SavedReport
+
+        user = self.request.user
+        return SavedReport.objects.filter(
+            Q(created_by=user) | Q(is_public=True),
+        ).select_related('created_by').order_by('-updated_at')
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [IsAdminOrManager()]
+        return [CanManageReports()]
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def run(self, request, pk=None):
+        """Return saved filters for the SPA to load into the Reports page."""
+        saved = self.get_object()
+        return Response({
+            'report_type': saved.report_type,
+            'filters': saved.filters,
+            'name': saved.name,
+        })
+
+
+class ReportSnapshotViewSet(AuditedModelViewSet):
+    serializer_class = ReportSnapshotSerializer
+
+    def get_queryset(self):
+        from reports.models import ReportSnapshot
+
+        qs = ReportSnapshot.objects.select_related('generated_by').order_by('-generated_at')
+        report_type = self.request.query_params.get('report_type')
+        if report_type:
+            qs = qs.filter(report_type=report_type)
+        if not self.request.user.is_admin:
+            qs = qs.filter(generated_by=self.request.user)
+        return qs
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [IsAdminOrManager()]
+        return [CanManageReports()]
+
+    def perform_create(self, serializer):
+        serializer.save(generated_by=self.request.user)
+
+
+class ScheduledReportViewSet(AuditedModelViewSet):
+    serializer_class = ScheduledReportSerializer
+
+    def get_queryset(self):
+        from reports.models import ScheduledReport
+
+        return ScheduledReport.objects.select_related('created_by').order_by('name')
+
+    def get_permissions(self):
+        return [CanManageReports()]
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def run_now(self, request, pk=None):
+        from reports.services import deliver_scheduled_report
+
+        scheduled = self.get_object()
+        try:
+            result = deliver_scheduled_report(scheduled.id)
+            return Response(result)
+        except Exception as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class SensitiveDataAccessLogViewSet(viewsets.ReadOnlyModelViewSet):
+    permission_classes = [IsAdmin]
+
+    def get_serializer_class(self):
+        from .serializers import SensitiveDataAccessLogSerializer
+        return SensitiveDataAccessLogSerializer
+
+    def get_queryset(self):
+        from accounts.models import SensitiveDataAccessLog
+
+        return SensitiveDataAccessLog.objects.select_related('user', 'employee').order_by('-accessed_at')
+
+
+class DocumentAccessRuleViewSet(AuditedModelViewSet):
+    permission_classes = [IsAdmin]
+
+    def get_serializer_class(self):
+        from .serializers import DocumentAccessRuleSerializer
+        return DocumentAccessRuleSerializer
+
+    def get_queryset(self):
+        from documents.models import DocumentAccessRule
+
+        return DocumentAccessRule.objects.select_related('role').order_by('role__name', 'category')

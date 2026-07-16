@@ -1,11 +1,17 @@
 import { employeeField, renderStatus } from './shared';
 
+const formatUGX = (value) => `UGX ${Number(value || 0).toLocaleString('en-UG')}`;
+
 export const attendanceTabs = [{
   id: 'records', label: 'Attendance Records', endpoint: 'attendance',
+  importCsv: true,
+  importCsvHelp: 'CSV columns: employee_number, date (YYYY-MM-DD), time_in, time_out, status, notes',
   columns: [
     { key: 'employee_name', label: 'Employee' }, { key: 'date', label: 'Date' },
     { key: 'time_in', label: 'In' }, { key: 'time_out', label: 'Out' },
     { key: 'status', label: 'Status', render: (r) => renderStatus(r.status) },
+    { key: 'approval_status', label: 'Approval', render: (r) => renderStatus(r.approval_status) },
+    { key: 'shift_name', label: 'Shift' },
   ],
   formFields: [
     employeeField, { name: 'date', type: 'date', required: true },
@@ -14,8 +20,65 @@ export const attendanceTabs = [{
       { value: 'present', label: 'Present' }, { value: 'absent', label: 'Absent' },
       { value: 'late', label: 'Late' }, { value: 'half_day', label: 'Half Day' },
     ]},
+    { name: 'source', type: 'select', choices: [
+      { value: 'manual', label: 'Manual' }, { value: 'import', label: 'Import' },
+    ]},
     { name: 'notes', type: 'textarea', fullWidth: true },
   ],
+  rowActions: [
+    { name: 'submit', label: 'Submit', variant: 'outline-primary', show: (r) => ['draft', 'rejected'].includes(r.approval_status) },
+    { name: 'approve', label: 'Approve', variant: 'success', managerOnly: true, show: (r) => r.approval_status === 'submitted' },
+    { name: 'reject', label: 'Reject', variant: 'danger', managerOnly: true, show: (r) => r.approval_status === 'submitted' },
+  ],
+}, {
+  id: 'timesheets', label: 'Timesheets', endpoint: 'timesheets',
+  selfServiceEmployee: true,
+  columns: [
+    { key: 'employee_name', label: 'Employee' }, { key: 'date', label: 'Date' },
+    { key: 'regular_hours', label: 'Regular Hrs' }, { key: 'overtime_hours', label: 'OT Hrs' },
+    { key: 'status', label: 'Status', render: (r) => renderStatus(r.status) },
+  ],
+  formFields: [
+    employeeField, { name: 'date', type: 'date', required: true },
+    { name: 'clock_in', type: 'time' }, { name: 'clock_out', type: 'time' },
+    { name: 'regular_hours', type: 'number', step: '0.01', required: true },
+    { name: 'project_code', label: 'Project code' },
+    { name: 'notes', type: 'textarea', fullWidth: true },
+  ],
+  rowActions: [
+    { name: 'submit', label: 'Submit', variant: 'outline-primary', show: (r) => ['draft', 'rejected'].includes(r.status) },
+    { name: 'approve', label: 'Approve', variant: 'success', managerOnly: true, show: (r) => r.status === 'submitted' },
+  ],
+}, {
+  id: 'overtime', label: 'Overtime', endpoint: 'overtime-records',
+  selfServiceEmployee: true,
+  columns: [
+    { key: 'employee_name', label: 'Employee' }, { key: 'date', label: 'Date' },
+    { key: 'hours', label: 'Hours' }, { key: 'status', label: 'Status', render: (r) => renderStatus(r.status) },
+    { key: 'reason', label: 'Reason' },
+  ],
+  formFields: [
+    employeeField, { name: 'date', type: 'date', required: true },
+    { name: 'hours', type: 'number', step: '0.01', required: true },
+    { name: 'reason', type: 'textarea', fullWidth: true, required: true },
+  ],
+  rowActions: [
+    { name: 'approve', label: 'Approve', variant: 'success', managerOnly: true, show: (r) => r.status === 'pending' },
+    { name: 'reject', label: 'Reject', variant: 'danger', managerOnly: true, show: (r) => r.status === 'pending' },
+  ],
+}, {
+  id: 'holidays', label: 'Public Holidays', endpoint: 'public-holidays',
+  columns: [
+    { key: 'name', label: 'Holiday' }, { key: 'date', label: 'Date' },
+    { key: 'is_recurring', label: 'Recurring', render: (r) => (r.is_recurring ? 'Yes' : 'No') },
+  ],
+  formFields: [
+    { name: 'name', required: true }, { name: 'date', type: 'date', required: true },
+    { name: 'is_recurring', type: 'checkbox', label: 'Recurring annually', default: true },
+    { name: 'notes', type: 'textarea', fullWidth: true },
+  ],
+  hideCreateForEmployee: true,
+  hideEditForEmployee: true,
 }];
 
 export const leaveTabs = [
@@ -26,7 +89,8 @@ export const leaveTabs = [
     columns: [
       { key: 'employee_name', label: 'Employee' }, { key: 'leave_type_display', label: 'Type' },
       { key: 'start_date', label: 'Start' }, { key: 'end_date', label: 'End' },
-      { key: 'duration', label: 'Days' }, { key: 'status', label: 'Status', render: (r) => renderStatus(r.status) },
+      { key: 'duration', label: 'Working Days' }, { key: 'is_half_day', label: 'Half Day', render: (r) => (r.is_half_day ? 'Yes' : 'No') },
+      { key: 'status', label: 'Status', render: (r) => renderStatus(r.status) },
     ],
     formFields: [
       employeeField,
@@ -37,6 +101,7 @@ export const leaveTabs = [
       ]},
       { name: 'start_date', type: 'date', required: true },
       { name: 'end_date', type: 'date', required: true },
+      { name: 'is_half_day', type: 'checkbox', label: 'Half day (same start/end date)' },
       { name: 'reason', type: 'textarea', fullWidth: true, required: true },
     ],
     rowActions: [
@@ -133,16 +198,131 @@ export const payrollTabs = [{
   id: 'salaries', label: 'Salary Records', endpoint: 'salaries',
   columns: [
     { key: 'employee_name', label: 'Employee' }, { key: 'month_name', label: 'Month' },
-    { key: 'year', label: 'Year' }, { key: 'net_salary', label: 'Net' },
-    { key: 'is_paid', label: 'Paid', render: (r) => (r.is_paid ? 'Yes' : 'No') },
+    { key: 'year', label: 'Year' },
+    { key: 'gross_salary', label: 'Gross', render: (r) => formatUGX(r.gross_salary) },
+    { key: 'tax', label: 'PAYE', render: (r) => formatUGX(r.tax) },
+    { key: 'net_salary', label: 'Net', render: (r) => formatUGX(r.net_salary) },
+    { key: 'status', label: 'Status', render: (r) => renderStatus(r.status) },
   ],
   formFields: [
     employeeField, { name: 'month', type: 'number', required: true },
     { name: 'year', type: 'number', required: true },
     { name: 'basic_salary', type: 'number', step: '0.01', required: true },
     { name: 'allowances', type: 'number', step: '0.01', default: 0 },
+    { name: 'taxable_benefits', type: 'number', step: '0.01', default: 0 },
     { name: 'deductions', type: 'number', step: '0.01', default: 0 },
-    { name: 'tax', type: 'number', step: '0.01', default: 0 },
+    { name: 'is_resident', type: 'checkbox', default: true, label: 'Uganda tax resident' },
+    { name: 'is_secondary_employment', type: 'checkbox', label: 'Secondary employment (30% PAYE)' },
+    { name: 'nssf_applicable', type: 'checkbox', default: true, label: 'NSSF applicable' },
+    { name: 'lst_applicable', type: 'checkbox', default: true, label: 'Local Service Tax applicable' },
   ],
-  rowActions: [{ name: 'slip', label: 'PDF', variant: 'outline-info', method: 'GET' }],
+  rowActions: [
+    { name: 'slip', label: 'PDF', variant: 'outline-info', method: 'GET' },
+  ],
+  hideCreateForEmployee: true,
+  hideEditForEmployee: true,
+  hideRowActionsForEmployee: true,
+}, {
+  id: 'runs', label: 'Payroll Runs', endpoint: 'payroll-runs',
+  columns: [
+    { key: 'period', label: 'Period' },
+    { key: 'employee_count', label: 'Employees' },
+    { key: 'total_gross', label: 'Gross', render: (r) => formatUGX(r.total_gross) },
+    { key: 'total_paye', label: 'PAYE', render: (r) => formatUGX(r.total_paye) },
+    { key: 'total_nssf', label: 'Total NSSF', render: (r) => formatUGX(r.total_nssf) },
+    { key: 'total_net', label: 'Net', render: (r) => formatUGX(r.total_net) },
+    { key: 'status', label: 'Status', render: (r) => renderStatus(r.status) },
+  ],
+  formFields: [
+    { name: 'month', type: 'number', required: true, default: new Date().getMonth() + 1 },
+    { name: 'year', type: 'number', required: true, default: new Date().getFullYear() },
+    { name: 'notes', type: 'textarea', fullWidth: true },
+  ],
+  rowActions: [
+    { name: 'approve', label: 'Approve Run', variant: 'success', adminOnly: true, show: (r) => r.status === 'draft' },
+    { name: 'mark_paid', label: 'Mark Paid', variant: 'primary', adminOnly: true, show: (r) => r.status === 'approved' },
+  ],
+  hideCreateForEmployee: true,
+  hideEditForEmployee: true,
+  hideRowActionsForEmployee: true,
 }];
+
+export const workforceStructureTabs = [
+  {
+    id: 'positions', label: 'Positions', endpoint: 'positions',
+    columns: [
+      { key: 'code', label: 'Code' }, { key: 'title', label: 'Position' },
+      { key: 'department_name', label: 'Department' }, { key: 'grade_name', label: 'Grade' },
+      { key: 'reports_to_title', label: 'Reports To' },
+    ],
+    formFields: [
+      { name: 'code', required: true }, { name: 'title', required: true },
+      { name: 'department', type: 'select', required: true },
+      { name: 'grade', type: 'select' }, { name: 'reports_to', type: 'select' },
+      { name: 'description', type: 'textarea', fullWidth: true },
+      { name: 'is_active', type: 'checkbox', default: true },
+    ],
+  },
+  {
+    id: 'grades', label: 'Job Grades', endpoint: 'job-grades',
+    columns: [
+      { key: 'code', label: 'Code' }, { key: 'name', label: 'Grade' },
+      { key: 'rank', label: 'Rank' },
+      { key: 'minimum_salary', label: 'Minimum', render: (r) => formatUGX(r.minimum_salary) },
+      { key: 'maximum_salary', label: 'Maximum', render: (r) => formatUGX(r.maximum_salary) },
+    ],
+    formFields: [
+      { name: 'code', required: true }, { name: 'name', required: true },
+      { name: 'rank', type: 'number', required: true },
+      { name: 'minimum_salary', type: 'number', step: '0.01' },
+      { name: 'maximum_salary', type: 'number', step: '0.01' },
+      { name: 'is_active', type: 'checkbox', default: true },
+    ],
+  },
+  {
+    id: 'contracts', label: 'Contracts', endpoint: 'employment-contracts',
+    columns: [
+      { key: 'employee_name', label: 'Employee' }, { key: 'contract_type', label: 'Type' },
+      { key: 'start_date', label: 'Start' }, { key: 'end_date', label: 'End' },
+      { key: 'status', label: 'Status', render: (r) => renderStatus(r.status) },
+    ],
+    formFields: [
+      employeeField,
+      { name: 'contract_type', type: 'select', required: true, choices: [
+        { value: 'permanent', label: 'Permanent' }, { value: 'fixed_term', label: 'Fixed Term' },
+        { value: 'temporary', label: 'Temporary' }, { value: 'internship', label: 'Internship' },
+        { value: 'consultancy', label: 'Consultancy' },
+      ] },
+      { name: 'start_date', type: 'date', required: true }, { name: 'end_date', type: 'date' },
+      { name: 'probation_end_date', type: 'date' },
+      { name: 'salary', type: 'number', step: '0.01', required: true },
+      { name: 'status', type: 'select', choices: [
+        { value: 'draft', label: 'Draft' }, { value: 'active', label: 'Active' },
+        { value: 'expired', label: 'Expired' }, { value: 'terminated', label: 'Terminated' },
+      ] },
+      { name: 'document', type: 'file', accept: '.pdf,.doc,.docx' },
+      { name: 'notes', type: 'textarea', fullWidth: true },
+    ],
+  },
+  {
+    id: 'history', label: 'Employment History', endpoint: 'employment-history',
+    columns: [
+      { key: 'employee_name', label: 'Employee' }, { key: 'event_type_display', label: 'Change' },
+      { key: 'effective_date', label: 'Effective Date' }, { key: 'notes', label: 'Notes' },
+    ],
+    formFields: [
+      employeeField,
+      { name: 'event_type', type: 'select', required: true, choices: [
+        { value: 'hire', label: 'Hire' }, { value: 'promotion', label: 'Promotion' },
+        { value: 'transfer', label: 'Transfer' }, { value: 'grade_change', label: 'Grade Change' },
+        { value: 'salary_change', label: 'Salary Change' },
+        { value: 'contract_change', label: 'Contract Change' }, { value: 'exit', label: 'Exit' },
+      ] },
+      { name: 'effective_date', type: 'date', required: true },
+      { name: 'previous_position', type: 'select' }, { name: 'new_position', type: 'select' },
+      { name: 'previous_department', type: 'select' }, { name: 'new_department', type: 'select' },
+      { name: 'previous_grade', type: 'select' }, { name: 'new_grade', type: 'select' },
+      { name: 'notes', type: 'textarea', fullWidth: true },
+    ],
+  },
+];

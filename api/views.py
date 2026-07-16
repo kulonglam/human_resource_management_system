@@ -39,11 +39,18 @@ from .mfa import (
     verify_totp,
 )
 from .permissions import IsAdmin, IsAdminOrManager
+from .throttles import LoginRateThrottle, MFARateThrottle
 from .serializers import (
     LoginSerializer,
     RegisterSerializer,
     RoleSerializer,
     UserSerializer,
+)
+from accounts.security import (
+    clear_failed_logins,
+    is_login_locked,
+    log_security_event,
+    record_failed_login,
 )
 
 
@@ -57,21 +64,38 @@ class CsrfView(APIView):
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [LoginRateThrottle]
 
     def post(self, request):
-        serializer = LoginSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.validated_data['user']
+        username = (request.data.get('username') or '').strip()
+        if username and is_login_locked(username):
+            log_security_event('login_locked', username, request=request)
+            return Response(
+                {'detail': 'Account temporarily locked due to failed login attempts. Try again later.'},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
 
-        if settings.ENFORCE_MFA_FOR_ADMINS and user.is_admin:
-            if user.mfa_enabled and user.mfa_secret:
-                token = create_pending_mfa_token(user.id)
-                return Response({
-                    'mfa_required': True,
-                    'mfa_token': token,
-                })
+        serializer = LoginSerializer(data=request.data)
+        if not serializer.is_valid():
+            if username:
+                record_failed_login(username)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        user = serializer.validated_data['user']
+        clear_failed_logins(user.username)
+
+        if user.mfa_enabled and user.mfa_secret:
+            token = create_pending_mfa_token(user.id)
+            return Response({'mfa_required': True, 'mfa_token': token})
+
+        if settings.ENFORCE_MFA_FOR_ADMINS and user.is_admin and not user.mfa_enabled:
             login(request, user)
             log_action(request, 'login', 'CustomUser', user.id, user.username, 'Admin login (MFA setup pending)')
+            return Response(UserSerializer(user).data)
+
+        if settings.ENFORCE_MFA_FOR_MANAGERS and user.is_manager and not user.mfa_enabled:
+            login(request, user)
+            log_action(request, 'login', 'CustomUser', user.id, user.username, 'Manager login (MFA setup pending)')
             return Response(UserSerializer(user).data)
 
         login(request, user)
@@ -81,6 +105,7 @@ class LoginView(APIView):
 
 class MFAVerifyView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [MFARateThrottle]
 
     def post(self, request):
         token = request.data.get('mfa_token', '')
@@ -95,15 +120,16 @@ class MFAVerifyView(APIView):
             return Response({'detail': 'User not found.'}, status=status.HTTP_400_BAD_REQUEST)
 
         if not verify_totp(user.mfa_secret, code):
+            log_security_event('mfa_failed', user.username, user=user, request=request)
             return Response({'detail': 'Invalid verification code.'}, status=status.HTTP_400_BAD_REQUEST)
 
         login(request, user)
-        log_action(request, 'login', 'CustomUser', user.id, user.username, 'Admin login with MFA')
+        log_action(request, 'login', 'CustomUser', user.id, user.username, 'MFA verified login')
         return Response(UserSerializer(user).data)
 
 
 class MFASetupView(APIView):
-    permission_classes = [IsAuthenticated, IsAdmin]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         user = request.user
@@ -146,7 +172,8 @@ class HealthCheckView(APIView):
         payload = {
             'status': 'ok' if db_ok else 'degraded',
             'database': 'ok' if db_ok else 'unavailable',
-            'version': '1.0.0',
+            'version': '1.2.0',
+            'api_version': 'v1',
         }
         http_status = status.HTTP_200_OK if db_ok else status.HTTP_503_SERVICE_UNAVAILABLE
         return Response(payload, status=http_status)
@@ -170,6 +197,8 @@ class AuthConfigView(APIView):
         return Response({
             'allow_registration': settings.ALLOW_PUBLIC_REGISTRATION,
             'enforce_mfa_for_admins': settings.ENFORCE_MFA_FOR_ADMINS,
+            'enforce_mfa_for_managers': settings.ENFORCE_MFA_FOR_MANAGERS,
+            'api_version': '1.2.0',
         })
 
 
@@ -289,6 +318,8 @@ class DashboardView(APIView):
 
 
 class ReportsAnalyticsView(APIView):
+    permission_classes = [IsAdminOrManager]
+
     def get(self, request):
         today = timezone.now().date()
         return Response({

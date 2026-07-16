@@ -11,6 +11,11 @@ const CATEGORIES = [
   { value: 'other', label: 'Other' },
 ];
 
+function formatDate(value) {
+  if (!value) return '—';
+  return new Date(`${value}T00:00:00`).toLocaleDateString('en-UG');
+}
+
 export default function Documents() {
   const { user } = useAuth();
   const [documents, setDocuments] = useState([]);
@@ -18,7 +23,10 @@ export default function Documents() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
-  const [form, setForm] = useState({ title: '', category: 'policy', description: '', file: null });
+  const [form, setForm] = useState({
+    title: '', category: 'policy', description: '', file: null,
+    requires_acknowledgement: false, expires_at: '', legal_hold: false,
+  });
 
   const canUpload = user?.is_admin || user?.is_manager;
 
@@ -49,13 +57,29 @@ export default function Documents() {
       payload.append('category', form.category);
       payload.append('description', form.description);
       payload.append('file', form.file);
+      payload.append('requires_acknowledgement', form.requires_acknowledgement ? 'true' : 'false');
+      if (form.expires_at) payload.append('expires_at', form.expires_at);
+      if (canUpload) payload.append('legal_hold', form.legal_hold ? 'true' : 'false');
       await api.createForm('documents', payload);
-      setForm({ title: '', category: 'policy', description: '', file: null });
+      setForm({
+        title: '', category: 'policy', description: '', file: null,
+        requires_acknowledgement: false, expires_at: '', legal_hold: false,
+      });
       load();
     } catch (err) {
       setError(err.message);
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleAcknowledge = async (docId) => {
+    setError('');
+    try {
+      await api.acknowledgeDocument(docId);
+      load();
+    } catch (err) {
+      setError(err.message);
     }
   };
 
@@ -104,6 +128,29 @@ export default function Documents() {
                   {uploading ? 'Uploading...' : 'Upload'}
                 </button>
               </div>
+              <div className="col-md-3">
+                <input type="date" className="form-control" value={form.expires_at}
+                  onChange={(e) => setForm({ ...form, expires_at: e.target.value })} />
+                <small className="text-muted">Expiry date (optional)</small>
+              </div>
+              <div className="col-md-3 d-flex align-items-center">
+                <div className="form-check">
+                  <input className="form-check-input" type="checkbox" id="requires-ack"
+                    checked={form.requires_acknowledgement}
+                    onChange={(e) => setForm({ ...form, requires_acknowledgement: e.target.checked })} />
+                  <label className="form-check-label" htmlFor="requires-ack">Requires acknowledgement</label>
+                </div>
+              </div>
+              {canUpload && (
+                <div className="col-md-3 d-flex align-items-center">
+                  <div className="form-check">
+                    <input className="form-check-input" type="checkbox" id="legal-hold"
+                      checked={form.legal_hold}
+                      onChange={(e) => setForm({ ...form, legal_hold: e.target.checked })} />
+                    <label className="form-check-label" htmlFor="legal-hold">Legal hold</label>
+                  </div>
+                </div>
+              )}
               <div className="col-12">
                 <input className="form-control" placeholder="Description (optional)" value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })} />
@@ -127,7 +174,8 @@ export default function Documents() {
                     <th>Title</th>
                     <th>Category</th>
                     <th>Employee</th>
-                    <th>Version</th>
+                    <th>Expires</th>
+                    <th>Acknowledgement</th>
                     <th>Uploaded</th>
                     <th />
                   </tr>
@@ -135,16 +183,26 @@ export default function Documents() {
                 <tbody>
                   {documents.map((doc) => (
                     <tr key={doc.id}>
-                      <td>{doc.title}</td>
+                      <td>{doc.title}{doc.legal_hold ? ' (Legal hold)' : ''}</td>
                       <td>{doc.category_display}</td>
                       <td>{doc.employee_name || 'Company-wide'}</td>
-                      <td>v{doc.version}</td>
-                      <td>{new Date(doc.created_at).toLocaleDateString()}</td>
+                      <td>{formatDate(doc.expires_at)}</td>
                       <td>
+                        {doc.requires_acknowledgement
+                          ? (doc.acknowledged ? 'Acknowledged' : 'Pending')
+                          : '—'}
+                      </td>
+                      <td>{new Date(doc.created_at).toLocaleDateString()}</td>
+                      <td className="text-nowrap">
                         {doc.file_url && (
-                          <a href={doc.file_url} className="btn btn-sm btn-outline-primary" target="_blank" rel="noreferrer">
+                          <a href={doc.file_url} className="btn btn-sm btn-outline-primary me-1" target="_blank" rel="noreferrer">
                             Download
                           </a>
+                        )}
+                        {doc.requires_acknowledgement && !doc.acknowledged && (
+                          <button type="button" className="btn btn-sm btn-success" onClick={() => handleAcknowledge(doc.id)}>
+                            Acknowledge
+                          </button>
                         )}
                       </td>
                     </tr>

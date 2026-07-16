@@ -71,7 +71,7 @@ class ApprovalRequestSerializer(serializers.ModelSerializer):
                 f'({target.start_date} to {target.end_date}, {target.duration} days)'
             )
         if workflow_type == 'expense':
-            return f'{target.employee.full_name} — {target.description} (KES {target.amount})'
+            return f'{target.employee.full_name} — {target.description} (UGX {target.amount})'
         if workflow_type == 'recruitment':
             return f'{target.first_name} {target.last_name} — {target.job.title}'
         return str(target)
@@ -105,15 +105,35 @@ class HRDocumentSerializer(serializers.ModelSerializer):
     category_display = serializers.CharField(source='get_category_display', read_only=True)
     uploaded_by_name = serializers.CharField(source='uploaded_by.username', read_only=True, default=None)
     file_url = serializers.SerializerMethodField()
+    acknowledged = serializers.SerializerMethodField()
+    acknowledgement_count = serializers.SerializerMethodField()
 
     class Meta:
         model = HRDocument
         fields = [
             'id', 'title', 'category', 'category_display', 'description', 'file', 'file_url',
             'employee', 'employee_name', 'version', 'is_active',
+            'requires_acknowledgement', 'expires_at', 'legal_hold',
+            'acknowledged', 'acknowledgement_count',
             'uploaded_by', 'uploaded_by_name', 'created_at', 'updated_at',
         ]
         read_only_fields = ['uploaded_by', 'created_at', 'updated_at']
+
+    def get_acknowledged(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return False
+        try:
+            from employees.models import Employee
+            from documents.models import DocumentAcknowledgement
+
+            employee = Employee.objects.get(email=request.user.email)
+            return DocumentAcknowledgement.objects.filter(document=obj, employee=employee).exists()
+        except Exception:
+            return False
+
+    def get_acknowledgement_count(self, obj):
+        return obj.acknowledgements.count()
 
     def get_file_url(self, obj):
         if obj.file:

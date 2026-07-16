@@ -96,7 +96,7 @@ Open **http://localhost:8000**
 | Manager | `manager` | `Manager@HRMIS2026!` |
 | Employee | `employee` | `Employee@HRMIS2026!` |
 
-On Render, passwords come from `SEED_*_PASSWORD` env vars (see `render.yaml`).
+On Render, the initial administrator password comes from `SEED_ADMIN_PASSWORD`; subsequent deploys never reset it.
 
 Reset locally anytime:
 
@@ -111,9 +111,7 @@ python manage.py seed_data --reset-password
 | `SECRET_KEY` | Django secret (required in production) |
 | `DEBUG` | `True` for local dev, `False` on Render |
 | `DATABASE_URL` | PostgreSQL connection string (Render sets this) |
-| `SEED_ADMIN_PASSWORD` | Admin password for seed command (Render) |
-| `SEED_MANAGER_PASSWORD` | Manager password for seed command |
-| `SEED_EMPLOYEE_PASSWORD` | Employee password for seed command |
+| `SEED_ADMIN_PASSWORD` | Initial administrator password for `bootstrap_admin` (Render) |
 | `ALLOW_PUBLIC_REGISTRATION` | Set `True` to allow public sign-up (default: `False`) |
 | `ENFORCE_MFA_FOR_ADMINS` | Require TOTP MFA for admin accounts (default: `True` on Render/production, `False` for local SQLite) |
 | `HR_NOTIFY_EMAIL` | HR inbox for new leave/expense alerts |
@@ -140,7 +138,7 @@ The repo includes `render.yaml`. Render will:
 1. Install Python and Node dependencies
 2. Build the React app (`frontend/dist`)
 3. Run `collectstatic` (admin assets only — `staticfiles/` is not committed)
-4. Migrate and seed users on deploy
+4. Migrate and create the initial administrator only when absent
 5. Start Gunicorn
 
 Push to your connected Git branch; Render handles the rest.
@@ -149,7 +147,7 @@ See **[DEPLOY.md](DEPLOY.md)** for the full staging/production checklist (SMTP, 
 
 ### Staging environment
 
-`render.yaml` defines a second **staging** web service (`human-resource-management-system-staging`) with its own PostgreSQL database. Use it to validate changes before production. Staging runs with `DEBUG=True` and the same security defaults (registration off, MFA enforced for admins).
+`render.yaml` defines a second **staging** web service (`human-resource-management-system-staging`) with its own PostgreSQL database. Use it to validate changes before production. Staging runs with `DEBUG=False` and the same security defaults (registration off, MFA enforced for admins).
 
 ## Health check
 
@@ -190,7 +188,7 @@ cd frontend && npm run build
 - **In-app notification center** (bell icon in the top bar; `/api/v1/notifications/`)
 - **Document management** — contracts, policies, offer letters (`/documents` in the SPA)
 - **Leave policy sync** — `POST /api/v1/leave-policy-allocations/sync/` applies policies to employee balances
-- **Report export** — CSV/Excel via `?format=xlsx` or the Export Excel button on Reports
+- **Report export** — CSV/Excel via `?export_format=xlsx` or the export buttons on Reports
 
 Default workflows (seeded via `python manage.py seed_workflows`):
 
@@ -206,7 +204,7 @@ Default workflows (seeded via `python manage.py seed_workflows`):
 - **API keys** — machine-to-machine access via `Authorization: Api-Key <key>` (admin UI at `/settings/integrations`)
 - **Webhooks** — outbound HTTP notifications for leave, expense, and employee lifecycle events
 - **S3 media storage** — enable by setting `AWS_STORAGE_BUCKET_NAME` (uses `django-storages` + `boto3`)
-- **Payroll export** — CSV/Excel/JSON at `GET /api/v1/payroll/export/?month=&year=&format=` (Export Excel on Reports → Payroll)
+- **Payroll export** — CSV/Excel/JSON at `GET /api/v1/payroll/export/?month=&year=&export_format=` (Reports → Payroll)
 - **Org chart** — department hierarchy with parent/child relationships (`/org-chart`)
 - **Role-based dashboards** — tailored views for employees, managers, and HR/admins on `/dashboard`
 

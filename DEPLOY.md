@@ -57,7 +57,7 @@ Do **not** use `python manage.py runserver` in production, and do not put `npm r
 If you are not using the blueprint, set **Pre-Deploy Command** to:
 
 ```bash
-python manage.py migrate --noinput && python manage.py seed_data --reset-password && python manage.py seed_workflows
+python manage.py migrate --noinput && python manage.py bootstrap_admin && python manage.py seed_workflows
 ```
 
 ### Quick reference (manual Render service)
@@ -65,7 +65,7 @@ python manage.py migrate --noinput && python manage.py seed_data --reset-passwor
 | Setting | Command |
 |---------|---------|
 | **Build** | `bash scripts/render-build.sh` |
-| **Pre-Deploy** | `python manage.py migrate --noinput && python manage.py seed_data --reset-password && python manage.py seed_workflows` |
+| **Pre-Deploy** | `python manage.py migrate --noinput && python manage.py bootstrap_admin && python manage.py seed_workflows` |
 | **Start** | `gunicorn avvento_hrmis.wsgi:application --bind 0.0.0.0:$PORT` |
 | **Health check path** | `/api/v1/health/` |
 
@@ -79,13 +79,13 @@ Set these in the Render dashboard for **production** and **staging** separately.
 |----------|-------|
 | `SECRET_KEY` | Auto-generated |
 | `DATABASE_URL` | Linked from database |
-| `SEED_*_PASSWORD` | Auto-generated; save admin password securely after first deploy |
+| `SEED_ADMIN_PASSWORD` | Auto-generated; used only when creating the initial administrator |
 
 ### Security (defaults in blueprint)
 
 | Variable | Production | Staging |
 |----------|------------|---------|
-| `DEBUG` | `False` | `True` |
+| `DEBUG` | `False` | `False` |
 | `ALLOW_PUBLIC_REGISTRATION` | `False` | `False` |
 | `ENFORCE_MFA_FOR_ADMINS` | `True` | `True` |
 | `RENDER_SERVICE_NAME` | `production` | `staging` |
@@ -164,19 +164,63 @@ curl https://<your-service>.onrender.com/api/v1/health/
 3. Production auto-deploys from the same push (or promote manually)
 4. Re-check health endpoint and admin MFA on production
 
-## 5. Rollback
+## 5. Scheduled tasks (cron)
+
+The blueprint defines **Render Cron Jobs** and a **django-q worker** for production:
+
+| Job | Schedule (UTC) | Command |
+|-----|----------------|---------|
+| `hrmis-daily-scheduled-reports` | 07:00 daily | `python manage.py run_scheduled_tasks --skip-backup` |
+| `hrmis-monthly-tasks` | 06:00 on the 1st of each month | `python manage.py run_scheduled_tasks --skip-backup` |
+| `hrmis-annual-holidays` | 07:00 on 1 January | `python manage.py seed_uganda_holidays` |
+| `hrmis-qcluster` | continuous worker | `python manage.py qcluster` |
+
+Monthly tasks run leave accrual, document expiry reminders, and due scheduled report emails. Database backup is skipped on Render cron (use Postgres backups); run locally with:
+
+```powershell
+python manage.py backup_database
+python manage.py restore_database backups\sqlite_YYYYMMDD.sqlite3 --force
+```
+
+Register django-q schedules once:
+
+```powershell
+python manage.py setup_enterprise_schedules
+python manage.py seed_compliance_evidence
+```
+
+After blueprint sync, confirm cron and worker services appear in the Render dashboard and have `DATABASE_URL` linked to `avvento-hrmis-db`.
+
+### Ops / SLO / SCIM
+
+| Endpoint | Purpose |
+|----------|---------|
+| `/api/v1/ops/status/` | Queue counts, backups, runbooks |
+| `/api/v1/ops/slos/` | Availability & latency for current hour |
+| `/api/v1/api-changelog/` | Versioned deprecation policy |
+| `/api/v1/scim/v2/Users` | SCIM user list/provision |
+| `/settings/ops` | Admin Operations Center UI |
+
+### Environment additions
+
+| Variable | Notes |
+|----------|-------|
+| `ENFORCE_MFA_FOR_MANAGERS` | `True` to require manager MFA setup |
+| `FIELD_ENCRYPTION_KEY` | Stable Fernet key for PII at rest |
+| `BACKUP_S3_BUCKET` | Optional offsite backup upload |
+
+## 6. Rollback
 
 In Render → service → **Deploys** → select a previous successful deploy → **Rollback**.
 
-## 6. Local pre-deploy checks
+## 7. Local pre-deploy checks
 
 ```powershell
 pip install -r requirements.txt
 python manage.py check
-python manage.py test api
-coverage run --source=api manage.py test api
-coverage report --omit="api/tests/*"
-cd frontend ; npm run build
+python manage.py test api.tests
+cd frontend ; npm ci ; npm run test ; npm run build
 ```
 
-CI enforces **≥60%** API coverage (see `.coveragerc` and `.github/workflows/ci.yml`).
+CI runs backend `api.tests` and frontend Vitest + production build (see `.github/workflows/ci.yml`).
+Playwright smoke: `cd frontend ; npx playwright install ; npm run e2e` (with app + API running).

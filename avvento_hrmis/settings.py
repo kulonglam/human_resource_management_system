@@ -32,6 +32,40 @@ DEBUG = os.environ.get(
     'False' if os.environ.get('DATABASE_URL') else 'True',
 ) == 'True'
 
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'True') == 'True'
+    SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    CSRF_COOKIE_SECURE = True
+    CSRF_COOKIE_SAMESITE = 'Lax'
+    SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '31536000'))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = 'same-origin'
+    X_FRAME_OPTIONS = 'DENY'
+    # Refuse the well-known development secret in production.
+    if SECRET_KEY == 'My$ecretKeyForDevelopmentOnly!ChangeMeInProduction':
+        from django.core.exceptions import ImproperlyConfigured
+        raise ImproperlyConfigured('Set a unique SECRET_KEY in production.')
+
+# Session hardening
+SESSION_COOKIE_AGE = int(os.environ.get('SESSION_COOKIE_AGE', str(60 * 60 * 8)))  # 8 hours
+SESSION_SAVE_EVERY_REQUEST = True
+SESSION_IDLE_TIMEOUT_SECONDS = int(os.environ.get('SESSION_IDLE_TIMEOUT_SECONDS', str(60 * 30)))  # 30 min idle
+LOGIN_LOCKOUT_THRESHOLD = int(os.environ.get('LOGIN_LOCKOUT_THRESHOLD', '5'))
+LOGIN_LOCKOUT_WINDOW_SECONDS = int(os.environ.get('LOGIN_LOCKOUT_WINDOW_SECONDS', '900'))
+MAX_UPLOAD_BYTES = int(os.environ.get('MAX_UPLOAD_BYTES', str(10 * 1024 * 1024)))
+ENCRYPT_BACKUPS = os.environ.get('ENCRYPT_BACKUPS', 'True' if not DEBUG else 'False') == 'True'
+CONTENT_SECURITY_POLICY = os.environ.get(
+    'CONTENT_SECURITY_POLICY',
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; "
+    "frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+)
+
 ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 
 _extra_hosts = os.environ.get('ALLOWED_HOSTS', '')
@@ -70,6 +104,7 @@ INSTALLED_APPS = [
     # Third-party
     'rest_framework',
     'corsheaders',
+    'drf_spectacular',
     # Local apps
     'api',
     'accounts',
@@ -95,6 +130,7 @@ INSTALLED_APPS = [
     'documents',
     'integrations',
     'compliance',
+    'django_q',
 ]
 
 MIDDLEWARE = [
@@ -105,6 +141,10 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'api.middleware.RequestIDMiddleware',
+    'api.middleware.DeprecationMiddleware',
+    'api.middleware.SecurityHeadersMiddleware',
+    'api.middleware.SessionIdleTimeoutMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -181,7 +221,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # Internationalization
 LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'Africa/Nairobi'
+TIME_ZONE = 'Africa/Kampala'
 USE_I18N = True
 USE_TZ = True
 
@@ -235,6 +275,11 @@ ENFORCE_MFA_FOR_ADMINS = os.environ.get(
     'ENFORCE_MFA_FOR_ADMINS',
     'True' if os.environ.get('DATABASE_URL') else 'False',
 ) == 'True'
+# Managers: default on in production (DATABASE_URL present)
+ENFORCE_MFA_FOR_MANAGERS = os.environ.get(
+    'ENFORCE_MFA_FOR_MANAGERS',
+    'True' if os.environ.get('DATABASE_URL') else 'False',
+) == 'True'
 
 # Email
 EMAIL_BACKEND = os.environ.get(
@@ -260,6 +305,38 @@ SSO_FRONTEND_REDIRECT = os.environ.get('SSO_FRONTEND_REDIRECT', 'http://localhos
 SSO_AUTO_PROVISION = os.environ.get('SSO_AUTO_PROVISION', 'False') == 'True'
 WEBHOOKS_ENABLED = os.environ.get('WEBHOOKS_ENABLED', 'True') == 'True'
 
+ENFORCE_MFA_FOR_PAYROLL = os.environ.get(
+    'ENFORCE_MFA_FOR_PAYROLL',
+    'True' if os.environ.get('DATABASE_URL') else 'False',
+) == 'True'
+
+FIELD_ENCRYPTION_KEY = os.environ.get('FIELD_ENCRYPTION_KEY', '')
+FIELD_ENCRYPTION_KEY_PREVIOUS = os.environ.get('FIELD_ENCRYPTION_KEY_PREVIOUS', '')
+REQUIRE_FIELD_ENCRYPTION_KEY = os.environ.get(
+    'REQUIRE_FIELD_ENCRYPTION_KEY',
+    'True' if not DEBUG else 'False',
+) == 'True'
+if REQUIRE_FIELD_ENCRYPTION_KEY and not FIELD_ENCRYPTION_KEY:
+    from django.core.exceptions import ImproperlyConfigured
+    raise ImproperlyConfigured(
+        'FIELD_ENCRYPTION_KEY must be set in production. '
+        'Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"',
+    )
+
+BACKUP_S3_BUCKET = os.environ.get('BACKUP_S3_BUCKET', '')
+BACKUP_S3_PREFIX = os.environ.get('BACKUP_S3_PREFIX', 'hrmis-backups/')
+
+Q_CLUSTER = {
+    'name': 'hrmis',
+    'workers': int(os.environ.get('Q_WORKERS', '2')),
+    'timeout': 300,
+    'retry': 360,
+    'queue_limit': 50,
+    'bulk': 10,
+    'orm': 'default',
+    'catch_up': True,
+}
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.SessionAuthentication',
@@ -271,6 +348,26 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 25,
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': os.environ.get('API_THROTTLE_ANON', '60/minute'),
+        'user': os.environ.get('API_THROTTLE_USER', '600/minute'),
+        'login': os.environ.get('API_THROTTLE_LOGIN', '10/minute'),
+        'mfa': os.environ.get('API_THROTTLE_MFA', '10/minute'),
+        'export': os.environ.get('API_THROTTLE_EXPORT', '30/minute'),
+        'scim': os.environ.get('API_THROTTLE_SCIM', '60/minute'),
+    },
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Avvento HRMIS API',
+    'DESCRIPTION': 'Human Resource Management Information System API',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
 }
 
 SENTRY_DSN = os.environ.get('SENTRY_DSN', '')

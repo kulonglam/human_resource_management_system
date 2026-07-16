@@ -100,6 +100,9 @@ export default function ResourceManager({
   const [form, setForm] = useState({});
   const [files, setFiles] = useState({});
   const [submitting, setSubmitting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
 
   const tab = tabs.find((t) => t.id === activeTab) || tabs[0];
   const isEmployeeUser = user && !user.is_admin && !user.is_manager;
@@ -131,7 +134,30 @@ export default function ResourceManager({
 
   useEffect(() => {
     load();
+    setSelectedIds([]);
   }, [load]);
+
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === rows.length) setSelectedIds([]);
+    else setSelectedIds(rows.map((r) => r.id));
+  };
+
+  const handleBulkDelete = async () => {
+    if (!selectedIds.length) return;
+    if (!window.confirm(`Delete ${selectedIds.length} selected record(s)?`)) return;
+    setError('');
+    try {
+      await Promise.all(selectedIds.map((id) => api.remove(tab.endpoint, id)));
+      setSelectedIds([]);
+      await load();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
 
   const openCreate = () => {
     const initial = {};
@@ -178,6 +204,9 @@ export default function ResourceManager({
         payload.employee = user.linked_employee_id;
       }
       fields?.forEach((f) => {
+        if (f.type === 'time' && payload[f.name] === '') {
+          payload[f.name] = null;
+        }
         if (f.type === 'number' && payload[f.name] !== '') {
           payload[f.name] = Number(payload[f.name]);
         }
@@ -254,6 +283,24 @@ export default function ResourceManager({
     }
   };
 
+  const handleImportCsv = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setImporting(true);
+    setError('');
+    setImportResult(null);
+    try {
+      const result = await api.importAttendanceCsv(file);
+      setImportResult(result);
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const columns = tab.columns || (rows[0] ? Object.keys(rows[0]).slice(0, 6) : []);
 
   return (
@@ -263,11 +310,23 @@ export default function ResourceManager({
           <h4 className="page-heading mb-0">
             {icon && <i className={`bi ${icon}`} style={{ color: 'var(--fca-lime)' }} />} {title}
           </h4>
+          <div className="d-flex gap-2">
           {canUseTabCreate && (
             <button type="button" className="btn btn-primary btn-sm" onClick={openCreate}>
               <i className="bi bi-plus-lg" /> {tab.createLabel || 'Add'}
             </button>
           )}
+          {tab.importCsv && (user?.is_admin || user?.is_manager) && (
+            <label className="btn btn-outline-secondary btn-sm mb-0">
+              {importing ? (
+                <span className="spinner-border spinner-border-sm" />
+              ) : (
+                <><i className="bi bi-upload" /> Import CSV</>
+              )}
+              <input type="file" accept=".csv,text/csv" className="d-none" onChange={handleImportCsv} disabled={importing} />
+            </label>
+          )}
+          </div>
         </div>
       )}
 
@@ -280,6 +339,18 @@ export default function ResourceManager({
       )}
 
       {headerExtra}
+
+      {tab.importCsvHelp && (user?.is_admin || user?.is_manager) && (
+        <p className="small text-muted mb-2">{tab.importCsvHelp}</p>
+      )}
+      {importResult && (
+        <div className="alert alert-success py-2 small">
+          Imported {importResult.created} new, updated {importResult.updated}.
+          {importResult.errors?.length > 0 && (
+            <span className="text-warning"> {importResult.errors.length} row(s) skipped.</span>
+          )}
+        </div>
+      )}
 
       {tabs.length > 1 && (
         <ul className="nav nav-tabs mb-3">
@@ -299,6 +370,15 @@ export default function ResourceManager({
 
       {error && <div className="alert alert-danger">{error}</div>}
 
+      {selectedIds.length > 0 && canUseTabEdit && tab.canDelete !== false && (
+        <div className="alert alert-secondary py-2 d-flex justify-content-between align-items-center">
+          <span className="small">{selectedIds.length} selected</span>
+          <button type="button" className="btn btn-danger btn-sm" onClick={handleBulkDelete}>
+            Delete selected
+          </button>
+        </div>
+      )}
+
       <div className="card">
         <div className="card-body p-0">
           {loading ? (
@@ -310,6 +390,17 @@ export default function ResourceManager({
               <table className="table table-hover mb-0 align-middle">
                 <thead>
                   <tr>
+                    {canUseTabEdit && tab.canDelete !== false && (
+                      <th style={{ width: 36 }}>
+                        <input
+                          type="checkbox"
+                          className="form-check-input"
+                          checked={rows.length > 0 && selectedIds.length === rows.length}
+                          onChange={toggleSelectAll}
+                          aria-label="Select all"
+                        />
+                      </th>
+                    )}
                     {columns.map((col) => (
                       <th key={col.key || col}>{typeof col === 'string' ? defaultLabel(col) : col.label}</th>
                     ))}
@@ -319,6 +410,17 @@ export default function ResourceManager({
                 <tbody>
                   {rows.map((row) => (
                     <tr key={row.id}>
+                      {canUseTabEdit && tab.canDelete !== false && (
+                        <td>
+                          <input
+                            type="checkbox"
+                            className="form-check-input"
+                            checked={selectedIds.includes(row.id)}
+                            onChange={() => toggleSelect(row.id)}
+                            aria-label={`Select row ${row.id}`}
+                          />
+                        </td>
+                      )}
                       {columns.map((col) => {
                         const key = col.key || col;
                         const val = col.render ? col.render(row) : row[key];
@@ -353,7 +455,10 @@ export default function ResourceManager({
                             </button>
                           )}
                           {tab.rowActions?.map((action) =>
-                            (!action.show || action.show(row)) && !(isEmployeeUser && tab.hideRowActionsForEmployee) ? (
+                            (!action.show || action.show(row))
+                              && !(isEmployeeUser && tab.hideRowActionsForEmployee)
+                              && !(action.adminOnly && !user?.is_admin)
+                              && !(action.managerOnly && !user?.is_admin && !user?.is_manager) ? (
                               <button
                                 key={action.name}
                                 type="button"
@@ -370,7 +475,7 @@ export default function ResourceManager({
                   ))}
                   {!rows.length && (
                     <tr>
-                      <td colSpan={columns.length + (visibleFormFields.length || tab.rowActions?.length || tab.detailPath ? 1 : 0)} className="text-center py-4 text-muted">
+                      <td colSpan={columns.length + (visibleFormFields.length || tab.rowActions?.length || tab.detailPath ? 1 : 0) + 1} className="text-center py-4 text-muted">
                         No records found.
                       </td>
                     </tr>

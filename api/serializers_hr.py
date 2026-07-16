@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from accounts.access_control import can_access_employee
 from assets.models import Asset, AssetAssignment
-from attendance.models import Attendance
+from attendance.models import Attendance, OvertimeRecord, PublicHoliday, Timesheet
 from benefits.models import Benefit, EmployeeBenefit
 from discipline.models import Discipline, DisciplineAppeal
 from employees.models import Employee
@@ -11,7 +11,7 @@ from expenses.models import Expense, ExpenseCategory
 from kin.models import Kin
 from leave_policies.models import LeavePolicy, LeavePolicyAllocation
 from leaves.models import Leave, LeaveBalance
-from payroll.models import Salary
+from payroll.models import PayrollRun, Salary
 from workflows.services import approval_status_payload
 from performance.models import (
     Feedback,
@@ -40,7 +40,7 @@ def employee_label(obj):
 
 class LeaveSerializer(serializers.ModelSerializer):
     employee_name = serializers.CharField(source='employee.full_name', read_only=True)
-    duration = serializers.IntegerField(read_only=True)
+    duration = serializers.FloatField(source='working_days', read_only=True)
     leave_type_display = serializers.CharField(source='get_leave_type_display', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     approval_status = serializers.SerializerMethodField()
@@ -48,7 +48,7 @@ class LeaveSerializer(serializers.ModelSerializer):
     class Meta:
         model = Leave
         fields = '__all__'
-        read_only_fields = ['status', 'applied_on', 'reviewed_by', 'reviewed_on']
+        read_only_fields = ['status', 'applied_on', 'reviewed_by', 'reviewed_on', 'working_days']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -61,27 +61,40 @@ class LeaveSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         request = self.context.get('request')
-        if not request or not request.user.is_authenticated:
-            return attrs
+        if request and request.user.is_authenticated:
+            user = request.user
+            if user.is_admin or user.is_manager:
+                employee = attrs.get('employee')
+                if employee and not can_access_employee(user, employee):
+                    raise serializers.ValidationError({'employee': 'You cannot create leave for this employee.'})
+            else:
+                try:
+                    own_employee = Employee.objects.get(email=user.email)
+                except Employee.DoesNotExist:
+                    raise serializers.ValidationError(
+                        {'employee': 'No employee profile is linked to your account.'},
+                    )
 
-        user = request.user
-        if user.is_admin or user.is_manager:
-            employee = attrs.get('employee')
-            if employee and not can_access_employee(user, employee):
-                raise serializers.ValidationError({'employee': 'You cannot create leave for this employee.'})
-            return attrs
+                employee = attrs.get('employee')
+                if employee and employee.pk != own_employee.pk:
+                    raise serializers.ValidationError({'employee': 'You can only apply leave for yourself.'})
+                attrs['employee'] = own_employee
 
-        try:
-            own_employee = Employee.objects.get(email=user.email)
-        except Employee.DoesNotExist:
-            raise serializers.ValidationError(
-                {'employee': 'No employee profile is linked to your account.'},
-            )
+        start_date = attrs.get('start_date') or getattr(self.instance, 'start_date', None)
+        end_date = attrs.get('end_date') or getattr(self.instance, 'end_date', None)
+        is_half_day = attrs.get('is_half_day', getattr(self.instance, 'is_half_day', False))
+        if start_date and end_date:
+            if is_half_day and start_date != end_date:
+                raise serializers.ValidationError(
+                    {'is_half_day': 'Half-day leave must use the same start and end date.'},
+                )
+            from leaves.services import calculate_leave_duration
 
-        employee = attrs.get('employee')
-        if employee and employee.pk != own_employee.pk:
-            raise serializers.ValidationError({'employee': 'You can only apply leave for yourself.'})
-        attrs['employee'] = own_employee
+            working_days = calculate_leave_duration(start_date, end_date, is_half_day=is_half_day)
+            if working_days <= 0:
+                raise serializers.ValidationError(
+                    {'start_date': 'Selected dates contain no working days.'},
+                )
         return attrs
 
 
@@ -98,10 +111,14 @@ class LeaveBalanceSerializer(serializers.ModelSerializer):
 class AttendanceSerializer(serializers.ModelSerializer):
     employee_name = serializers.CharField(source='employee.full_name', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    approval_status_display = serializers.CharField(source='get_approval_status_display', read_only=True)
+    approved_by_name = serializers.CharField(source='approved_by.username', read_only=True, default=None)
+    shift_name = serializers.CharField(source='shift_assignment.shift.shift_name', read_only=True, default=None)
 
     class Meta:
         model = Attendance
         fields = '__all__'
+        read_only_fields = ['approved_by', 'approved_at']
 
 
 class JobPostingSerializer(serializers.ModelSerializer):
@@ -206,6 +223,44 @@ class InterviewSerializer(serializers.ModelSerializer):
         read_only_fields = ['created_by', 'created_at']
 
 
+class PayrollRunSerializer(serializers.ModelSerializer):
+    period = serializers.CharField(source='__str__', read_only=True)
+    employee_count = serializers.IntegerField(source='salary_records.count', read_only=True)
+    total_gross = serializers.SerializerMethodField()
+    total_net = serializers.SerializerMethodField()
+    total_paye = serializers.SerializerMethodField()
+    total_nssf = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PayrollRun
+        fields = '__all__'
+        read_only_fields = [
+            'status', 'created_by', 'approved_by', 'approved_at', 'paid_at',
+            'created_at', 'updated_at',
+        ]
+
+    def _sum(self, obj, field):
+        from django.db.models import Sum
+        return obj.salary_records.aggregate(value=Sum(field))['value'] or 0
+
+    def get_total_gross(self, obj):
+        return self._sum(obj, 'gross_salary')
+
+    def get_total_net(self, obj):
+        return self._sum(obj, 'net_salary')
+
+    def get_total_paye(self, obj):
+        return self._sum(obj, 'tax')
+
+    def get_total_nssf(self, obj):
+        return self._sum(obj, 'nssf_employee') + self._sum(obj, 'nssf_employer')
+
+    def validate_month(self, value):
+        if not 1 <= value <= 12:
+            raise serializers.ValidationError('Month must be between 1 and 12.')
+        return value
+
+
 class SalarySerializer(serializers.ModelSerializer):
     employee_name = serializers.CharField(source='employee.full_name', read_only=True)
     month_name = serializers.CharField(read_only=True)
@@ -215,7 +270,21 @@ class SalarySerializer(serializers.ModelSerializer):
     class Meta:
         model = Salary
         fields = '__all__'
-        read_only_fields = ['net_salary', 'created_at', 'updated_at']
+        read_only_fields = [
+            'gross_salary', 'chargeable_income', 'tax', 'nssf_employee',
+            'nssf_employer', 'local_service_tax', 'net_salary', 'status',
+            'is_paid', 'paid_on', 'payroll_run', 'created_at', 'updated_at',
+        ]
+
+    def validate_month(self, value):
+        if not 1 <= value <= 12:
+            raise serializers.ValidationError('Month must be between 1 and 12.')
+        return value
+
+    def validate_year(self, value):
+        if not 2000 <= value <= 2100:
+            raise serializers.ValidationError('Enter a valid payroll year.')
+        return value
 
 
 class PerformanceGoalSerializer(serializers.ModelSerializer):
@@ -488,3 +557,40 @@ class SurveyResponseSerializer(serializers.ModelSerializer):
     class Meta:
         model = SurveyResponse
         fields = '__all__'
+
+
+class PublicHolidaySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PublicHoliday
+        fields = '__all__'
+
+
+class TimesheetSerializer(serializers.ModelSerializer):
+    employee_name = serializers.CharField(source='employee.full_name', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    approved_by_name = serializers.CharField(source='approved_by.username', read_only=True, default=None)
+
+    class Meta:
+        model = Timesheet
+        fields = '__all__'
+        read_only_fields = ['submitted_at', 'approved_by', 'approved_at', 'overtime_hours']
+
+    def validate(self, attrs):
+        from attendance.services import hours_worked
+
+        clock_in = attrs.get('clock_in') or getattr(self.instance, 'clock_in', None)
+        clock_out = attrs.get('clock_out') or getattr(self.instance, 'clock_out', None)
+        if clock_in and clock_out and 'regular_hours' not in attrs:
+            attrs['regular_hours'] = hours_worked(clock_in, clock_out)
+        return attrs
+
+
+class OvertimeRecordSerializer(serializers.ModelSerializer):
+    employee_name = serializers.CharField(source='employee.full_name', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    approved_by_name = serializers.CharField(source='approved_by.username', read_only=True, default=None)
+
+    class Meta:
+        model = OvertimeRecord
+        fields = '__all__'
+        read_only_fields = ['approved_by', 'approved_at', 'created_at']
