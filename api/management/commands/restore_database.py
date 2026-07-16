@@ -7,6 +7,8 @@ from pathlib import Path
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
+from api.backup_storage import decrypt_file, is_legacy_encrypted, is_stream_encrypted
+
 
 class Command(BaseCommand):
     help = 'Restore a database backup created by backup_database (supports .enc).'
@@ -27,49 +29,42 @@ class Command(BaseCommand):
         if not source.exists():
             raise CommandError(f'Backup not found: {source}')
 
-        if source.suffix == '.enc' or source.name.endswith('.enc'):
-            source = self._decrypt_backup(source)
+        plain_path = source
+        temp_plain = None
+        if source.suffix == '.enc' or is_stream_encrypted(source) or is_legacy_encrypted(source):
+            suffix = '.sqlite3' if 'sqlite' in source.name else '.sql'
+            temp_plain = Path(tempfile.gettempdir()) / f'restore_{source.stem}{suffix}'
+            plain_path = decrypt_file(source, temp_plain)
+            self.stdout.write(self.style.SUCCESS(f'Decrypted backup to {plain_path}'))
 
         db_settings = settings.DATABASES['default']
         engine = db_settings['ENGINE']
 
-        if 'sqlite' in engine:
-            destination = Path(db_settings['NAME'])
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, destination)
-            self.stdout.write(self.style.SUCCESS(f'Restored SQLite database from {source}'))
-            return
+        try:
+            if 'sqlite' in engine:
+                destination = Path(db_settings['NAME'])
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(plain_path, destination)
+                self.stdout.write(self.style.SUCCESS(f'Restored SQLite database from {plain_path}'))
+                return
 
-        if 'postgresql' in engine:
-            env = os.environ.copy()
-            if db_settings.get('PASSWORD'):
-                env['PGPASSWORD'] = db_settings['PASSWORD']
-            cmd = [
-                'psql',
-                '-h', db_settings.get('HOST', 'localhost'),
-                '-p', str(db_settings.get('PORT', '5432')),
-                '-U', db_settings.get('USER', 'postgres'),
-                '-d', db_settings['NAME'],
-                '-f', str(source),
-            ]
-            subprocess.run(cmd, check=True, env=env)
-            self.stdout.write(self.style.SUCCESS(f'Restored PostgreSQL database from {source}'))
-            return
+            if 'postgresql' in engine:
+                env = os.environ.copy()
+                if db_settings.get('PASSWORD'):
+                    env['PGPASSWORD'] = db_settings['PASSWORD']
+                cmd = [
+                    'psql',
+                    '-h', db_settings.get('HOST', 'localhost'),
+                    '-p', str(db_settings.get('PORT', '5432')),
+                    '-U', db_settings.get('USER', 'postgres'),
+                    '-d', db_settings['NAME'],
+                    '-f', str(plain_path),
+                ]
+                subprocess.run(cmd, check=True, env=env)
+                self.stdout.write(self.style.SUCCESS(f'Restored PostgreSQL database from {plain_path}'))
+                return
 
-        raise CommandError(f'Restore not implemented for engine: {engine}')
-
-    def _decrypt_backup(self, enc_path: Path) -> Path:
-        import base64
-
-        from accounts.encryption import decrypt_value, is_encrypted
-
-        token = enc_path.read_text(encoding='utf-8').strip()
-        if not is_encrypted(token):
-            raise CommandError('Encrypted backup does not look like a valid ciphertext.')
-        plain_b64 = decrypt_value(token)
-        raw = base64.b64decode(plain_b64.encode('ascii'))
-        suffix = '.sqlite3' if 'sqlite' in enc_path.name else '.sql'
-        tmp = Path(tempfile.gettempdir()) / f'restore_{enc_path.stem}{suffix}'
-        tmp.write_bytes(raw)
-        self.stdout.write(self.style.SUCCESS(f'Decrypted backup to {tmp}'))
-        return tmp
+            raise CommandError(f'Restore not implemented for engine: {engine}')
+        finally:
+            if temp_plain and temp_plain.exists():
+                temp_plain.unlink(missing_ok=True)

@@ -1,11 +1,14 @@
 import os
 import shutil
 import subprocess
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
+
+from api.backup_storage import encrypt_file, upload_backup_to_s3
 
 
 class Command(BaseCommand):
@@ -20,13 +23,18 @@ class Command(BaseCommand):
 
         if 'sqlite' in engine:
             source = Path(db_settings['NAME'])
-            if not source.exists():
-                raise FileNotFoundError(f'SQLite database not found: {source}')
             destination = backup_dir / f'sqlite_{timestamp}.sqlite3'
-            shutil.copy2(source, destination)
+            if self._is_memory_sqlite(source):
+                self._backup_memory_sqlite(destination)
+            else:
+                if not source.exists():
+                    raise FileNotFoundError(f'SQLite database not found: {source}')
+                shutil.copy2(source, destination)
             destination = self._maybe_encrypt(destination)
             self.stdout.write(self.style.SUCCESS(f'Backup saved to {destination}'))
-            self._upload_to_s3(destination)
+            s3_uri = self._upload_to_s3(destination)
+            if s3_uri:
+                self.stdout.write(self.style.SUCCESS(f'Uploaded to {s3_uri}'))
             return str(destination)
 
         if 'postgresql' in engine:
@@ -45,45 +53,40 @@ class Command(BaseCommand):
             subprocess.run(cmd, check=True, env=env)
             destination = self._maybe_encrypt(destination)
             self.stdout.write(self.style.SUCCESS(f'Backup saved to {destination}'))
-            self._upload_to_s3(destination)
+            s3_uri = self._upload_to_s3(destination)
+            if s3_uri:
+                self.stdout.write(self.style.SUCCESS(f'Uploaded to {s3_uri}'))
             return str(destination)
 
         raise NotImplementedError(f'Backup not implemented for engine: {engine}')
 
+    def _is_memory_sqlite(self, source: Path) -> bool:
+        name = str(source)
+        return ':memory:' in name or 'mode=memory' in name
+
+    def _backup_memory_sqlite(self, destination: Path) -> None:
+        import sqlite3
+
+        from django.db import connection
+
+        dest_conn = sqlite3.connect(destination)
+        try:
+            connection.connection.backup(dest_conn)
+        finally:
+            dest_conn.close()
+
     def _maybe_encrypt(self, file_path: Path) -> Path:
         if not getattr(settings, 'ENCRYPT_BACKUPS', False):
             return file_path
-        from accounts.encryption import encrypt_value
-
-        raw = Path(file_path).read_bytes()
-        # Chunk large files: store as Fernet of base64 for modest DBs; for large use streaming.
-        import base64
-        payload = base64.b64encode(raw).decode('ascii')
-        token = encrypt_value(payload)
         enc_path = Path(str(file_path) + '.enc')
-        enc_path.write_text(token, encoding='utf-8')
-        Path(file_path).unlink(missing_ok=True)
-        self.stdout.write(self.style.SUCCESS(f'Backup encrypted at {enc_path}'))
+        encrypt_file(file_path, enc_path)
+        file_path.unlink(missing_ok=True)
+        self.stdout.write(self.style.SUCCESS(f'Backup encrypted (streaming) at {enc_path}'))
         return enc_path
 
-    def _upload_to_s3(self, file_path):
-        bucket = getattr(settings, 'BACKUP_S3_BUCKET', '')
-        if not bucket:
-            return None
+    def _upload_to_s3(self, file_path: Path):
         try:
-            import boto3
-
-            prefix = getattr(settings, 'BACKUP_S3_PREFIX', 'hrmis-backups/')
-            key = f'{prefix}{Path(file_path).name}'
-            client = boto3.client(
-                's3',
-                region_name=getattr(settings, 'AWS_S3_REGION_NAME', None) or os.environ.get('AWS_S3_REGION_NAME', 'us-east-1'),
-                aws_access_key_id=os.environ.get('AWS_ACCESS_KEY_ID', ''),
-                aws_secret_access_key=os.environ.get('AWS_SECRET_ACCESS_KEY', ''),
-            )
-            client.upload_file(str(file_path), bucket, key)
-            self.stdout.write(self.style.SUCCESS(f'Backup uploaded to s3://{bucket}/{key}'))
-            return key
+            return upload_backup_to_s3(file_path)
         except Exception as exc:
             self.stderr.write(self.style.WARNING(f'S3 upload skipped: {exc}'))
             return None

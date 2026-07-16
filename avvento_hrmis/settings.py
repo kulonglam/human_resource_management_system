@@ -325,6 +325,8 @@ if REQUIRE_FIELD_ENCRYPTION_KEY and not FIELD_ENCRYPTION_KEY:
 
 BACKUP_S3_BUCKET = os.environ.get('BACKUP_S3_BUCKET', '')
 BACKUP_S3_PREFIX = os.environ.get('BACKUP_S3_PREFIX', 'hrmis-backups/')
+BACKUP_S3_SSE = os.environ.get('BACKUP_S3_SSE', 'AES256')  # AES256 or aws:kms
+BACKUP_S3_SSE_KMS_KEY_ID = os.environ.get('BACKUP_S3_SSE_KMS_KEY_ID', '')
 
 Q_CLUSTER = {
     'name': 'hrmis',

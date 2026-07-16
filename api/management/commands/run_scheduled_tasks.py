@@ -12,6 +12,11 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--skip-backup', action='store_true')
+        parser.add_argument(
+            '--verify-backup',
+            action='store_true',
+            help='After backup, run verify_backup on the newest file.',
+        )
         parser.add_argument('--carry-forward', action='store_true')
 
     def handle(self, *args, **options):
@@ -40,6 +45,9 @@ class Command(BaseCommand):
                 from django.core.management import call_command
                 call_command('backup_database')
                 results['backup'] = 'ok'
+                if options['verify_backup']:
+                    call_command('verify_backup')
+                    results['backup_verify'] = 'ok'
             except Exception as exc:
                 results['backup'] = str(exc)
 

@@ -172,14 +172,42 @@ The blueprint defines **Render Cron Jobs** and a **django-q worker** for product
 |-----|----------------|---------|
 | `hrmis-daily-scheduled-reports` | 07:00 daily | `python manage.py run_scheduled_tasks --skip-backup` |
 | `hrmis-monthly-tasks` | 06:00 on the 1st of each month | `python manage.py run_scheduled_tasks --skip-backup` |
+| `hrmis-weekly-backup` | 05:00 Sundays (UTC) | `python manage.py backup_database && python manage.py verify_backup` |
 | `hrmis-annual-holidays` | 07:00 on 1 January | `python manage.py seed_uganda_holidays` |
 | `hrmis-qcluster` | continuous worker | `python manage.py qcluster` |
 
-Monthly tasks run leave accrual, document expiry reminders, and due scheduled report emails. Database backup is skipped on Render cron (use Postgres backups); run locally with:
+Monthly tasks run leave accrual, document expiry reminders, and due scheduled report emails. **Weekly backup** creates an encrypted dump, verifies decrypt + integrity, and optionally uploads to S3.
+
+### Backup / restore drill
+
+Backups use **streaming Fernet encryption** (chunked, memory-safe). Legacy single-blob `.enc` files still decrypt.
 
 ```powershell
+# Create encrypted backup (SQLite dev or pg_dump in prod)
 python manage.py backup_database
-python manage.py restore_database backups\sqlite_YYYYMMDD.sqlite3 --force
+
+# Verify without touching the live database
+python manage.py verify_backup
+python manage.py verify_backup --path backups\sqlite_20260101_120000.sqlite3.enc
+
+# Restore (destructive — requires --force)
+python manage.py restore_database backups\sqlite_YYYYMMDD.sqlite3.enc --force
+```
+
+Set on production:
+
+| Variable | Purpose |
+|----------|---------|
+| `ENCRYPT_BACKUPS` | `True` (default when `DEBUG=False`) |
+| `FIELD_ENCRYPTION_KEY` | Encrypts backup chunks (same key as PII fields) |
+| `BACKUP_S3_BUCKET` | Optional offsite copy after local encrypt |
+| `BACKUP_S3_SSE` | `AES256` (default) or `aws:kms` |
+| `BACKUP_S3_SSE_KMS_KEY_ID` | KMS key when using `aws:kms` |
+
+Run backup + verify in one job:
+
+```powershell
+python manage.py run_scheduled_tasks --verify-backup
 ```
 
 Register django-q schedules once:
@@ -208,6 +236,7 @@ After blueprint sync, confirm cron and worker services appear in the Render dash
 | `ENFORCE_MFA_FOR_MANAGERS` | `True` to require manager MFA setup |
 | `FIELD_ENCRYPTION_KEY` | Stable Fernet key for PII at rest |
 | `BACKUP_S3_BUCKET` | Optional offsite backup upload |
+| `BACKUP_S3_SSE` | S3 server-side encryption (`AES256` or `aws:kms`) |
 
 ## 6. Rollback
 
