@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api/client';
+import { errorMessage } from '../utils/apiErrors';
 
 const emptyForm = {
   first_name: '',
@@ -101,6 +102,17 @@ export default function EmployeeForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (form.date_of_birth && form.date_joined && form.date_joined < form.date_of_birth) {
+      setError('date_joined: Date joined cannot be before date of birth.');
+      return;
+    }
+    const salaryNum = Number(form.salary);
+    if (!(salaryNum > 0)) {
+      setError('salary: Must be greater than zero.');
+      return;
+    }
+
     setSubmitting(true);
 
     const payload = {
@@ -122,10 +134,7 @@ export default function EmployeeForm() {
         navigate(`/employees/${created.id}`);
       }
     } catch (err) {
-      const messages = Object.entries(err.data || {})
-        .map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`)
-        .join(' ');
-      setError(messages || err.message);
+      setError(errorMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -279,7 +288,7 @@ export default function EmployeeForm() {
             </div>
             <div className="col-md-4">
               <label className="form-label">Salary</label>
-              <input type="number" step="0.01" name="salary" className="form-control" value={form.salary} onChange={handleChange} required />
+              <input type="number" step="0.01" min="0.01" name="salary" className="form-control" value={form.salary} onChange={handleChange} required />
             </div>
           </div>
 

@@ -13,6 +13,11 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--skip-backup', action='store_true')
         parser.add_argument(
+            '--skip-retention',
+            action='store_true',
+            help='Skip data retention policy enforcement.',
+        )
+        parser.add_argument(
             '--verify-backup',
             action='store_true',
             help='After backup, run verify_backup on the newest file.',
@@ -51,10 +56,25 @@ class Command(BaseCommand):
             except Exception as exc:
                 results['backup'] = str(exc)
 
+        if not options['skip_retention']:
+            try:
+                from django.core.management import call_command
+                call_command('apply_retention_policies')
+                results['retention'] = 'ok'
+            except Exception as exc:
+                results['retention'] = str(exc)
+
         try:
             from reports.services import run_due_scheduled_reports
             results['scheduled_reports'] = run_due_scheduled_reports()
         except Exception as exc:
             results['scheduled_reports'] = str(exc)
+
+        try:
+            from api.ops_monitoring import emit_ops_alerts
+
+            results['ops_alerts'] = emit_ops_alerts()
+        except Exception as exc:
+            results['ops_alerts'] = str(exc)
 
         self.stdout.write(self.style.SUCCESS(f'Scheduled tasks finished: {results}'))

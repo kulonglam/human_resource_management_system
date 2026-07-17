@@ -323,21 +323,43 @@ if REQUIRE_FIELD_ENCRYPTION_KEY and not FIELD_ENCRYPTION_KEY:
         'Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"',
     )
 
+# Prefer a dedicated backup key so a dump leak does not expose field-level PII crypto.
+# Falls back to FIELD_ENCRYPTION_KEY for decrypting older backups / unset deploys.
+BACKUP_ENCRYPTION_KEY = os.environ.get('BACKUP_ENCRYPTION_KEY', '')
+BACKUP_ENCRYPTION_KEY_PREVIOUS = os.environ.get('BACKUP_ENCRYPTION_KEY_PREVIOUS', '')
+REQUIRE_BACKUP_ENCRYPTION_KEY = os.environ.get(
+    'REQUIRE_BACKUP_ENCRYPTION_KEY',
+    'False',
+) == 'True'
+if REQUIRE_BACKUP_ENCRYPTION_KEY and ENCRYPT_BACKUPS and not BACKUP_ENCRYPTION_KEY:
+    from django.core.exceptions import ImproperlyConfigured
+    raise ImproperlyConfigured(
+        'BACKUP_ENCRYPTION_KEY must be set when REQUIRE_BACKUP_ENCRYPTION_KEY=True '
+        'and ENCRYPT_BACKUPS=True. Generate a key distinct from FIELD_ENCRYPTION_KEY.',
+    )
+
 BACKUP_S3_BUCKET = os.environ.get('BACKUP_S3_BUCKET', '')
 BACKUP_S3_PREFIX = os.environ.get('BACKUP_S3_PREFIX', 'hrmis-backups/')
 BACKUP_S3_SSE = os.environ.get('BACKUP_S3_SSE', 'AES256')  # AES256 or aws:kms
 BACKUP_S3_SSE_KMS_KEY_ID = os.environ.get('BACKUP_S3_SSE_KMS_KEY_ID', '')
+# Local retention: keep newest N files and/or drop files older than D days (0 disables that rule).
+BACKUP_RETENTION_COUNT = int(os.environ.get('BACKUP_RETENTION_COUNT', '14'))
+BACKUP_RETENTION_DAYS = int(os.environ.get('BACKUP_RETENTION_DAYS', '30'))
 
-Q_CLUSTER = {
-    'name': 'hrmis',
-    'workers': int(os.environ.get('Q_WORKERS', '2')),
-    'timeout': 300,
-    'retry': 360,
-    'queue_limit': 50,
-    'bulk': 10,
-    'orm': 'default',
-    'catch_up': True,
-}
+# Disaster recovery targets (see DISASTER_RECOVERY.md)
+DR_RTO_TARGET_MINUTES = int(os.environ.get('DR_RTO_TARGET_MINUTES', '60'))
+DR_RPO_TARGET_HOURS = int(os.environ.get('DR_RPO_TARGET_HOURS', '168'))
+DR_VERIFY_STALE_DAYS = int(os.environ.get('DR_VERIFY_STALE_DAYS', '35'))
+DR_DRILL_STALE_DAYS = int(os.environ.get('DR_DRILL_STALE_DAYS', '35'))
+
+REDIS_URL = os.environ.get('REDIS_URL', '').strip()
+from api.redis_config import build_cache_config, build_q_cluster_config  # noqa: E402
+
+CACHES = build_cache_config(REDIS_URL or None)
+Q_CLUSTER = build_q_cluster_config(
+    REDIS_URL or None,
+    workers=int(os.environ.get('Q_WORKERS', '2')),
+)
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [

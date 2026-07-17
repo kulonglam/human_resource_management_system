@@ -1,7 +1,7 @@
+"""Reports domain serializers."""
 from rest_framework import serializers
 
 from reports.models import ReportSnapshot, SavedReport, ScheduledReport
-
 
 class SavedReportSerializer(serializers.ModelSerializer):
     report_type_display = serializers.CharField(source='get_report_type_display', read_only=True)
@@ -15,6 +15,7 @@ class SavedReportSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at',
         ]
         read_only_fields = ['created_by', 'created_at', 'updated_at']
+
 
 
 class ScheduledReportSerializer(serializers.ModelSerializer):
@@ -33,6 +34,7 @@ class ScheduledReportSerializer(serializers.ModelSerializer):
         read_only_fields = ['created_by', 'last_run_at', 'created_at', 'updated_at']
 
 
+
 class ReportSnapshotSerializer(serializers.ModelSerializer):
     generated_by_name = serializers.CharField(source='generated_by.username', read_only=True, default=None)
 
@@ -43,3 +45,4 @@ class ReportSnapshotSerializer(serializers.ModelSerializer):
             'generated_by', 'generated_by_name', 'generated_at',
         ]
         read_only_fields = ['generated_by', 'generated_at']
+

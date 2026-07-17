@@ -1,7 +1,6 @@
 from datetime import timedelta
 
 from django.conf import settings
-from django.db import connection
 from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.utils.decorators import method_decorator
@@ -12,7 +11,7 @@ from rest_framework.views import APIView
 
 from django.contrib.auth import login, logout
 
-from accounts.models import CustomUser, Role
+from accounts.models import CustomUser
 from departments.models import Department
 from employees.models import Employee
 from leaves.models import Leave, LeaveBalance
@@ -38,12 +37,12 @@ from .mfa import (
     store_setup_secret,
     verify_totp,
 )
+from .ops_monitoring import get_health_snapshot
 from .permissions import IsAdmin, IsAdminOrManager
 from .throttles import LoginRateThrottle, MFARateThrottle
 from .serializers import (
     LoginSerializer,
     RegisterSerializer,
-    RoleSerializer,
     UserSerializer,
 )
 from accounts.security import (
@@ -161,21 +160,11 @@ class HealthCheckView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        db_ok = True
-        try:
-            connection.ensure_connection()
-            with connection.cursor() as cursor:
-                cursor.execute('SELECT 1')
-        except Exception:
-            db_ok = False
-
-        payload = {
-            'status': 'ok' if db_ok else 'degraded',
-            'database': 'ok' if db_ok else 'unavailable',
-            'version': '1.2.0',
-            'api_version': 'v1',
-        }
-        http_status = status.HTTP_200_OK if db_ok else status.HTTP_503_SERVICE_UNAVAILABLE
+        payload = get_health_snapshot()
+        payload.pop('error', None)
+        http_status = (
+            status.HTTP_200_OK if payload['status'] == 'ok' else status.HTTP_503_SERVICE_UNAVAILABLE
+        )
         return Response(payload, status=http_status)
 
 
@@ -230,19 +219,6 @@ class RegisterView(generics.CreateAPIView):
 class CurrentUserView(APIView):
     def get(self, request):
         return Response(UserSerializer(request.user).data)
-
-
-class RoleListView(generics.ListAPIView):
-    serializer_class = RoleSerializer
-
-    def get_permissions(self):
-        from django.conf import settings
-        if settings.ALLOW_PUBLIC_REGISTRATION:
-            return [AllowAny()]
-        return [IsAdmin()]
-
-    def get_queryset(self):
-        return Role.objects.all()
 
 
 class DashboardView(APIView):

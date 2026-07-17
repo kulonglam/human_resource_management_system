@@ -77,6 +77,23 @@ class EmployeeQuerysetMixin:
     def filter_by_accessible_employees(self, queryset):
         return queryset.filter(**{f'{self.employee_field}__in': self.get_accessible_employee_ids()})
 
+    def scope_to_accessible_employees(self, queryset):
+        """Apply role + organization scoping for reads.
+
+        - Admin without an organization: unrestricted (single-tenant default).
+        - Admin with an organization: restricted to employees in that organization.
+        - Manager / employee: restricted via get_user_accessible_employees.
+        """
+        user = self.request.user
+        if getattr(user, 'is_admin', False):
+            org_id = getattr(user, 'organization_id', None)
+            if org_id:
+                return queryset.filter(
+                    **{f'{self.employee_field}__organization_id': org_id}
+                )
+            return queryset
+        return self.filter_by_accessible_employees(queryset)
+
     def employee_allowed(self, employee):
         return can_access_employee(self.request.user, employee)
 

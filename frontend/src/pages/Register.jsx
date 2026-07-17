@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { errorMessage } from '../utils/apiErrors';
 
 export default function Register() {
   const { user, register } = useAuth();
@@ -40,6 +41,14 @@ export default function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    if (form.password1 !== form.password2) {
+      setError('password2: Passwords do not match.');
+      return;
+    }
+    if (form.password1.length < 8) {
+      setError('password1: Password must be at least 8 characters.');
+      return;
+    }
     setSubmitting(true);
     try {
       await register({
@@ -48,10 +57,7 @@ export default function Register() {
       });
       navigate('/dashboard', { replace: true });
     } catch (err) {
-      const messages = Object.entries(err.data || {})
-        .map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`)
-        .join(' ');
-      setError(messages || err.message);
+      setError(errorMessage(err));
     } finally {
       setSubmitting(false);
     }

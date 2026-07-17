@@ -1,6 +1,7 @@
 import uuid
 from datetime import timedelta
 
+from django.db import transaction
 from django.utils import timezone
 
 from departments.models import Department
@@ -119,35 +120,42 @@ def create_hire_onboarding(application, start_date=None, salary=None, job_title=
 
 def complete_hire_onboarding(onboarding, hr_user, employee_data):
     """Create employee record from onboarding + HR-supplied fields."""
-    application = onboarding.application
-    department = employee_data.get('department')
-    if isinstance(department, int):
-        department = Department.objects.filter(pk=department).first()
+    with transaction.atomic():
+        onboarding = HireOnboarding.objects.select_for_update().select_related(
+            'application', 'application__job',
+        ).get(pk=onboarding.pk)
+        if onboarding.status == 'completed':
+            raise ValueError('Onboarding already completed.')
 
-    employee = Employee.objects.create(
-        first_name=application.first_name,
-        last_name=application.last_name,
-        email=application.email,
-        mobile=employee_data.get('mobile', application.phone),
-        date_of_birth=employee_data['date_of_birth'],
-        gender=employee_data.get('gender', 'Other'),
-        address=employee_data.get('address', 'TBD'),
-        emergency_contact=employee_data.get('emergency_contact', application.phone),
-        job_title=employee_data.get('job_title', onboarding.job_title)[:20],
-        department=department,
-        date_joined=employee_data.get('date_joined', onboarding.start_date),
-        account_number=employee_data.get('account_number', '0000000000'),
-        bank=employee_data.get('bank', 'TBD'),
-        salary=employee_data.get('salary', onboarding.salary),
-    )
+        application = Application.objects.select_for_update().get(pk=onboarding.application_id)
+        department = employee_data.get('department')
+        if isinstance(department, int):
+            department = Department.objects.filter(pk=department).first()
 
-    application.employee = employee
-    application.save(update_fields=['employee'])
+        employee = Employee.objects.create(
+            first_name=application.first_name,
+            last_name=application.last_name,
+            email=application.email,
+            mobile=employee_data.get('mobile', application.phone),
+            date_of_birth=employee_data['date_of_birth'],
+            gender=employee_data.get('gender', 'Other'),
+            address=employee_data.get('address', 'TBD'),
+            emergency_contact=employee_data.get('emergency_contact', application.phone),
+            job_title=employee_data.get('job_title', onboarding.job_title)[:20],
+            department=department,
+            date_joined=employee_data.get('date_joined', onboarding.start_date),
+            account_number=employee_data.get('account_number', '0000000000'),
+            bank=employee_data.get('bank', 'TBD'),
+            salary=employee_data.get('salary', onboarding.salary),
+        )
 
-    onboarding.employee = employee
-    onboarding.status = 'completed'
-    onboarding.completed_at = timezone.now()
-    onboarding.save(update_fields=['employee', 'status', 'completed_at'])
+        application.employee = employee
+        application.save(update_fields=['employee'])
+
+        onboarding.employee = employee
+        onboarding.status = 'completed'
+        onboarding.completed_at = timezone.now()
+        onboarding.save(update_fields=['employee', 'status', 'completed_at'])
 
     return employee
 
@@ -196,3 +204,93 @@ def backfill_application_stages():
         if stage:
             app.current_stage = stage
             app.save(update_fields=['current_stage'])
+
+
+def update_application_after_save(*, application, old_status, previous_status_label):
+    """Side-effects when an application status changes on update."""
+    from api.notifications import notify_application_status
+
+    if old_status != application.status:
+        if application.status == 'hired' and not application.hired_at:
+            application.hired_at = timezone.now()
+            application.save(update_fields=['hired_at'])
+        notify_application_status(application, previous_status_label)
+    return application
+
+
+def move_application_to_stage(*, application, stage):
+    """Move application to a pipeline stage; may trigger hire onboarding."""
+    with transaction.atomic():
+        application = Application.objects.select_for_update().select_related('job').get(
+            pk=application.pk,
+        )
+        sync_application_stage(application, stage)
+        if stage.stage_type == 'hired':
+            create_hire_onboarding(application)
+    return application
+
+
+def after_interview_created(*, interview):
+    """Align application status when an interview is scheduled."""
+    with transaction.atomic():
+        application = Application.objects.select_for_update().select_related('job').get(
+            pk=interview.application_id,
+        )
+        stage = application.job.pipeline_stages.filter(key='interviewed').first()
+        if stage:
+            sync_application_stage(application, stage)
+        elif application.status in ('received', 'shortlisted'):
+            application.status = 'interviewed'
+            application.save(update_fields=['status'])
+    return interview
+
+
+def create_offer_from_template_data(*, template, application, created_by, **data):
+    """Build and persist a job offer from a template."""
+    offer = build_offer_from_template(
+        template,
+        application,
+        created_by,
+        salary=data['salary'],
+        start_date=data['start_date'],
+        currency=data.get('currency', 'UGX'),
+        job_title=data.get('job_title') or application.job.title,
+        department=data.get('department') or application.job.department,
+    )
+    offer.save()
+    return offer
+
+
+def submit_job_offer(offer):
+    with transaction.atomic():
+        offer = JobOffer.objects.select_for_update().get(pk=offer.pk)
+        offer.status = 'pending_approval'
+        offer.save(update_fields=['status', 'updated_at'])
+    return offer
+
+
+def approve_job_offer(offer):
+    with transaction.atomic():
+        offer = JobOffer.objects.select_for_update().get(pk=offer.pk)
+        if offer.status != 'pending_approval':
+            raise ValueError('Offer is not pending approval.')
+        offer.status = 'approved'
+        offer.save(update_fields=['status', 'updated_at'])
+    return offer
+
+
+def send_job_offer(offer):
+    with transaction.atomic():
+        offer = JobOffer.objects.select_for_update().select_related(
+            'application', 'application__job',
+        ).get(pk=offer.pk)
+        if offer.status not in ('approved', 'draft'):
+            raise ValueError('Offer must be approved before sending.')
+        offer.status = 'sent'
+        offer.sent_at = timezone.now()
+        offer.save(update_fields=['status', 'sent_at', 'updated_at'])
+        stage = offer.application.job.pipeline_stages.filter(key='offer').first()
+        if stage:
+            application = Application.objects.select_for_update().get(pk=offer.application_id)
+            sync_application_stage(application, stage)
+    return offer

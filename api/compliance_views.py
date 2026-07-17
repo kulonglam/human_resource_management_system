@@ -71,11 +71,11 @@ class RetentionRunView(APIView):
         dry_run = str(request.data.get('dry_run', 'false')).lower() in ('1', 'true', 'yes')
         results = apply_all_retention_policies(dry_run=dry_run)
         total = sum(item['purged'] for item in results)
-        if not dry_run and total:
+        if not dry_run:
             log_action(
                 request, 'delete', 'DataRetentionPolicy', None,
                 'Retention purge',
-                f'Purged {total} record(s) across {len(results)} categories',
+                f'source=api; total={total}; categories={len(results)}',
             )
         return Response({
             'dry_run': dry_run,

@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.utils import timezone
 
 from accounts.models import CustomUser
@@ -137,20 +138,22 @@ def process_leave_decision(request, leave, approved, comment=''):
 def _finalize_leave_approval(request, leave):
     from leaves.models import LeaveBalance
 
-    current_year = timezone.now().year
-    try:
-        balance = LeaveBalance.objects.get(
-            employee=leave.employee, leave_type=leave.leave_type, year=current_year,
-        )
-        balance.pending_days -= leave.working_days
-        balance.used_days += leave.working_days
-        balance.save()
-    except LeaveBalance.DoesNotExist:
-        pass
-    leave.status = 'approved'
-    leave.reviewed_by = request.user.get_full_name() or request.user.username
-    leave.reviewed_on = timezone.now()
-    leave.save()
+    with transaction.atomic():
+        leave = leave.__class__.objects.select_for_update().select_related('employee').get(pk=leave.pk)
+        current_year = timezone.now().year
+        try:
+            balance = LeaveBalance.objects.select_for_update().get(
+                employee=leave.employee, leave_type=leave.leave_type, year=current_year,
+            )
+            balance.pending_days = max(float(balance.pending_days) - float(leave.working_days), 0.0)
+            balance.used_days = float(balance.used_days) + float(leave.working_days)
+            balance.save(update_fields=['pending_days', 'used_days'])
+        except LeaveBalance.DoesNotExist:
+            pass
+        leave.status = 'approved'
+        leave.reviewed_by = request.user.get_full_name() or request.user.username
+        leave.reviewed_on = timezone.now()
+        leave.save(update_fields=['status', 'reviewed_by', 'reviewed_on', 'working_days'])
     log_action(request, 'approve', 'Leave', leave.id, str(leave), 'Leave fully approved')
     from integrations.services import dispatch_webhook
     dispatch_webhook('leave.approved', {
@@ -166,19 +169,21 @@ def _finalize_leave_approval(request, leave):
 def _reject_leave(request, leave, comment=''):
     from leaves.models import LeaveBalance
 
-    current_year = timezone.now().year
-    try:
-        balance = LeaveBalance.objects.get(
-            employee=leave.employee, leave_type=leave.leave_type, year=current_year,
-        )
-        balance.pending_days -= leave.working_days
-        balance.save()
-    except LeaveBalance.DoesNotExist:
-        pass
-    leave.status = 'rejected'
-    leave.reviewed_by = request.user.get_full_name() or request.user.username
-    leave.reviewed_on = timezone.now()
-    leave.save()
+    with transaction.atomic():
+        leave = leave.__class__.objects.select_for_update().select_related('employee').get(pk=leave.pk)
+        current_year = timezone.now().year
+        try:
+            balance = LeaveBalance.objects.select_for_update().get(
+                employee=leave.employee, leave_type=leave.leave_type, year=current_year,
+            )
+            balance.pending_days = max(float(balance.pending_days) - float(leave.working_days), 0.0)
+            balance.save(update_fields=['pending_days'])
+        except LeaveBalance.DoesNotExist:
+            pass
+        leave.status = 'rejected'
+        leave.reviewed_by = request.user.get_full_name() or request.user.username
+        leave.reviewed_on = timezone.now()
+        leave.save(update_fields=['status', 'reviewed_by', 'reviewed_on', 'working_days'])
     log_action(request, 'reject', 'Leave', leave.id, str(leave), comment or 'Leave rejected')
     from integrations.services import dispatch_webhook
     dispatch_webhook('leave.rejected', {
@@ -221,9 +226,9 @@ def process_expense_decision(request, expense, approved, comment=''):
 
 
 def _finalize_expense_approval(request, expense):
-    expense.status = 'approved'
-    expense.approved_date = timezone.now()
-    expense.save()
+    from expenses.services import finalize_expense_approval
+
+    expense = finalize_expense_approval(expense=expense)
     log_action(request, 'approve', 'Expense', expense.id, expense.description, 'Expense fully approved')
     from integrations.services import dispatch_webhook
     dispatch_webhook('expense.approved', {
@@ -235,9 +240,9 @@ def _finalize_expense_approval(request, expense):
 
 
 def _reject_expense(request, expense, comment=''):
-    expense.status = 'rejected'
-    expense.rejection_reason = comment
-    expense.save()
+    from expenses.services import reject_expense
+
+    expense = reject_expense(expense=expense, reason=comment)
     log_action(request, 'reject', 'Expense', expense.id, expense.description, comment or 'Expense rejected')
     from integrations.services import dispatch_webhook
     dispatch_webhook('expense.rejected', {
@@ -258,9 +263,7 @@ def process_recruitment_decision(request, application, approved, comment=''):
         if outcome['result'] == 'denied':
             return {'status': 403, 'detail': outcome['detail']}
         if outcome['result'] == 'rejected':
-            application.status = 'rejected'
-            application.save()
-            log_action(request, 'reject', 'Application', application.id, str(application), comment)
+            _reject_recruitment(request, application, comment)
             return {'status': 200, 'result': 'rejected'}
         if outcome['result'] == 'advanced':
             log_action(
@@ -278,32 +281,43 @@ def process_recruitment_decision(request, application, approved, comment=''):
             return {'status': 200, 'result': 'approved'}
 
     if not approved:
-        application.status = 'rejected'
-        application.save()
+        _reject_recruitment(request, application, comment)
         return {'status': 200, 'result': 'rejected'}
     _finalize_recruitment_approval(request, application)
     return {'status': 200, 'result': 'approved'}
 
 
+def _reject_recruitment(request, application, comment=''):
+    with transaction.atomic():
+        application = application.__class__.objects.select_for_update().get(pk=application.pk)
+        application.status = 'rejected'
+        application.save(update_fields=['status'])
+    log_action(request, 'reject', 'Application', application.id, str(application), comment)
+
+
 def _finalize_recruitment_approval(request, application):
     from recruitment.services import create_hire_onboarding, sync_application_stage
 
-    if application.status == 'received':
-        stage = application.job.pipeline_stages.filter(key='shortlisted').first()
-        if stage:
-            sync_application_stage(application, stage)
-        else:
-            application.status = 'shortlisted'
-            application.save(update_fields=['status'])
-    elif application.status in ('shortlisted', 'interviewed', 'offer'):
-        stage = application.job.pipeline_stages.filter(stage_type='hired').first()
-        if stage:
-            sync_application_stage(application, stage)
-        else:
-            application.status = 'hired'
-            application.hired_at = timezone.now()
-            application.save(update_fields=['status', 'hired_at'])
-        create_hire_onboarding(application)
+    with transaction.atomic():
+        application = application.__class__.objects.select_for_update().select_related('job').get(
+            pk=application.pk,
+        )
+        if application.status == 'received':
+            stage = application.job.pipeline_stages.filter(key='shortlisted').first()
+            if stage:
+                sync_application_stage(application, stage)
+            else:
+                application.status = 'shortlisted'
+                application.save(update_fields=['status'])
+        elif application.status in ('shortlisted', 'interviewed', 'offer'):
+            stage = application.job.pipeline_stages.filter(stage_type='hired').first()
+            if stage:
+                sync_application_stage(application, stage)
+            else:
+                application.status = 'hired'
+                application.hired_at = timezone.now()
+                application.save(update_fields=['status', 'hired_at'])
+            create_hire_onboarding(application)
     log_action(request, 'approve', 'Application', application.id, str(application), 'Recruitment approved')
 
 

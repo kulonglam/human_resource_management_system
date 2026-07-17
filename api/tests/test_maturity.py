@@ -28,7 +28,14 @@ class MaturityAPITests(HRAPITestCase):
 
     def test_admin_ops_and_slos(self):
         self.login('admin', 'AdminPass123!')
-        self.assertEqual(self.client.get('/api/v1/ops/status/').status_code, 200)
+        ops = self.client.get('/api/v1/ops/status/')
+        self.assertEqual(ops.status_code, 200)
+        self.assertIn('disaster_recovery', ops.data)
+        self.assertIn('infrastructure', ops.data)
+        self.assertIn('alerts', ops.data)
+        self.assertIn('active', ops.data['alerts'])
+        self.assertIn('recent', ops.data['alerts'])
+        self.assertIn('cooldowns', ops.data['alerts'])
         self.assertEqual(self.client.get('/api/v1/ops/slos/').status_code, 200)
 
     def test_organization_crud_and_scim_list(self):

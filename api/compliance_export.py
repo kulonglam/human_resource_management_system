@@ -25,14 +25,18 @@ from training.models import (
     TrainingRecord,
 )
 
-from api.serializers import EmployeeSerializer, UserSerializer
-from api.serializers_hr import (
+from api.serializers import (
+    ApplicationSerializer,
     AttendanceSerializer,
+    EmployeeSerializer,
     ExpenseSerializer,
     KinSerializer,
     LeaveBalanceSerializer,
     LeaveSerializer,
+    PublicApplicationSerializer,
+    PublicJobPostingSerializer,
     SalarySerializer,
+    UserSerializer,
 )
 
 

@@ -8,6 +8,24 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [sqlite, postgres]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: hrmis
+          POSTGRES_PASSWORD: hrmis
+          POSTGRES_DB: hrmis_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hrmis -d hrmis_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -16,9 +34,10 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt pip-audit
       - name: Dependency vulnerability scan
+        if: matrix.database == 'sqlite'
         run: pip-audit -r requirements.txt --progress-spinner off
         continue-on-error: true
-      - name: Run API tests
+      - name: Run API tests (${{ matrix.database }})
         run: python manage.py test api.tests
         env:
           SECRET_KEY: test-secret-key-not-for-production
@@ -26,7 +45,8 @@ jobs:
           ENFORCE_MFA_FOR_MANAGERS: 'False'
           ENFORCE_MFA_FOR_PAYROLL: 'False'
           REQUIRE_FIELD_ENCRYPTION_KEY: 'False'
-          FIELD_ENCRYPTION_KEY: 'test-field-encryption-key-for-ci'
+          FIELD_ENCRYPTION_KEY: test-field-encryption-key-for-ci
+          DATABASE_URL: ${{ matrix.database == 'postgres' && 'postgresql://hrmis:hrmis@localhost:5432/hrmis_test?sslmode=disable' || '' }}
 
   frontend:
     runs-on: ubuntu-latest
@@ -46,6 +66,59 @@ jobs:
         continue-on-error: true
       - run: npm run test
       - run: npm run build
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install backend dependencies
+        run: pip install -r requirements.txt
+      - name: Prepare database and seed users
+        run: |
+          python manage.py migrate --noinput
+          python manage.py seed_data
+        env:
+          SECRET_KEY: test-secret-key-not-for-production
+          ENFORCE_MFA_FOR_ADMINS: 'False'
+          ENFORCE_MFA_FOR_MANAGERS: 'False'
+          ENFORCE_MFA_FOR_PAYROLL: 'False'
+          REQUIRE_FIELD_ENCRYPTION_KEY: 'False'
+          FIELD_ENCRYPTION_KEY: test-field-encryption-key-for-ci
+      - name: Build frontend for Django SPA
+        working-directory: frontend
+        run: npm ci && npm run build
+      - name: Install Playwright
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Start Django (API + built SPA)
+        run: |
+          python manage.py runserver 127.0.0.1:8000 &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8000/api/v1/health/ && break
+            sleep 2
+          done
+        env:
+          SECRET_KEY: test-secret-key-not-for-production
+          ENFORCE_MFA_FOR_ADMINS: 'False'
+          ENFORCE_MFA_FOR_MANAGERS: 'False'
+          ENFORCE_MFA_FOR_PAYROLL: 'False'
+          REQUIRE_FIELD_ENCRYPTION_KEY: 'False'
+          FIELD_ENCRYPTION_KEY: test-field-encryption-key-for-ci
+      - name: Run Playwright E2E
+        working-directory: frontend
+        run: npm run e2e
+        env:
+          E2E_BASE_URL: http://127.0.0.1:8000
+          E2E_PYTHON: python
 
   secrets:
     runs-on: ubuntu-latest

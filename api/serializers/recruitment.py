@@ -1,23 +1,135 @@
+"""Recruitment domain serializers."""
 from rest_framework import serializers
 
 from recruitment.models import (
     Application,
+    ApplicationNote,
     ApplicationScorecard,
     HireOnboarding,
     HiringTeamMember,
+    Interview,
     JobOffer,
     JobPipelineStage,
+    JobPosting,
     OfferTemplate,
     ScorecardCriterion,
     ScorecardRating,
 )
-from recruitment.services import render_offer_body
+from workflows.services import approval_status_payload
+
+class JobPostingSerializer(serializers.ModelSerializer):
+    application_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = JobPosting
+        fields = '__all__'
+
+    def get_application_count(self, obj):
+        return obj.applications.count()
+
+
+
+class ApplicationSerializer(serializers.ModelSerializer):
+    job_title = serializers.CharField(source='job.title', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    source_display = serializers.CharField(source='get_source_display', read_only=True)
+    full_name = serializers.SerializerMethodField()
+    resume_url = serializers.SerializerMethodField()
+    approval_status = serializers.SerializerMethodField()
+    notes_count = serializers.SerializerMethodField()
+    interviews_count = serializers.SerializerMethodField()
+    current_stage_label = serializers.CharField(source='current_stage.label', read_only=True, default=None)
+    current_stage_key = serializers.CharField(source='current_stage.key', read_only=True, default=None)
+    onboarding_status = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Application
+        fields = '__all__'
+
+    def get_onboarding_status(self, obj):
+        if hasattr(obj, 'onboarding'):
+            return obj.onboarding.status
+        return None
+
+    def get_approval_status(self, obj):
+        return approval_status_payload(obj)
+
+    def get_full_name(self, obj):
+        return f'{obj.first_name} {obj.last_name}'
+
+    def get_resume_url(self, obj):
+        if obj.resume:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.resume.url)
+            return obj.resume.url
+        return None
+
+    def get_notes_count(self, obj):
+        if hasattr(obj, '_notes_count'):
+            return obj._notes_count
+        return obj.notes.count()
+
+    def get_interviews_count(self, obj):
+        if hasattr(obj, '_interviews_count'):
+            return obj._interviews_count
+        return obj.interviews.count()
+
+    def validate_rating(self, value):
+        if value is not None and not 1 <= value <= 5:
+            raise serializers.ValidationError('Rating must be between 1 and 5.')
+        return value
+
+
+
+class PublicJobPostingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = JobPosting
+        fields = ['id', 'title', 'department', 'description', 'requirements', 'deadline', 'posted_on']
+
+
+
+class PublicApplicationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Application
+        fields = [
+            'first_name', 'last_name', 'email', 'phone', 'cover_letter', 'resume',
+            'eeo_gender', 'eeo_ethnicity', 'eeo_veteran_status', 'eeo_disability_status',
+        ]
+
+
+
+class ApplicationNoteSerializer(serializers.ModelSerializer):
+    author_name = serializers.CharField(source='author.username', read_only=True)
+
+    class Meta:
+        model = ApplicationNote
+        fields = ['id', 'application', 'author', 'author_name', 'body', 'created_at']
+        read_only_fields = ['author', 'created_at']
+
+
+
+class InterviewSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = Interview
+        fields = [
+            'id', 'application', 'scheduled_at', 'duration_minutes', 'location',
+            'interviewer_name', 'notes', 'status', 'status_display',
+            'calendar_uid', 'external_calendar_url',
+            'created_by', 'created_by_name', 'created_at',
+        ]
+        read_only_fields = ['created_by', 'created_at']
+
 
 
 class JobPipelineStageSerializer(serializers.ModelSerializer):
     class Meta:
         model = JobPipelineStage
         fields = ['id', 'job', 'key', 'label', 'order', 'stage_type']
+
 
 
 class HiringTeamMemberSerializer(serializers.ModelSerializer):
@@ -29,10 +141,12 @@ class HiringTeamMemberSerializer(serializers.ModelSerializer):
         fields = ['id', 'job', 'user', 'user_name', 'user_email', 'role']
 
 
+
 class ScorecardCriterionSerializer(serializers.ModelSerializer):
     class Meta:
         model = ScorecardCriterion
         fields = ['id', 'job', 'name', 'description', 'order', 'weight']
+
 
 
 class ScorecardRatingSerializer(serializers.ModelSerializer):
@@ -48,6 +162,7 @@ class ScorecardRatingSerializer(serializers.ModelSerializer):
         return value
 
 
+
 class ApplicationScorecardSerializer(serializers.ModelSerializer):
     reviewer_name = serializers.CharField(source='reviewer.username', read_only=True)
     recommendation_display = serializers.CharField(source='get_overall_recommendation_display', read_only=True)
@@ -61,6 +176,7 @@ class ApplicationScorecardSerializer(serializers.ModelSerializer):
             'summary', 'ratings', 'created_at', 'updated_at',
         ]
         read_only_fields = ['reviewer', 'created_at', 'updated_at']
+
 
 
 class ApplicationScorecardWriteSerializer(serializers.ModelSerializer):
@@ -92,11 +208,13 @@ class ApplicationScorecardWriteSerializer(serializers.ModelSerializer):
         return instance
 
 
+
 class OfferTemplateSerializer(serializers.ModelSerializer):
     class Meta:
         model = OfferTemplate
         fields = ['id', 'name', 'body', 'is_active', 'created_at']
         read_only_fields = ['created_at']
+
 
 
 class JobOfferSerializer(serializers.ModelSerializer):
@@ -121,6 +239,7 @@ class JobOfferSerializer(serializers.ModelSerializer):
         return f'{obj.application.first_name} {obj.application.last_name}'
 
 
+
 class JobOfferCreateSerializer(serializers.Serializer):
     application = serializers.PrimaryKeyRelatedField(queryset=Application.objects.all())
     template = serializers.PrimaryKeyRelatedField(queryset=OfferTemplate.objects.filter(is_active=True))
@@ -131,14 +250,16 @@ class JobOfferCreateSerializer(serializers.Serializer):
     department = serializers.CharField(max_length=100, required=False)
 
 
+
 class OfferSignSerializer(serializers.Serializer):
     signer_name = serializers.CharField(max_length=100)
     accept = serializers.BooleanField()
 
 
+
 class HireOnboardingSerializer(serializers.ModelSerializer):
     candidate_name = serializers.SerializerMethodField()
-    employee_id = serializers.IntegerField(source='employee_id', read_only=True)
+    employee_id = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = HireOnboarding
@@ -153,6 +274,7 @@ class HireOnboardingSerializer(serializers.ModelSerializer):
         return f'{obj.application.first_name} {obj.application.last_name}'
 
 
+
 class CompleteOnboardingSerializer(serializers.Serializer):
     date_of_birth = serializers.DateField()
     gender = serializers.ChoiceField(choices=['Male', 'Female', 'Other'])
@@ -164,3 +286,4 @@ class CompleteOnboardingSerializer(serializers.Serializer):
     salary = serializers.DecimalField(max_digits=16, decimal_places=2, required=False)
     date_joined = serializers.DateField(required=False)
     job_title = serializers.CharField(max_length=20, required=False)
+

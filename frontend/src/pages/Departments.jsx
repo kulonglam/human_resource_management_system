@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
+import { errorMessage } from '../utils/apiErrors';
 
 function DepartmentModal({ department, departments, onClose, onSaved }) {
   const isEdit = Boolean(department);
@@ -39,10 +40,7 @@ function DepartmentModal({ department, departments, onClose, onSaved }) {
       onSaved();
       onClose();
     } catch (err) {
-      const messages = Object.entries(err.data || {})
-        .map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`)
-        .join(' ');
-      setError(messages || err.message);
+      setError(errorMessage(err));
     } finally {
       setSubmitting(false);
     }

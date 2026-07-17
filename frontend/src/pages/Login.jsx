@@ -100,14 +100,15 @@ export default function Login() {
             <i className="bi bi-person-lock" /> HRMIS Login
           </h4>
 
-          {error && <div className="alert alert-danger">{error}</div>}
+          {error && <div className="alert alert-danger" role="alert">{error}</div>}
 
           {!mfaStep ? (
             <form onSubmit={handleSubmit}>
               <div className="mb-3">
-                <label className="form-label">Username</label>
+                <label className="form-label" htmlFor="login-username">Username</label>
                 <input
                   type="text"
+                  id="login-username"
                   className="form-control"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
@@ -117,10 +118,11 @@ export default function Login() {
               </div>
 
               <div className="mb-3">
-                <label className="form-label">Password</label>
+                <label className="form-label" htmlFor="login-password">Password</label>
                 <div className="position-relative">
                   <input
                     type={showPassword ? 'text' : 'password'}
+                    id="login-password"
                     className="form-control"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -133,8 +135,9 @@ export default function Login() {
                     className="btn btn-link position-absolute end-0 top-50 translate-middle-y"
                     onClick={() => setShowPassword((v) => !v)}
                     style={{ zIndex: 10 }}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
-                    <i className={`bi ${showPassword ? 'bi-eye-slash' : 'bi-eye'}`} />
+                    <i className={`bi ${showPassword ? 'bi-eye-slash' : 'bi-eye'}`} aria-hidden="true" />
                   </button>
                 </div>
               </div>
@@ -151,9 +154,10 @@ export default function Login() {
                 Enter the 6-digit code from your authenticator app.
               </p>
               <div className="mb-3">
-                <label className="form-label">Verification code</label>
+                <label className="form-label" htmlFor="login-mfa-code">Verification code</label>
                 <input
                   type="text"
+                  id="login-mfa-code"
                   className="form-control"
                   value={mfaCode}
                   onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}

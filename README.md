@@ -14,11 +14,29 @@ Django REST API + React SPA for HR operations. The UI is fully React; Django ser
 ## Project layout
 
 ```
-api/                 REST API (auth, viewsets, reports)
+api/                 HTTP adapters (viewsets/, serializers/, urls, auth)
+  viewsets/          Domain-split DRF viewsets (thin)
+  serializers/       Domain-split serializers
+accounts/ … payroll/ Domain apps: models + services (use-cases)
 avvento_hrmis/       Django project settings, SPA catch-all route
-frontend/            React application (src/, dist/ after build)
-accounts/ … discipline/   HR domain apps (models, admin, migrations only)
+frontend/            React SPA (pages → api/client → backend)
 ```
+
+### Layering (where to put new code)
+
+| Kind of change | Put it in |
+|----------------|-----------|
+| Business rule / workflow | Domain `*/services.py` (e.g. `leaves.services.submit_leave`) |
+| HTTP endpoint / permissions | `api/viewsets/<domain>.py` |
+| Request/response shape + field validation | `api/serializers/<domain>.py` |
+| Persistence schema | Domain `models.py` + migration |
+| UI screen | `frontend/src/pages/` + `api/client.js` |
+| Reusable UI pieces | `frontend/src/components/<domain>/` |
+| Report/chart helpers | `frontend/src/utils/` |
+
+Do **not** put multi-step business orchestration in viewsets — call a domain service instead.
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the diagram and conventions.
 
 ## Prerequisites
 
@@ -167,6 +185,9 @@ python manage.py check
 python manage.py test api
 coverage run --source=api manage.py test api
 coverage report --omit="api/tests/*"
+
+# E2E (Playwright): seed data, start Django :8000 + Vite :5173, then:
+cd frontend && npm run e2e
 python manage.py createsuperuser
 python manage.py collectstatic --noinput
 cd frontend && npm run build
@@ -224,7 +245,8 @@ Default workflows (seeded via `python manage.py seed_workflows`):
 - **Right to erasure** — admins anonymize employee PII via `/settings/compliance` (`POST /api/v1/compliance/erasure/{id}/`)
 - **Audit log export** — CSV/Excel from the Audit Log page or `GET /api/v1/audit-logs/export/?format=csv|xlsx`
 - **Data retention policies** — configurable retention for audit logs, webhook deliveries, and notifications at `/settings/compliance`
-- **Scheduled purge** — `python manage.py apply_retention_policies` (add `--dry-run` to preview)
+- **Scheduled purge** — runs inside `python manage.py run_scheduled_tasks` (Render daily/monthly cron); manual: `python manage.py apply_retention_policies` (`--dry-run` to preview; `--skip-retention` on scheduled tasks to pause during incidents)
+- **Incident / risk docs** — [INCIDENT_RESPONSE.md](INCIDENT_RESPONSE.md), [RISK_REGISTER.md](RISK_REGISTER.md); env catalogue in [ENV.md](ENV.md)
 
 Default retention (seeded on migrate):
 

@@ -3,7 +3,7 @@
 from datetime import timedelta
 from decimal import Decimal
 
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 
 from employees.models import Employee
@@ -71,6 +71,47 @@ def calculate_leave_duration(start_date, end_date, is_half_day=False):
     if is_half_day and start_date == end_date:
         return 0.5 if is_working_day(start_date) else 0.0
     return float(count_working_days(start_date, end_date))
+
+
+def submit_leave(*, leave, balance=None, submitted_by=None):
+    """
+    Application use-case: after Leave is persisted, update pending balance,
+    start approval workflow, notify, and emit webhook.
+    Returns the leave instance.
+    """
+    from api.approval_integration import start_leave_approval
+    from api.notifications import notify_leave_submitted
+    from integrations.services import dispatch_webhook
+
+    with transaction.atomic():
+        if balance is not None:
+            balance = LeaveBalance.objects.select_for_update().get(pk=balance.pk)
+            if balance.available_days < leave.working_days:
+                from rest_framework import serializers
+
+                raise serializers.ValidationError({
+                    'leave_type': (
+                        f'Insufficient leave balance. Available: {balance.available_days} days, '
+                        f'requested: {leave.working_days}.'
+                    ),
+                })
+            balance.pending_days = float(balance.pending_days) + float(leave.working_days)
+            balance.save(update_fields=['pending_days'])
+
+        notify_leave_submitted(leave)
+        if submitted_by is not None:
+            start_leave_approval(leave, submitted_by)
+
+    dispatch_webhook('leave.submitted', {
+        'id': leave.id,
+        'employee_id': leave.employee_id,
+        'employee_name': leave.employee.full_name,
+        'leave_type': leave.leave_type,
+        'start_date': str(leave.start_date),
+        'end_date': str(leave.end_date),
+        'duration': leave.duration,
+    })
+    return leave
 
 
 def accrue_monthly_balances(year=None, month=None):

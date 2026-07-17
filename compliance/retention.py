@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.db import transaction
 from django.utils import timezone
 
 from accounts.models import AuditLog, Notification
@@ -30,6 +31,7 @@ def preview_retention(policy):
     return _queryset_for_category(policy.category, cutoff).count()
 
 
+@transaction.atomic
 def apply_retention_policy(policy, dry_run=False):
     if not policy.is_active:
         return 0
@@ -37,17 +39,42 @@ def apply_retention_policy(policy, dry_run=False):
     cutoff = _cutoff(policy.retention_days)
     qs = _queryset_for_category(policy.category, cutoff)
     count = qs.count()
-    if count and not dry_run:
+    if dry_run:
+        return count
+
+    if count:
         qs.delete()
-        policy.last_run_at = timezone.now()
-        policy.last_purged_count = count
-        policy.save(update_fields=['last_run_at', 'last_purged_count'])
+
+    policy.last_run_at = timezone.now()
+    policy.last_purged_count = count
+    policy.save(update_fields=['last_run_at', 'last_purged_count'])
     return count
 
 
 def apply_all_retention_policies(dry_run=False):
     results = []
-    for policy in DataRetentionPolicy.objects.filter(is_active=True):
+    for policy in DataRetentionPolicy.objects.filter(is_active=True).order_by('category'):
         count = apply_retention_policy(policy, dry_run=dry_run)
-        results.append({'category': policy.category, 'purged': count})
+        results.append({
+            'category': policy.category,
+            'purged': count,
+            'retention_days': policy.retention_days,
+        })
     return results
+
+
+def record_retention_audit(results, dry_run=False, source='scheduled'):
+    """Write an AuditLog entry for automated or manual retention runs."""
+    if dry_run:
+        return None
+    total = sum(item.get('purged', 0) for item in results)
+    detail_parts = [
+        f"{item['category']}={item['purged']}" for item in results
+    ]
+    return AuditLog.objects.create(
+        user=None,
+        action='delete',
+        model_name='DataRetentionPolicy',
+        object_description='Retention purge',
+        details=f'source={source}; total={total}; ' + ', '.join(detail_parts),
+    )

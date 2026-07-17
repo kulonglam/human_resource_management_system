@@ -1,0 +1,134 @@
+"""Domain-split viewsets package (compat re-exports)."""
+from .accounts import (
+    ApprovalRequestViewSet,
+    ApprovalWorkflowViewSet,
+    AuditLogViewSet,
+    DocumentAccessRuleViewSet,
+    HRDocumentViewSet,
+    NotificationViewSet,
+    RoleViewSet,
+    SensitiveDataAccessLogViewSet,
+    UserViewSet,
+)
+from .assets import AssetAssignmentViewSet, AssetViewSet
+from .attendance import AttendanceViewSet, OvertimeRecordViewSet, PublicHolidayViewSet, TimesheetViewSet
+from .benefits import BenefitViewSet, EmployeeBenefitViewSet
+from .discipline import DisciplineAppealViewSet, DisciplineViewSet
+from .employees import (
+    DepartmentViewSet,
+    EmployeeViewSet,
+    EmploymentContractViewSet,
+    EmploymentHistoryViewSet,
+    JobGradeViewSet,
+    PositionViewSet,
+)
+from .exits import ExitChecklistViewSet, ExitProcessViewSet
+from .expenses import ExpenseCategoryViewSet, ExpenseViewSet
+from .integrations import APIKeyViewSet, WebhookEndpointViewSet
+from .kin import KinViewSet
+from .leaves import LeaveBalanceViewSet, LeavePolicyAllocationViewSet, LeavePolicyViewSet, LeaveViewSet
+from .payroll import PayrollRunViewSet, SalaryViewSet
+from .performance import (
+    FeedbackRequestViewSet,
+    FeedbackRoundViewSet,
+    FeedbackViewSet,
+    PerformanceAppraisalViewSet,
+    PerformanceGoalViewSet,
+)
+from .recruitment import (
+    ApplicationNoteViewSet,
+    ApplicationScorecardViewSet,
+    ApplicationViewSet,
+    HireOnboardingViewSet,
+    HiringTeamMemberViewSet,
+    InterviewViewSet,
+    JobOfferViewSet,
+    JobPipelineStageViewSet,
+    JobPostingViewSet,
+    OfferTemplateViewSet,
+    ScorecardCriterionViewSet,
+)
+from .reports import ReportSnapshotViewSet, SavedReportViewSet, ScheduledReportViewSet
+from .shifts import ShiftAssignmentViewSet, ShiftViewSet
+from .surveys import SurveyQuestionViewSet, SurveyResponseViewSet, SurveyViewSet
+from .training import (
+    CertificationViewSet,
+    DevelopmentPlanViewSet,
+    EmployeeCertificationViewSet,
+    EmployeeSkillViewSet,
+    SkillViewSet,
+    TrainingCourseViewSet,
+    TrainingRecordViewSet,
+)
+
+__all__ = [
+    'AuditLogViewSet',
+    'NotificationViewSet',
+    'HRDocumentViewSet',
+    'ApprovalWorkflowViewSet',
+    'ApprovalRequestViewSet',
+    'RoleViewSet',
+    'UserViewSet',
+    'SensitiveDataAccessLogViewSet',
+    'DocumentAccessRuleViewSet',
+    'AttendanceViewSet',
+    'PublicHolidayViewSet',
+    'TimesheetViewSet',
+    'OvertimeRecordViewSet',
+    'EmployeeViewSet',
+    'JobGradeViewSet',
+    'PositionViewSet',
+    'EmploymentContractViewSet',
+    'EmploymentHistoryViewSet',
+    'DepartmentViewSet',
+    'APIKeyViewSet',
+    'WebhookEndpointViewSet',
+    'LeaveViewSet',
+    'LeaveBalanceViewSet',
+    'LeavePolicyViewSet',
+    'LeavePolicyAllocationViewSet',
+    'ExitProcessViewSet',
+    'ExitChecklistViewSet',
+    'AssetViewSet',
+    'AssetAssignmentViewSet',
+    'ShiftViewSet',
+    'ShiftAssignmentViewSet',
+    'ExpenseCategoryViewSet',
+    'ExpenseViewSet',
+    'BenefitViewSet',
+    'EmployeeBenefitViewSet',
+    'DisciplineViewSet',
+    'DisciplineAppealViewSet',
+    'KinViewSet',
+    'SurveyViewSet',
+    'SurveyQuestionViewSet',
+    'SurveyResponseViewSet',
+    'PayrollRunViewSet',
+    'SalaryViewSet',
+    'PerformanceGoalViewSet',
+    'PerformanceAppraisalViewSet',
+    'FeedbackRoundViewSet',
+    'FeedbackRequestViewSet',
+    'FeedbackViewSet',
+    'JobPostingViewSet',
+    'ApplicationViewSet',
+    'ApplicationNoteViewSet',
+    'InterviewViewSet',
+    'JobPipelineStageViewSet',
+    'HiringTeamMemberViewSet',
+    'ScorecardCriterionViewSet',
+    'ApplicationScorecardViewSet',
+    'OfferTemplateViewSet',
+    'JobOfferViewSet',
+    'HireOnboardingViewSet',
+    'SavedReportViewSet',
+    'ReportSnapshotViewSet',
+    'ScheduledReportViewSet',
+    'SkillViewSet',
+    'EmployeeSkillViewSet',
+    'TrainingCourseViewSet',
+    'TrainingRecordViewSet',
+    'CertificationViewSet',
+    'EmployeeCertificationViewSet',
+    'DevelopmentPlanViewSet',
+]

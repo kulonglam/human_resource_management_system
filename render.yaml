@@ -2,14 +2,19 @@ services:
   - type: web
     name: human-resource-management-system
     runtime: python
-    plan: free
+    plan: starter
     buildCommand: bash scripts/render-build.sh
     preDeployCommand: >-
       python manage.py migrate --noinput &&
       python manage.py bootstrap_admin &&
       python manage.py seed_workflows &&
       python manage.py seed_document_access
-    startCommand: gunicorn avvento_hrmis.wsgi:application --bind 0.0.0.0:$PORT
+    startCommand: >-
+      gunicorn avvento_hrmis.wsgi:application
+      --bind 0.0.0.0:$PORT
+      --workers 2
+      --threads 2
+      --timeout 120
     healthCheckPath: /api/v1/health/
     envVars:
       - key: PYTHON_VERSION
@@ -26,7 +31,10 @@ services:
         value: "True"
       - key: REQUIRE_FIELD_ENCRYPTION_KEY
         value: "True"
-      # Set FIELD_ENCRYPTION_KEY manually in the Render dashboard (do not commit).
+      - key: FIELD_ENCRYPTION_KEY
+        sync: false
+      - key: BACKUP_ENCRYPTION_KEY
+        sync: false
       - key: RENDER_SERVICE_NAME
         value: production
       - key: SECRET_KEY
@@ -45,14 +53,19 @@ services:
         value: "587"
       - key: SENTRY_TRACES_SAMPLE_RATE
         value: "0.1"
+      - key: SENTRY_DSN
+        sync: false
+      - fromGroup: hrmis-shared-redis
+      - key: Q_WORKERS
+        value: "2"
       # Set these manually in the Render dashboard after first sync:
       # EMAIL_HOST, EMAIL_HOST_USER, EMAIL_HOST_PASSWORD,
-      # DEFAULT_FROM_EMAIL, HR_NOTIFY_EMAIL, SENTRY_DSN
+      # DEFAULT_FROM_EMAIL, HR_NOTIFY_EMAIL
 
   - type: web
     name: human-resource-management-system-staging
     runtime: python
-    plan: free
+    plan: starter
     branch: main
     buildCommand: bash scripts/render-build.sh
     preDeployCommand: >-
@@ -60,7 +73,12 @@ services:
       python manage.py bootstrap_admin &&
       python manage.py seed_workflows &&
       python manage.py seed_document_access
-    startCommand: gunicorn avvento_hrmis.wsgi:application --bind 0.0.0.0:$PORT
+    startCommand: >-
+      gunicorn avvento_hrmis.wsgi:application
+      --bind 0.0.0.0:$PORT
+      --workers 2
+      --threads 2
+      --timeout 120
     healthCheckPath: /api/v1/health/
     envVars:
       - key: PYTHON_VERSION
@@ -77,6 +95,10 @@ services:
         value: "True"
       - key: REQUIRE_FIELD_ENCRYPTION_KEY
         value: "True"
+      - key: FIELD_ENCRYPTION_KEY
+        sync: false
+      - key: BACKUP_ENCRYPTION_KEY
+        sync: false
       - key: RENDER_SERVICE_NAME
         value: staging
       - key: SECRET_KEY
@@ -95,13 +117,16 @@ services:
         value: "587"
       - key: SENTRY_TRACES_SAMPLE_RATE
         value: "0.1"
+      - key: SENTRY_DSN
+        sync: false
+      - fromGroup: hrmis-shared-redis
       # Set manually: EMAIL_HOST, EMAIL_HOST_USER, EMAIL_HOST_PASSWORD,
-      # DEFAULT_FROM_EMAIL, HR_NOTIFY_EMAIL, SENTRY_DSN (optional on staging)
+      # DEFAULT_FROM_EMAIL, HR_NOTIFY_EMAIL
 
   - type: worker
     name: hrmis-qcluster
     runtime: python
-    plan: free
+    plan: starter
     buildCommand: pip install -r requirements.txt
     startCommand: python manage.py qcluster
     envVars:
@@ -115,8 +140,67 @@ services:
           property: connectionString
       - key: SECRET_KEY
         generateValue: true
+      - key: SENTRY_DSN
+        sync: false
+      - key: SENTRY_TRACES_SAMPLE_RATE
+        value: "0.1"
+
+      - key: SENTRY_TRACES_SAMPLE_RATE
+        value: "0.1"
+      - fromGroup: hrmis-shared-redis
+      - key: Q_WORKERS
+        value: "2"
+
+  - type: keyvalue
+    name: hrmis-redis
+    plan: starter
+    maxmemoryPolicy: noeviction
+    ipAllowList: []
 
   # Scheduled maintenance (Render Cron Jobs)
+  - type: cron
+    name: hrmis-ops-alerts
+    runtime: python
+    schedule: "*/10 * * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python manage.py check_ops_alerts
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: DEBUG
+        value: "False"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: avvento-hrmis-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: HR_NOTIFY_EMAIL
+        sync: false
+      - key: DEFAULT_FROM_EMAIL
+        sync: false
+      - key: EMAIL_BACKEND
+        value: django.core.mail.backends.smtp.EmailBackend
+      - key: EMAIL_USE_TLS
+        value: "True"
+      - key: EMAIL_PORT
+        value: "587"
+      - key: EMAIL_HOST
+        sync: false
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: SENTRY_TRACES_SAMPLE_RATE
+        value: "0.1"
+      - key: OPS_ALERT_COOLDOWN_MINUTES
+        value: "30"
+      - key: SLO_ALERT_MIN_REQUESTS
+        value: "25"
+      - fromGroup: hrmis-shared-redis
+
   - type: cron
     name: hrmis-daily-scheduled-reports
     runtime: python
@@ -166,13 +250,63 @@ services:
         value: "False"
       - key: ENCRYPT_BACKUPS
         value: "True"
+      - key: REQUIRE_FIELD_ENCRYPTION_KEY
+        value: "True"
+      - key: REQUIRE_BACKUP_ENCRYPTION_KEY
+        value: "False"
+      - key: BACKUP_RETENTION_COUNT
+        value: "14"
+      - key: BACKUP_RETENTION_DAYS
+        value: "30"
       - key: DATABASE_URL
         fromDatabase:
           name: avvento-hrmis-db
           property: connectionString
       - key: SECRET_KEY
         generateValue: true
-      # Set FIELD_ENCRYPTION_KEY and optional BACKUP_S3_* in dashboard.
+      # Dashboard secrets (sync: false — set after blueprint; do not commit values):
+      - key: FIELD_ENCRYPTION_KEY
+        sync: false
+      - key: BACKUP_ENCRYPTION_KEY
+        sync: false
+      - key: BACKUP_S3_BUCKET
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_S3_REGION_NAME
+        sync: false
+
+  - type: cron
+    name: hrmis-staging-monthly-dr
+    runtime: python
+    schedule: "0 8 1 * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python manage.py run_monthly_dr_checks
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: DEBUG
+        value: "False"
+      - key: ENCRYPT_BACKUPS
+        value: "True"
+      - key: REQUIRE_FIELD_ENCRYPTION_KEY
+        value: "True"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: avvento-hrmis-db-staging
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: FIELD_ENCRYPTION_KEY
+        sync: false
+      - key: BACKUP_ENCRYPTION_KEY
+        sync: false
+      - key: DR_RTO_TARGET_MINUTES
+        value: "60"
+      - key: DR_RPO_TARGET_HOURS
+        value: "168"
 
   - type: cron
     name: hrmis-annual-holidays
@@ -194,6 +328,15 @@ services:
 
 databases:
   - name: avvento-hrmis-db
-    plan: free
+    plan: starter
   - name: avvento-hrmis-db-staging
-    plan: free
+    plan: starter
+
+envVarGroups:
+  - name: hrmis-shared-redis
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: hrmis-redis
+          property: connectionString

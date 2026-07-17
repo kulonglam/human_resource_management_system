@@ -12,6 +12,25 @@ from rest_framework.views import APIView
 
 from api.permissions import IsAdmin, IsAdminOrManager, HasAPIKeyScope
 from api.audit import log_action
+from api.dr_monitoring import get_dr_snapshot
+from api.ops_monitoring import get_ops_alerts_snapshot, get_slo_snapshot
+from api.redis_config import infrastructure_snapshot
+
+
+def _safe_ops_alerts_snapshot():
+    try:
+        return get_ops_alerts_snapshot()
+    except Exception as exc:
+        return {
+            'cooldown_minutes': 30,
+            'checked_at': timezone.now().isoformat(),
+            'active': [],
+            'cooldowns': [],
+            'recent': [],
+            'breach_count': 0,
+            'cooldown_active_count': 0,
+            'error': str(exc),
+        }
 
 
 API_CHANGELOG = [
@@ -65,11 +84,38 @@ RUNBOOKS = [
         'id': 'backup-restore',
         'title': 'Database backup restore',
         'severity': [
-            'Identify backup file under backups/ or S3 prefix.',
+            'Identify backup file under backups/ or S3 (postgres_*.dump.enc or sqlite_*.sqlite3.enc).',
             'Put app in maintenance (scale to 0 or hold traffic).',
-            'Run: python manage.py restore_database path/to/backup',
+            'Prefer restore drill on staging first: python manage.py verify_backup --path <file>',
+            'Run: python manage.py restore_database path/to/backup.dump.enc --force',
+            'Postgres uses pg_restore --clean --if-exists (custom -Fc). Legacy .sql uses psql.',
             'Verify /api/v1/health/ and smoke login + payroll list.',
             'Document restore time for RTO evidence pack.',
+            'Run monthly on staging: python manage.py run_monthly_dr_checks',
+        ],
+    },
+    {
+        'id': 'security-incident',
+        'title': 'Security / data incident',
+        'checklist': [
+            'Declare severity and incident commander (see INCIDENT_RESPONSE.md).',
+            'Preserve audit logs; avoid wiping evidence.',
+            'Contain: disable accounts, rotate exposed secrets from a clean device.',
+            'Pause retention purges until cleared (apply_retention_policies --dry-run only).',
+            'Check /api/v1/health/, Ops Center, and Sentry.',
+            'Notify HR_NOTIFY_EMAIL / leadership for SEV-1/2.',
+            'Close with post-incident review and update compliance evidence.',
+        ],
+    },
+    {
+        'id': 'retention-enforcement',
+        'title': 'Data retention enforcement',
+        'checklist': [
+            'Preview: python manage.py apply_retention_policies --dry-run',
+            'Review eligible counts in /settings/compliance.',
+            'Purge runs automatically via run_scheduled_tasks (skip with --skip-retention).',
+            'Manual purge: python manage.py apply_retention_policies',
+            'Confirm AuditLog entries for retention runs.',
         ],
     },
 ]
@@ -123,9 +169,23 @@ class OpsStatusView(APIView):
                         ).isoformat(),
                     })
 
+        retention = {
+            'keep_count': int(getattr(settings, 'BACKUP_RETENTION_COUNT', 14) or 0),
+            'keep_days': int(getattr(settings, 'BACKUP_RETENTION_DAYS', 30) or 0),
+            'hint': (
+                'Local backups pruned after each backup_database run. '
+                'Configure S3 lifecycle separately for offsite objects. '
+                'Restore: python manage.py restore_database <path> --force'
+            ),
+        }
+
         return Response({
             'jobs': jobs,
             'backups': backups,
+            'backup_retention': retention,
+            'disaster_recovery': get_dr_snapshot(),
+            'alerts': _safe_ops_alerts_snapshot(),
+            'infrastructure': infrastructure_snapshot(getattr(settings, 'REDIS_URL', '') or None),
             'runbooks': RUNBOOKS,
             'worker_hint': 'Start worker with: python manage.py qcluster',
         })
@@ -135,29 +195,7 @@ class SLOMetricsView(APIView):
     permission_classes = [IsAdminOrManager]
 
     def get(self, request):
-        hour_key = timezone.now().strftime('%Y%m%d%H')
-        requests_count = int(cache.get(f'slo:requests:{hour_key}') or 0)
-        errors_count = int(cache.get(f'slo:errors:{hour_key}') or 0)
-        latency_sum = float(cache.get(f'slo:latency_ms:{hour_key}') or 0)
-        availability = 100.0 if requests_count == 0 else round(
-            100.0 * (1 - (errors_count / max(requests_count, 1))), 3,
-        )
-        avg_latency = 0.0 if requests_count == 0 else round(latency_sum / requests_count, 2)
-        targets = {
-            'availability_percent': 99.5,
-            'error_budget_percent': 0.5,
-            'avg_latency_ms': 800,
-        }
-        return Response({
-            'window': 'current_hour',
-            'requests': requests_count,
-            'server_errors': errors_count,
-            'availability_percent': availability,
-            'avg_latency_ms': avg_latency,
-            'targets': targets,
-            'within_slo': availability >= targets['availability_percent'] and avg_latency <= targets['avg_latency_ms'],
-            'request_id_header': 'X-Request-ID',
-        })
+        return Response(get_slo_snapshot())
 
 
 class ScimUsersView(APIView):

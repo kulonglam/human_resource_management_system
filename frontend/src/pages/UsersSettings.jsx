@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { ALL_PERMISSIONS, PERMISSION_LABELS } from '../utils/permissions';
+import { errorMessage } from '../utils/apiErrors';
 
 const EMPTY_FORM = {
   username: '',
@@ -56,10 +57,7 @@ function UserModal({ user, roles, departments, onClose, onSaved }) {
       onSaved();
       onClose();
     } catch (err) {
-      const messages = Object.entries(err.data || {})
-        .map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`)
-        .join(' ');
-      setError(messages || err.message);
+      setError(errorMessage(err));
     } finally {
       setSubmitting(false);
     }

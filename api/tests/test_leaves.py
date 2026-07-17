@@ -28,7 +28,7 @@ class LeaveWorkflowTests(HRAPITestCase):
             format='json',
         )
 
-    @patch('api.viewsets.notify_leave_submitted')
+    @patch('api.notifications.notify_leave_submitted')
     def test_create_leave_sends_notification(self, mock_notify):
         response = self._create_leave()
         self.assertEqual(response.status_code, 201)
@@ -39,8 +39,8 @@ class LeaveWorkflowTests(HRAPITestCase):
             AuditLog.objects.filter(action='create', model_name='Leave', object_id=leave.id).exists()
         )
 
-    @patch('api.viewsets.notify_leave_decision')
-    @patch('api.viewsets.notify_leave_submitted')
+    @patch('api.viewsets.leaves.notify_leave_decision')
+    @patch('api.notifications.notify_leave_submitted')
     def test_approve_leave(self, mock_submitted, mock_notify):
         create_response = self._create_leave()
         leave_id = create_response.data['id']
@@ -53,8 +53,8 @@ class LeaveWorkflowTests(HRAPITestCase):
             AuditLog.objects.filter(action='approve', model_name='Leave', object_id=leave_id).exists()
         )
 
-    @patch('api.viewsets.notify_leave_decision')
-    @patch('api.viewsets.notify_leave_submitted')
+    @patch('api.viewsets.leaves.notify_leave_decision')
+    @patch('api.notifications.notify_leave_submitted')
     def test_reject_leave(self, mock_submitted, mock_notify):
         create_response = self._create_leave()
         leave_id = create_response.data['id']
@@ -124,8 +124,7 @@ class LeaveWorkflowTests(HRAPITestCase):
         self.assertEqual(response.status_code, 403)
 
     @override_settings(HR_NOTIFY_EMAIL='hr@test.local')
-    @patch('api.viewsets.notify_leave_submitted')
-    def test_leave_submitted_email(self, mock_notify):
+    def test_leave_submitted_email(self):
         from api.notifications import notify_leave_submitted
 
         mail.outbox.clear()

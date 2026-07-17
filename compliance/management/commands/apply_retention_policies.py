@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 
-from compliance.retention import apply_all_retention_policies
+from compliance.retention import apply_all_retention_policies, record_retention_audit
 
 
 class Command(BaseCommand):
@@ -22,4 +22,14 @@ class Command(BaseCommand):
 
         prefix = 'Would purge' if dry_run else 'Purged'
         for item in results:
-            self.stdout.write(f'{prefix} {item["purged"]} {item["category"]} record(s)')
+            self.stdout.write(
+                f'{prefix} {item["purged"]} {item["category"]} record(s) '
+                f'(retention {item["retention_days"]} days)'
+            )
+
+        if not dry_run:
+            record_retention_audit(results, dry_run=False, source='management_command')
+            total = sum(item['purged'] for item in results)
+            self.stdout.write(self.style.SUCCESS(
+                f'Retention enforcement finished ({total} record(s) purged).'
+            ))

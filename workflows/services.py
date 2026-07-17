@@ -137,43 +137,50 @@ def get_pending_for_user(user):
 
 
 def process_decision(approval_request, user, approved, comment=''):
-    if approval_request.status != 'pending':
-        return {'result': 'invalid', 'detail': 'Request is not pending.'}
-    if not user_can_approve(user, approval_request):
-        return {'result': 'denied', 'detail': 'You cannot approve this step.'}
+    from django.db import transaction
 
-    step = _current_step(approval_request)
-    if not step:
-        return {'result': 'invalid', 'detail': 'No pending approval step.'}
+    with transaction.atomic():
+        approval_request = ApprovalRequest.objects.select_for_update().select_related(
+            'workflow',
+        ).prefetch_related('workflow__steps').get(pk=approval_request.pk)
 
-    ApprovalDecision.objects.create(
-        request=approval_request,
-        step_order=step.step_order,
-        step_label=step.label,
-        decided_by=user,
-        decision='approved' if approved else 'rejected',
-        comment=comment,
-    )
+        if approval_request.status != 'pending':
+            return {'result': 'invalid', 'detail': 'Request is not pending.'}
+        if not user_can_approve(user, approval_request):
+            return {'result': 'denied', 'detail': 'You cannot approve this step.'}
 
-    if not approved:
-        approval_request.status = 'rejected'
+        step = _current_step(approval_request)
+        if not step:
+            return {'result': 'invalid', 'detail': 'No pending approval step.'}
+
+        ApprovalDecision.objects.create(
+            request=approval_request,
+            step_order=step.step_order,
+            step_label=step.label,
+            decided_by=user,
+            decision='approved' if approved else 'rejected',
+            comment=comment,
+        )
+
+        if not approved:
+            approval_request.status = 'rejected'
+            approval_request.completed_at = timezone.now()
+            approval_request.save(update_fields=['status', 'completed_at'])
+            return {'result': 'rejected', 'step': step.label}
+
+        steps = _applicable_steps(approval_request.workflow, _request_context(approval_request))
+        step_orders = [s.step_order for s in steps]
+        current_idx = step_orders.index(step.step_order)
+        if current_idx + 1 < len(steps):
+            next_step = steps[current_idx + 1]
+            approval_request.current_step_order = next_step.step_order
+            approval_request.save(update_fields=['current_step_order'])
+            return {'result': 'advanced', 'step': step.label, 'next_step': next_step.label}
+
+        approval_request.status = 'approved'
         approval_request.completed_at = timezone.now()
         approval_request.save(update_fields=['status', 'completed_at'])
-        return {'result': 'rejected', 'step': step.label}
-
-    steps = _applicable_steps(approval_request.workflow, _request_context(approval_request))
-    step_orders = [s.step_order for s in steps]
-    current_idx = step_orders.index(step.step_order)
-    if current_idx + 1 < len(steps):
-        next_step = steps[current_idx + 1]
-        approval_request.current_step_order = next_step.step_order
-        approval_request.save(update_fields=['current_step_order'])
-        return {'result': 'advanced', 'step': step.label, 'next_step': next_step.label}
-
-    approval_request.status = 'approved'
-    approval_request.completed_at = timezone.now()
-    approval_request.save(update_fields=['status', 'completed_at'])
-    return {'result': 'approved', 'step': step.label}
+        return {'result': 'approved', 'step': step.label}
 
 
 def approval_status_payload(obj):

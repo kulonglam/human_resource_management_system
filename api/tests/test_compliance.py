@@ -1,9 +1,11 @@
 from datetime import timedelta
 
+from django.core.management import call_command
 from django.utils import timezone
 
 from accounts.models import AuditLog
 from compliance.models import DataRetentionPolicy
+from compliance.retention import apply_all_retention_policies
 from employees.models import Employee
 
 from .base import HRAPITestCase
@@ -33,6 +35,53 @@ class ComplianceRetentionTests(HRAPITestCase):
         self.login('employee', 'EmployeePass123!')
         response = self.client.get('/api/v1/compliance/retention-policies/')
         self.assertEqual(response.status_code, 403)
+
+    def test_apply_retention_purges_old_audit_logs_and_records_run(self):
+        policy = DataRetentionPolicy.objects.get(category='audit_logs')
+        policy.retention_days = 365
+        policy.is_active = True
+        policy.save(update_fields=['retention_days', 'is_active'])
+
+        old_log = AuditLog.objects.create(
+            user=self.admin_user,
+            action='login',
+            model_name='CustomUser',
+            timestamp=timezone.now() - timedelta(days=400),
+        )
+        recent_log = AuditLog.objects.create(
+            user=self.admin_user,
+            action='login',
+            model_name='CustomUser',
+            timestamp=timezone.now() - timedelta(days=10),
+        )
+
+        results = apply_all_retention_policies(dry_run=False)
+        audit_result = next(item for item in results if item['category'] == 'audit_logs')
+        self.assertGreaterEqual(audit_result['purged'], 1)
+        self.assertFalse(AuditLog.objects.filter(pk=old_log.pk).exists())
+        self.assertTrue(AuditLog.objects.filter(pk=recent_log.pk).exists())
+
+        policy.refresh_from_db()
+        self.assertIsNotNone(policy.last_run_at)
+        self.assertGreaterEqual(policy.last_purged_count, 1)
+
+    def test_apply_retention_command_dry_run_does_not_delete(self):
+        policy = DataRetentionPolicy.objects.get(category='audit_logs')
+        policy.retention_days = 30
+        policy.is_active = True
+        policy.save(update_fields=['retention_days', 'is_active'])
+        AuditLog.objects.create(
+            user=self.admin_user,
+            action='export',
+            model_name='Employee',
+            timestamp=timezone.now() - timedelta(days=90),
+        )
+        before = AuditLog.objects.count()
+        call_command('apply_retention_policies', dry_run=True)
+        self.assertEqual(AuditLog.objects.count(), before)
+
+    def test_scheduled_tasks_can_skip_retention(self):
+        call_command('run_scheduled_tasks', skip_backup=True, skip_retention=True)
 
 
 class GDPRExportTests(HRAPITestCase):

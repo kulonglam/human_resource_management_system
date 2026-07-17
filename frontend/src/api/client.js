@@ -284,7 +284,6 @@ export const api = {
     }),
 
   getUsers: () => request('/users/'),
-  getRoles: () => request('/roles/'),
   createUser: (payload) => api.create('users', payload),
   updateUser: (id, payload) => api.update('users', id, payload),
   getMyFeedbackRequests: () => request('/feedback-requests/mine/'),

@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 
 from recruitment.models import Application, JobPosting
 
-from .serializers_hr import ApplicationSerializer, PublicApplicationSerializer, PublicJobPostingSerializer
+from api.serializers import ApplicationSerializer, PublicApplicationSerializer, PublicJobPostingSerializer
 from .in_app_notifications import get_hr_users, notify_users
 
 

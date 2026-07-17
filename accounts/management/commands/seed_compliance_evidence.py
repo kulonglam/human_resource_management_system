@@ -8,9 +8,9 @@ DEFAULT_EVIDENCE = [
     ('encryption', 'Encrypted employee PII fields', 'ready', 'Security'),
     ('backup_restore', 'Database backup and restore runbook', 'ready', 'Ops'),
     ('audit_logging', 'Sensitive data access and audit logs', 'ready', 'Security'),
-    ('data_retention', 'Retention policies and purge jobs', 'ready', 'Compliance'),
+    ('data_retention', 'Retention policies and scheduled purge jobs', 'ready', 'Compliance'),
     ('vulnerability_mgmt', 'Vulnerability finding SLA tracker', 'draft', 'Security'),
-    ('incident_response', 'Payroll-day and leave-spike runbooks', 'ready', 'Ops'),
+    ('incident_response', 'Incident response playbook (INCIDENT_RESPONSE.md)', 'ready', 'Ops'),
 ]
 
 

@@ -12,12 +12,19 @@ from api.backup_storage import (
     decrypt_file,
     is_legacy_encrypted,
     is_stream_encrypted,
+    plain_backup_suffix,
+    secure_delete,
+    verify_postgres_dump,
     verify_sqlite_backup,
 )
+from api.dr_monitoring import record_dr_event
 
 
 class Command(BaseCommand):
-    help = 'Verify backup decrypts and passes integrity checks (SQLite) or non-empty SQL dump.'
+    help = (
+        'Verify backup decrypts and passes integrity checks '
+        '(SQLite pragma / PostgreSQL custom-format magic or plain SQL).'
+    )
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -37,9 +44,8 @@ class Command(BaseCommand):
         self.stdout.write(f'Verifying backup: {backup_path}')
 
         engine = settings.DATABASES['default']['ENGINE']
-        suffix = '.sqlite3' if 'sqlite' in engine else '.sql'
+        suffix = plain_backup_suffix(backup_path.name)
         work_path = backup_path
-
         temp_dir = Path(tempfile.mkdtemp(prefix='hrmis_verify_'))
         try:
             if backup_path.suffix == '.enc' or is_stream_encrypted(backup_path) or is_legacy_encrypted(backup_path):
@@ -52,22 +58,41 @@ class Command(BaseCommand):
                 self.stdout.write(str(report))
                 if not report['ok']:
                     raise CommandError(f'SQLite verification failed: {report}')
+                record_dr_event('verify', {
+                    'ok': True,
+                    'backup_name': backup_path.name,
+                    'engine': 'sqlite',
+                    'details': report,
+                })
                 self.stdout.write(self.style.SUCCESS('SQLite backup verification passed'))
                 return
 
-            if work_path.suffix == '.sql':
-                size = work_path.stat().st_size
-                if size < 1024:
-                    raise CommandError(f'PostgreSQL dump too small ({size} bytes)')
-                head = work_path.read_text(encoding='utf-8', errors='replace')[:500]
-                if 'PostgreSQL database dump' not in head and 'CREATE TABLE' not in head:
-                    raise CommandError('File does not look like a PostgreSQL dump')
-                self.stdout.write(self.style.SUCCESS(f'PostgreSQL dump verification passed ({size} bytes)'))
+            if work_path.suffix in {'.dump', '.sql'} or 'postgres' in backup_path.name.lower():
+                report = verify_postgres_dump(work_path)
+                self.stdout.write(str(report))
+                if not report.get('ok'):
+                    raise CommandError(f'PostgreSQL verification failed: {report}')
+                record_dr_event('verify', {
+                    'ok': True,
+                    'backup_name': backup_path.name,
+                    'engine': 'postgresql',
+                    'details': report,
+                })
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"PostgreSQL dump verification passed "
+                        f"({report.get('format')}, {report.get('bytes')} bytes)",
+                    ),
+                )
                 return
 
             raise CommandError(f'Unsupported backup type for engine {engine}')
         finally:
-            shutil.rmtree(temp_dir, ignore_errors=True)
+            if temp_dir.exists():
+                for path in temp_dir.rglob('*'):
+                    if path.is_file():
+                        secure_delete(path)
+                shutil.rmtree(temp_dir, ignore_errors=True)
 
     def _resolve_path(self, path_arg: str, create_if_missing: bool) -> Path:
         if path_arg:

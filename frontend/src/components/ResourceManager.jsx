@@ -1,86 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { api } from '../api/client';
-
-function defaultLabel(key) {
-  return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function FormField({ field, value, onChange, options = {}, existingUrl }) {
-  const { name, label, type = 'text', required, choices, step, accept } = field;
-  const common = {
-    name,
-    className: 'form-control form-control-sm',
-    value: type === 'file' ? undefined : (value ?? ''),
-    onChange,
-    required: type === 'file' ? required && !existingUrl : required,
-  };
-
-  if (type === 'file') {
-    return (
-      <div className="mb-3">
-        <label className="form-label">{label || defaultLabel(name)}</label>
-        {existingUrl && (
-          <div className="mb-1">
-            <a href={existingUrl} target="_blank" rel="noreferrer">View current file</a>
-          </div>
-        )}
-        <input type="file" accept={accept} className="form-control form-control-sm" name={name} onChange={onChange} />
-      </div>
-    );
-  }
-
-  if (type === 'select') {
-    const opts = choices || options[name] || [];
-    return (
-      <div className="mb-3">
-        <label className="form-label">{label || defaultLabel(name)}</label>
-        <select {...common} className="form-select form-select-sm">
-          <option value="">Select...</option>
-          {opts.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-      </div>
-    );
-  }
-
-  if (type === 'textarea') {
-    return (
-      <div className="mb-3">
-        <label className="form-label">{label || defaultLabel(name)}</label>
-        <textarea {...common} className="form-control form-control-sm" rows={3} />
-      </div>
-    );
-  }
-
-  if (type === 'checkbox') {
-    return (
-      <div className="form-check mb-3">
-        <input
-          type="checkbox"
-          className="form-check-input"
-          name={name}
-          id={`field-${name}`}
-          checked={!!value}
-          onChange={(e) => onChange({ target: { name, value: e.target.checked, type: 'checkbox' } })}
-        />
-        <label className="form-check-label" htmlFor={`field-${name}`}>
-          {label || defaultLabel(name)}
-        </label>
-      </div>
-    );
-  }
-
-  return (
-    <div className="mb-3">
-      <label className="form-label">{label || defaultLabel(name)}</label>
-      <input type={type} step={step} {...common} />
-    </div>
-  );
-}
+import { errorMessage } from '../utils/apiErrors';
+import ResourceFormModal from './resources/ResourceFormModal';
+import ResourceDataTable from './resources/ResourceDataTable';
+import ResourceTabs from './resources/ResourceTabs';
+import ResourceToolbar from './resources/ResourceToolbar';
 
 export default function ResourceManager({
   title,
@@ -243,6 +167,11 @@ export default function ResourceManager({
     setError('');
     try {
       const payload = buildPayload();
+      if (payload.start_date && payload.end_date && payload.end_date < payload.start_date) {
+        setError('end_date: End date cannot be before start date.');
+        setSubmitting(false);
+        return;
+      }
       if (editing) {
         await api.update(tab.endpoint, editing.id, payload);
       } else {
@@ -251,10 +180,7 @@ export default function ResourceManager({
       setShowModal(false);
       load();
     } catch (err) {
-      const messages = Object.entries(err.data || {})
-        .map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`)
-        .join(' ');
-      setError(messages || err.message);
+      setError(errorMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -266,7 +192,7 @@ export default function ResourceManager({
       await api.remove(tab.endpoint, row.id);
       load();
     } catch (err) {
-      setError(err.data?.detail || err.message);
+      setError(errorMessage(err));
     }
   };
 
@@ -279,7 +205,7 @@ export default function ResourceManager({
       await api.action(tab.endpoint, row.id, action.name, action.payload || {});
       load();
     } catch (err) {
-      setError(err.data?.detail || err.message);
+      setError(errorMessage(err));
     }
   };
 
@@ -295,7 +221,7 @@ export default function ResourceManager({
       setImportResult(result);
       await load();
     } catch (err) {
-      setError(err.message);
+      setError(errorMessage(err));
     } finally {
       setImporting(false);
     }
@@ -306,34 +232,22 @@ export default function ResourceManager({
   return (
     <>
       {!embedded && (
-        <div className="d-flex justify-content-between align-items-center mb-4">
-          <h4 className="page-heading mb-0">
-            {icon && <i className={`bi ${icon}`} style={{ color: 'var(--fca-lime)' }} />} {title}
-          </h4>
-          <div className="d-flex gap-2">
-          {canUseTabCreate && (
-            <button type="button" className="btn btn-primary btn-sm" onClick={openCreate}>
-              <i className="bi bi-plus-lg" /> {tab.createLabel || 'Add'}
-            </button>
-          )}
-          {tab.importCsv && (user?.is_admin || user?.is_manager) && (
-            <label className="btn btn-outline-secondary btn-sm mb-0">
-              {importing ? (
-                <span className="spinner-border spinner-border-sm" />
-              ) : (
-                <><i className="bi bi-upload" /> Import CSV</>
-              )}
-              <input type="file" accept=".csv,text/csv" className="d-none" onChange={handleImportCsv} disabled={importing} />
-            </label>
-          )}
-          </div>
-        </div>
+        <ResourceToolbar
+          title={title}
+          icon={icon}
+          tab={tab}
+          user={user}
+          canUseTabCreate={canUseTabCreate}
+          importing={importing}
+          onCreate={openCreate}
+          onImportCsv={handleImportCsv}
+        />
       )}
 
       {embedded && canUseTabCreate && (
         <div className="d-flex justify-content-end mb-3">
           <button type="button" className="btn btn-primary btn-sm" onClick={openCreate}>
-            <i className="bi bi-plus-lg" /> {tab.createLabel || 'Add'}
+            <i className="bi bi-plus-lg" aria-hidden="true" /> {tab.createLabel || 'Add'}
           </button>
         </div>
       )}
@@ -344,7 +258,7 @@ export default function ResourceManager({
         <p className="small text-muted mb-2">{tab.importCsvHelp}</p>
       )}
       {importResult && (
-        <div className="alert alert-success py-2 small">
+        <div className="alert alert-success py-2 small" role="status">
           Imported {importResult.created} new, updated {importResult.updated}.
           {importResult.errors?.length > 0 && (
             <span className="text-warning"> {importResult.errors.length} row(s) skipped.</span>
@@ -352,26 +266,17 @@ export default function ResourceManager({
         </div>
       )}
 
-      {tabs.length > 1 && (
-        <ul className="nav nav-tabs mb-3">
-          {tabs.map((t) => (
-            <li className="nav-item" key={t.id}>
-              <button
-                type="button"
-                className={`nav-link ${activeTab === t.id ? 'active' : ''}`}
-                onClick={() => setActiveTab(t.id)}
-              >
-                {t.label}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <ResourceTabs
+        tabs={tabs}
+        activeTab={activeTab}
+        onChange={setActiveTab}
+        ariaLabel={`${title || 'Resource'} sections`}
+      />
 
-      {error && <div className="alert alert-danger">{error}</div>}
+      {error && <div className="alert alert-danger" role="alert">{error}</div>}
 
       {selectedIds.length > 0 && canUseTabEdit && tab.canDelete !== false && (
-        <div className="alert alert-secondary py-2 d-flex justify-content-between align-items-center">
+        <div className="alert alert-secondary py-2 d-flex justify-content-between align-items-center" role="status">
           <span className="small">{selectedIds.length} selected</span>
           <button type="button" className="btn btn-danger btn-sm" onClick={handleBulkDelete}>
             Delete selected
@@ -380,161 +285,45 @@ export default function ResourceManager({
       )}
 
       <div className="card">
-        <div className="card-body p-0">
-          {loading ? (
-            <div className="text-center py-4">
-              <div className="spinner-border text-primary" role="status" />
-            </div>
-          ) : (
-            <div className="table-responsive">
-              <table className="table table-hover mb-0 align-middle">
-                <thead>
-                  <tr>
-                    {canUseTabEdit && tab.canDelete !== false && (
-                      <th style={{ width: 36 }}>
-                        <input
-                          type="checkbox"
-                          className="form-check-input"
-                          checked={rows.length > 0 && selectedIds.length === rows.length}
-                          onChange={toggleSelectAll}
-                          aria-label="Select all"
-                        />
-                      </th>
-                    )}
-                    {columns.map((col) => (
-                      <th key={col.key || col}>{typeof col === 'string' ? defaultLabel(col) : col.label}</th>
-                    ))}
-                    {(visibleFormFields.length || tab.rowActions?.length || tab.detailPath) && <th>Actions</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <tr key={row.id}>
-                      {canUseTabEdit && tab.canDelete !== false && (
-                        <td>
-                          <input
-                            type="checkbox"
-                            className="form-check-input"
-                            checked={selectedIds.includes(row.id)}
-                            onChange={() => toggleSelect(row.id)}
-                            aria-label={`Select row ${row.id}`}
-                          />
-                        </td>
-                      )}
-                      {columns.map((col) => {
-                        const key = col.key || col;
-                        const val = col.render ? col.render(row) : row[key];
-                        return <td key={key}>{val ?? '—'}</td>;
-                      })}
-                      {(visibleFormFields.length || tab.rowActions?.length || tab.detailPath) && (
-                        <td className="text-nowrap">
-                          {tab.detailPath && (
-                            <Link
-                              to={`${tab.detailPath}/${row.id}`}
-                              className="btn btn-outline-secondary btn-sm me-1"
-                            >
-                              <i className="bi bi-eye" />
-                            </Link>
-                          )}
-                          {canUseTabEdit && visibleFormFields.length > 0 && (
-                            <button
-                              type="button"
-                              className="btn btn-outline-primary btn-sm me-1"
-                              onClick={() => openEdit(row)}
-                            >
-                              <i className="bi bi-pencil" />
-                            </button>
-                          )}
-                          {canUseTabEdit && tab.canDelete !== false && visibleFormFields.length > 0 && (
-                            <button
-                              type="button"
-                              className="btn btn-outline-danger btn-sm me-1"
-                              onClick={() => handleDelete(row)}
-                            >
-                              <i className="bi bi-trash" />
-                            </button>
-                          )}
-                          {tab.rowActions?.map((action) =>
-                            (!action.show || action.show(row))
-                              && !(isEmployeeUser && tab.hideRowActionsForEmployee)
-                              && !(action.adminOnly && !user?.is_admin)
-                              && !(action.managerOnly && !user?.is_admin && !user?.is_manager) ? (
-                              <button
-                                key={action.name}
-                                type="button"
-                                className={`btn btn-sm me-1 btn-${action.variant || 'outline-secondary'}`}
-                                onClick={() => runAction(row, action)}
-                              >
-                                {action.label}
-                              </button>
-                            ) : null
-                          )}
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                  {!rows.length && (
-                    <tr>
-                      <td colSpan={columns.length + (visibleFormFields.length || tab.rowActions?.length || tab.detailPath ? 1 : 0) + 1} className="text-center py-4 text-muted">
-                        No records found.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
+        <div
+          className="card-body p-0"
+          role="tabpanel"
+          id={`resource-panel-${tab?.id}`}
+          aria-labelledby={tabs.length > 1 ? `resource-tab-${tab?.id}` : undefined}
+        >
+          <ResourceDataTable
+            rows={rows}
+            columns={columns}
+            loading={loading}
+            tab={tab}
+            canUseTabEdit={canUseTabEdit}
+            isEmployeeUser={isEmployeeUser}
+            user={user}
+            visibleFormFields={visibleFormFields}
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelect}
+            onToggleSelectAll={toggleSelectAll}
+            onEdit={openEdit}
+            onDelete={handleDelete}
+            onRunAction={runAction}
+          />
         </div>
       </div>
 
       {showModal && (
-        <>
-          <div className="modal show d-block" tabIndex="-1">
-            <div className="modal-dialog modal-lg">
-              <div className="modal-content">
-                <form onSubmit={handleSubmit}>
-                  <div className="modal-header">
-                    <h5 className="modal-title">{editing ? 'Edit' : 'Add'} {tab.label}</h5>
-                    <button type="button" className="btn-close" onClick={() => setShowModal(false)} />
-                  </div>
-                  <div className="modal-body">
-                    {tab.selfServiceEmployee && isEmployeeUser && user?.linked_employee_name && (
-                      <div className="alert alert-light border mb-3">
-                        Applying as <strong>{user.linked_employee_name}</strong>
-                      </div>
-                    )}
-                    <div className="row">
-                      {visibleFormFields.map((field) => (
-                        <div className={field.fullWidth ? 'col-12' : 'col-md-6'} key={field.name}>
-                          <FormField
-                            field={field}
-                            value={form[field.name]}
-                            onChange={handleChange}
-                            options={lookupOptions}
-                            existingUrl={
-                              field.type === 'file' && editing
-                                ? editing[`${field.name}_url`] || editing[field.name]
-                                : null
-                            }
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="modal-footer">
-                    <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
-                      Cancel
-                    </button>
-                    <button type="submit" className="btn btn-primary" disabled={submitting}>
-                      {submitting ? 'Saving...' : 'Save'}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>
-          <div className="modal-backdrop show" />
-        </>
+        <ResourceFormModal
+          tab={tab}
+          editing={editing}
+          form={form}
+          visibleFormFields={visibleFormFields}
+          lookupOptions={lookupOptions}
+          isEmployeeUser={isEmployeeUser}
+          user={user}
+          submitting={submitting}
+          onClose={() => setShowModal(false)}
+          onSubmit={handleSubmit}
+          onChange={handleChange}
+        />
       )}
     </>
   );

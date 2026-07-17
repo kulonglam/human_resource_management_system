@@ -2,6 +2,11 @@ import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import OpsAlertsCard from '../components/ops/OpsAlertsCard';
+import OpsBackupsCard from '../components/ops/OpsBackupsCard';
+import OpsJobsCard from '../components/ops/OpsJobsCard';
+import OpsRunbooksPanel from '../components/ops/OpsRunbooksPanel';
+import OpsSLOCard from '../components/ops/OpsSLOCard';
 
 export default function OpsCenter() {
   const { user } = useAuth();
@@ -11,14 +16,49 @@ export default function OpsCenter() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user?.is_admin) return;
-    Promise.all([api.getOpsStatus(), api.getSLOMetrics()])
-      .then(([opsData, sloData]) => {
-        setOps(opsData);
-        setSlos(sloData);
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+    if (!user?.is_admin) {
+      setLoading(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    setError('');
+
+    (async () => {
+      const errors = [];
+      try {
+        const [opsResult, sloResult] = await Promise.allSettled([
+          api.getOpsStatus(),
+          api.getSLOMetrics(),
+        ]);
+        if (cancelled) return;
+
+        if (opsResult.status === 'fulfilled') {
+          setOps(opsResult.value);
+        } else {
+          errors.push(opsResult.reason?.message || 'Failed to load ops status');
+          setOps(null);
+        }
+
+        if (sloResult.status === 'fulfilled') {
+          setSlos(sloResult.value);
+        } else {
+          errors.push(sloResult.reason?.message || 'Failed to load SLO metrics');
+          setSlos(null);
+        }
+
+        if (errors.length) {
+          setError(errors.join(' · '));
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
   if (!user?.is_admin) return <Navigate to="/dashboard" replace />;
@@ -26,84 +66,29 @@ export default function OpsCenter() {
   return (
     <div>
       <h1 className="page-heading mb-3">
-        <i className="bi bi-hdd-rack" /> Operations Center
+        <i className="bi bi-hdd-rack" aria-hidden="true" /> Operations Center
       </h1>
       <p className="text-muted mb-4">
-        Background jobs, backups, SLO health, and incident runbooks.
+        Background jobs, backups, SLO health, alert history, and incident runbooks.
       </p>
 
-      {error && <div className="alert alert-danger">{error}</div>}
+      {error && (
+        <div className="alert alert-danger" role="alert">
+          {error}
+        </div>
+      )}
       {loading ? (
-        <div className="text-center py-5"><div className="spinner-border text-primary" /></div>
+        <div className="text-center py-5" role="status">
+          <div className="spinner-border text-primary" aria-hidden="true" />
+          <span className="visually-hidden">Loading operations status</span>
+        </div>
       ) : (
         <div className="row g-3">
-          <div className="col-lg-4">
-            <div className="card h-100">
-              <div className="card-body">
-                <h6 className="card-title">Queue / jobs</h6>
-                <ul className="list-unstyled small mb-0">
-                  <li>Scheduled: {ops?.jobs?.scheduled ?? 0}</li>
-                  <li>Success: {ops?.jobs?.success ?? 0}</li>
-                  <li>Failed: {ops?.jobs?.failed ?? 0}</li>
-                  <li>Queued: {ops?.jobs?.queued ?? 0}</li>
-                </ul>
-                <p className="small text-muted mt-3 mb-0">{ops?.worker_hint}</p>
-              </div>
-            </div>
-          </div>
-          <div className="col-lg-4">
-            <div className="card h-100">
-              <div className="card-body">
-                <h6 className="card-title">SLO (current hour)</h6>
-                {slos && (
-                  <>
-                    <p className="mb-1">Availability: <strong>{slos.availability_percent}%</strong></p>
-                    <p className="mb-1">Avg latency: <strong>{slos.avg_latency_ms} ms</strong></p>
-                    <p className="mb-1">Requests: {slos.requests} · 5xx: {slos.server_errors}</p>
-                    <span className={`badge ${slos.within_slo ? 'bg-success' : 'bg-danger'}`}>
-                      {slos.within_slo ? 'Within SLO' : 'SLO breached'}
-                    </span>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-          <div className="col-lg-4">
-            <div className="card h-100">
-              <div className="card-body">
-                <h6 className="card-title">Recent backups</h6>
-                {(ops?.backups || []).length === 0 ? (
-                  <p className="small text-muted mb-0">No local backups found.</p>
-                ) : (
-                  <ul className="list-unstyled small mb-0">
-                    {ops.backups.slice(0, 5).map((b) => (
-                      <li key={b.name}>{b.name}</li>
-                    ))}
-                  </ul>
-                )}
-                <p className="small text-muted mt-2 mb-0">
-                  Restore: <code>python manage.py restore_database path --force</code>
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="col-12">
-            <div className="card">
-              <div className="card-body">
-                <h6 className="card-title">Runbooks</h6>
-                <div className="row g-3">
-                  {(ops?.runbooks || []).map((rb) => (
-                    <div className="col-md-4" key={rb.id}>
-                      <h6 className="small fw-semibold">{rb.title}</h6>
-                      <ol className="small ps-3 mb-0">
-                        {rb.checklist.map((step) => <li key={step}>{step}</li>)}
-                      </ol>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
+          <OpsJobsCard ops={ops} />
+          <OpsSLOCard slos={slos} />
+          <OpsBackupsCard ops={ops} />
+          <OpsAlertsCard alerts={ops?.alerts} />
+          <OpsRunbooksPanel runbooks={ops?.runbooks} />
         </div>
       )}
     </div>
