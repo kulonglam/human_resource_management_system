@@ -4,7 +4,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from api.audit import log_action
-from api.mixins import AuditedModelViewSet, EmployeeQuerysetMixin
+from api.mixins import AuditedModelViewSet, EmployeeQuerysetMixin, OrganizationQuerysetMixin
 from api.permissions import IsAdminOrManager, IsAdminOrManagerOrReadOnly
 from api.serializers import (
     FeedbackRequestSerializer,
@@ -65,13 +65,19 @@ class PerformanceAppraisalViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
         return Response(PerformanceAppraisalSerializer(appraisal).data)
 
 
-class FeedbackRoundViewSet(AuditedModelViewSet):
-    queryset = FeedbackRound.objects.all().order_by('-created_at')
+class FeedbackRoundViewSet(OrganizationQuerysetMixin, AuditedModelViewSet):
     serializer_class = FeedbackRoundSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
 
+    def get_queryset(self):
+        return self.scope_to_organization(FeedbackRound.objects.all().order_by('-created_at'))
+
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        kwargs = {'created_by': self.request.user}
+        org_id = getattr(self.request.user, 'organization_id', None)
+        if org_id and not serializer.validated_data.get('organization'):
+            kwargs['organization_id'] = org_id
+        serializer.save(**kwargs)
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()

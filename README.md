@@ -1,6 +1,8 @@
 # FCA Human Resource Management System (HRMIS)
 
-Django REST API + React SPA for HR operations. The UI is fully React; Django serves the API, admin, and media files.
+Django REST API + React SPA for HR operations at a **single organization** (one employer). English UI only. The UI is fully React; Django serves the API, admin, and media files.
+
+Optional `Organization` fields exist for future isolation; they are **not** required for normal single-org deployments (leave users/employees unscoped).
 
 ## Stack
 
@@ -75,9 +77,10 @@ python -m venv hrmis_env
 hrmis_env\Scripts\activate
 pip install -r requirements.txt
 python manage.py migrate
-python manage.py seed_data --reset-password
-python manage.py seed_workflows
+python manage.py seed_demo_data --reset-password
 ```
+
+`seed_demo_data` creates login users plus sample records for every major page (employees, leave, attendance, payroll, recruitment, performance, training, expenses, assets, surveys, settings packs, and more). For users/roles only: `python manage.py seed_data --reset-password`.
 
 ### 2. Frontend (hot reload)
 
@@ -106,7 +109,7 @@ python manage.py runserver
 
 Open **http://localhost:8000**
 
-## Default login (after `seed_data`)
+## Default login (after `seed_data` / `seed_demo_data`)
 
 | Role | Username | Password (local default) |
 |------|----------|-------------------------|
@@ -114,12 +117,14 @@ Open **http://localhost:8000**
 | Manager | `manager` | `Manager@HRMIS2026!` |
 | Employee | `employee` | `Employee@HRMIS2026!` |
 
-On Render, the initial administrator password comes from `SEED_ADMIN_PASSWORD`; subsequent deploys never reset it.
+Local defaults work only without `DATABASE_URL`. On Render/hosted Postgres, set `SEED_ADMIN_PASSWORD`, `SEED_MANAGER_PASSWORD`, and `SEED_EMPLOYEE_PASSWORD` (or temporarily `ALLOW_DEFAULT_SEED_PASSWORDS=1` for a throwaway demo). `bootstrap_admin` always requires `SEED_ADMIN_PASSWORD`; subsequent deploys never reset it.
 
-Reset locally anytime:
+Reset users / load full demo anytime:
 
 ```powershell
 python manage.py seed_data --reset-password
+python manage.py seed_demo_data
+# or both: python manage.py seed_data --reset-password --demo
 ```
 
 ## Environment variables
@@ -129,7 +134,9 @@ python manage.py seed_data --reset-password
 | `SECRET_KEY` | Django secret (required in production) |
 | `DEBUG` | `True` for local dev, `False` on Render |
 | `DATABASE_URL` | PostgreSQL connection string (Render sets this) |
-| `SEED_ADMIN_PASSWORD` | Initial administrator password for `bootstrap_admin` (Render) |
+| `SEED_ADMIN_PASSWORD` | Admin password for `bootstrap_admin` / `seed_data` (required when `DATABASE_URL` is set) |
+| `SEED_MANAGER_PASSWORD` / `SEED_EMPLOYEE_PASSWORD` | Manager/employee seed passwords (required with `DATABASE_URL`) |
+| `ALLOW_DEFAULT_SEED_PASSWORDS` | Allow published demo passwords on hosted DB (`1`/`true`; demos only) |
 | `ALLOW_PUBLIC_REGISTRATION` | Set `True` to allow public sign-up (default: `False`) |
 | `ENFORCE_MFA_FOR_ADMINS` | Require TOTP MFA for admin accounts (default: `True` on Render/production, `False` for local SQLite) |
 | `HR_NOTIFY_EMAIL` | HR inbox for new leave/expense alerts |
@@ -180,6 +187,8 @@ See **[DEPLOY.md](DEPLOY.md)** for the full staging/production checklist (SMTP, 
 
 ## Useful commands
 
+Pre-release regression / non-regression pack: **[REGRESSION.md](REGRESSION.md)**.
+
 ```powershell
 python manage.py check
 python manage.py test api
@@ -187,7 +196,9 @@ coverage run --source=api manage.py test api
 coverage report --omit="api/tests/*"
 
 # E2E (Playwright): seed data, start Django :8000 + Vite :5173, then:
-cd frontend && npm run e2e
+cd frontend
+npx playwright install chromium   # once, or after Playwright upgrades
+npm run e2e
 python manage.py createsuperuser
 python manage.py collectstatic --noinput
 cd frontend && npm run build
@@ -247,6 +258,11 @@ Default workflows (seeded via `python manage.py seed_workflows`):
 - **Data retention policies** — configurable retention for audit logs, webhook deliveries, and notifications at `/settings/compliance`
 - **Scheduled purge** — runs inside `python manage.py run_scheduled_tasks` (Render daily/monthly cron); manual: `python manage.py apply_retention_policies` (`--dry-run` to preview; `--skip-retention` on scheduled tasks to pause during incidents)
 - **Incident / risk docs** — [INCIDENT_RESPONSE.md](INCIDENT_RESPONSE.md), [RISK_REGISTER.md](RISK_REGISTER.md); env catalogue in [ENV.md](ENV.md)
+- **Continuity / exit / controls** — [BUSINESS_CONTINUITY.md](BUSINESS_CONTINUITY.md), [VENDOR_EXIT.md](VENDOR_EXIT.md), [COMPLIANCE_CONTROLS.md](COMPLIANCE_CONTROLS.md), [SECRETS_ROTATION.md](SECRETS_ROTATION.md), [DATA_DICTIONARY.md](DATA_DICTIONARY.md), [SECURITY_ASSURANCE.md](SECURITY_ASSURANCE.md), [ENTERPRISE_READINESS.md](ENTERPRISE_READINESS.md)
+- **Optional org scoping** — `organization` on catalogs + employee-linked APIs when set; default single-org admins remain unscoped
+- **Domain outbox** — `events.DomainEvent` + `process_outbox`
+- **Platform** — Docker Compose, K8s/HPA, nginx WAF baseline, Locust load tests (CI smoke on `main` + thresholds), durable Ops alert history
+- **Mobile / devices** — PWA clock at `/mobile` with offline queue ([MOBILE.md](MOBILE.md)); biometric device ingest + rich SCIM Users/Groups
 
 Default retention (seeded on migrate):
 

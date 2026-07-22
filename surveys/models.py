@@ -1,6 +1,7 @@
 from django.db import models
 from employees.models import Employee
 from django.utils import timezone
+from accounts.tenancy import organization_fk
 
 class Survey(models.Model):
     STATUS_CHOICES = [
@@ -14,6 +15,7 @@ class Survey(models.Model):
     survey_type = models.CharField(max_length=50, choices=[('feedback', '360 Feedback'), ('satisfaction', 'Satisfaction'), ('engagement', 'Engagement')])
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
     created_by = models.ForeignKey(Employee, on_delete=models.SET_NULL, null=True, related_name='created_surveys')
+    organization = organization_fk(related_name='surveys')
     start_date = models.DateField()
     end_date = models.DateField()
     is_anonymous = models.BooleanField(default=True)

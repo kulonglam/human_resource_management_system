@@ -3,7 +3,8 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from api.mixins import AuditedModelViewSet
+from accounts.tenancy import filter_queryset_for_organization
+from api.mixins import AuditedModelViewSet, OrganizationQuerysetMixin
 from api.permissions import IsAdmin
 
 
@@ -21,7 +22,8 @@ class APIKeyViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         from integrations.models import APIKey
-        return APIKey.objects.select_related('user').order_by('-created_at')
+        qs = APIKey.objects.select_related('user').order_by('-created_at')
+        return filter_queryset_for_organization(qs, self.request.user)
 
     def create(self, request, *args, **kwargs):
         from integrations.models import APIKey
@@ -39,7 +41,7 @@ class APIKeyViewSet(viewsets.ModelViewSet):
         return Response(data, status=status.HTTP_201_CREATED)
 
 
-class WebhookEndpointViewSet(AuditedModelViewSet):
+class WebhookEndpointViewSet(OrganizationQuerysetMixin, AuditedModelViewSet):
     def get_serializer_class(self):
         from api.integrations_serializers import WebhookDeliverySerializer, WebhookEndpointSerializer
         if self.action == 'deliveries':
@@ -48,13 +50,17 @@ class WebhookEndpointViewSet(AuditedModelViewSet):
 
     def get_queryset(self):
         from integrations.models import WebhookEndpoint
-        return WebhookEndpoint.objects.order_by('name')
+        return self.scope_to_organization(WebhookEndpoint.objects.order_by('name'))
 
     def get_permissions(self):
         return [IsAdmin()]
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        kwargs = {'created_by': self.request.user}
+        org_id = getattr(self.request.user, 'organization_id', None)
+        if org_id and not serializer.validated_data.get('organization'):
+            kwargs['organization_id'] = org_id
+        serializer.save(**kwargs)
 
     @action(detail=True, methods=['get'])
     def deliveries(self, request, pk=None):

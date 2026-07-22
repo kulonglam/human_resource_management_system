@@ -9,6 +9,7 @@ from django.db import models
 from django.utils import timezone
 
 from accounts.models import CustomUser
+from accounts.tenancy import organization_fk
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,7 @@ class APIKey(models.Model):
     prefix = models.CharField(max_length=12, unique=True, editable=False)
     key_hash = models.CharField(max_length=64, editable=False)
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='api_keys')
+    organization = organization_fk(related_name='api_keys')
     scopes = models.JSONField(default=list, blank=True, help_text='Capability scopes for this key')
     is_active = models.BooleanField(default=True)
     last_used_at = models.DateTimeField(null=True, blank=True)
@@ -62,6 +64,7 @@ class APIKey(models.Model):
             prefix=prefix,
             key_hash=key_hash,
             user=user,
+            organization_id=getattr(user, 'organization_id', None),
             scopes=scopes or ['read'],
         )
         return instance, raw_key
@@ -90,6 +93,7 @@ class WebhookEndpoint(models.Model):
     events = models.JSONField(default=list, help_text='List of event names to subscribe to')
     secret = models.CharField(max_length=64, blank=True)
     is_active = models.BooleanField(default=True)
+    organization = organization_fk(related_name='webhook_endpoints')
     created_by = models.ForeignKey(
         CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='webhooks',
     )

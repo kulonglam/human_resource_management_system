@@ -4,6 +4,7 @@ from django.db import models
 from django.utils import timezone
 
 from accounts.models import CustomUser
+from accounts.tenancy import organization_fk
 
 
 class ApprovalWorkflow(models.Model):
@@ -17,6 +18,7 @@ class ApprovalWorkflow(models.Model):
     workflow_type = models.CharField(max_length=20, choices=WORKFLOW_TYPES)
     is_default = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
+    organization = organization_fk(related_name='approval_workflows')
     extra_step_min_days = models.DecimalField(
         max_digits=6, decimal_places=2, null=True, blank=True,
         help_text='Leave: require HR step when duration >= this many days',

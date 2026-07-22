@@ -1,5 +1,5 @@
 """Training domain HTTP adapters."""
-from api.mixins import AuditedModelViewSet, EmployeeQuerysetMixin
+from api.mixins import AuditedModelViewSet, EmployeeQuerysetMixin, OrganizationQuerysetMixin
 from api.permissions import IsAdminOrManagerOrReadOnly
 from api.serializers import (
     CertificationSerializer,
@@ -21,10 +21,12 @@ from training.models import (
 )
 
 
-class SkillViewSet(AuditedModelViewSet):
-    queryset = Skill.objects.all().order_by('category', 'name')
+class SkillViewSet(OrganizationQuerysetMixin, AuditedModelViewSet):
     serializer_class = SkillSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
+
+    def get_queryset(self):
+        return self.scope_to_organization(Skill.objects.all().order_by('category', 'name'))
 
 
 class EmployeeSkillViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
@@ -36,13 +38,19 @@ class EmployeeSkillViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
         return qs
 
 
-class TrainingCourseViewSet(AuditedModelViewSet):
-    queryset = TrainingCourse.objects.all().order_by('-start_date')
+class TrainingCourseViewSet(OrganizationQuerysetMixin, AuditedModelViewSet):
     serializer_class = TrainingCourseSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
 
+    def get_queryset(self):
+        return self.scope_to_organization(TrainingCourse.objects.all().order_by('-start_date'))
+
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        kwargs = {'created_by': self.request.user}
+        org_id = getattr(self.request.user, 'organization_id', None)
+        if org_id and not serializer.validated_data.get('organization'):
+            kwargs['organization_id'] = org_id
+        serializer.save(**kwargs)
 
 
 class TrainingRecordViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
@@ -54,10 +62,12 @@ class TrainingRecordViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
         return qs
 
 
-class CertificationViewSet(AuditedModelViewSet):
-    queryset = Certification.objects.all().order_by('name')
+class CertificationViewSet(OrganizationQuerysetMixin, AuditedModelViewSet):
     serializer_class = CertificationSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
+
+    def get_queryset(self):
+        return self.scope_to_organization(Certification.objects.all().order_by('name'))
 
 
 class EmployeeCertificationViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):

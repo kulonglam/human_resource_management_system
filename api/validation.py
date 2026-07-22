@@ -10,6 +10,16 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
+# Letters (Unicode letters), spaces, hyphen, apostrophe, period — for personal/org names.
+_LETTERS_RE = re.compile(r"^[^\W\d_]+(?:[ '\-.][^\W\d_]+)*$", re.UNICODE)
+# Digits only (0-9).
+_DIGITS_RE = re.compile(r'^\d+$')
+# Letters + digits, with common code separators.
+_ALPHANUMERIC_RE = re.compile(r'^[A-Za-z0-9]+(?:[ \-_/]+[A-Za-z0-9]+)*$')
+_ADDRESS_RE = re.compile(r'^[A-Za-z0-9]+(?:[ \-_/.,#]+[A-Za-z0-9]+)*$')
+# Phone: optional +, then 9–15 digits (spaces/dashes/parens stripped first).
+_PHONE_RE = re.compile(r'^\+?\d{9,15}$')
+
 
 def validate_user_password(password: str, *, user=None) -> str:
     """Run Django AUTH_PASSWORD_VALIDATORS; raise DRF ValidationError on failure."""
@@ -28,6 +38,50 @@ def parse_positive_decimal(value, *, field_name='value'):
     if amount <= 0:
         raise serializers.ValidationError({field_name: 'Must be greater than zero.'})
     return amount
+
+
+def validate_letters_only(value, *, field_label='This field'):
+    """Accept letters only (spaces, hyphen, apostrophe, period allowed between words)."""
+    if value is None or value == '':
+        return value
+    cleaned = str(value).strip()
+    if not cleaned or not _LETTERS_RE.fullmatch(cleaned):
+        raise serializers.ValidationError(
+            f'{field_label} must contain letters only (spaces and - \' . allowed).',
+        )
+    return cleaned
+
+
+def validate_digits_only(value, *, field_label='This field', min_length=None, max_length=None):
+    """Accept integer digits only (0–9)."""
+    if value is None or value == '':
+        return value
+    cleaned = str(value).strip()
+    if not _DIGITS_RE.fullmatch(cleaned):
+        raise serializers.ValidationError(f'{field_label} must contain digits only.')
+    if min_length is not None and len(cleaned) < min_length:
+        raise serializers.ValidationError(
+            f'{field_label} must be at least {min_length} digits.',
+        )
+    if max_length is not None and len(cleaned) > max_length:
+        raise serializers.ValidationError(
+            f'{field_label} must be at most {max_length} digits.',
+        )
+    return cleaned
+
+
+def validate_alphanumeric(value, *, field_label='This field', allow_punctuation=False):
+    """Accept letters and digits (spaces, hyphen, underscore, slash allowed as separators)."""
+    if value is None or value == '':
+        return value
+    cleaned = str(value).strip()
+    pattern = _ADDRESS_RE if allow_punctuation else _ALPHANUMERIC_RE
+    if not cleaned or not pattern.fullmatch(cleaned):
+        raise serializers.ValidationError(
+            f'{field_label} must contain letters and/or numbers only '
+            f'(spaces and - _ /{", . #" if allow_punctuation else ""} allowed).',
+        )
+    return cleaned
 
 
 def validate_employee_dates(attrs, instance=None):
@@ -68,12 +122,12 @@ def validate_employee_dates(attrs, instance=None):
 def validate_mobile_number(value: str) -> str:
     if value is None or value == '':
         return value
-    digits = re.sub(r'\D', '', str(value))
-    if len(digits) < 9 or len(digits) > 15:
+    compact = re.sub(r'[\s\-()]', '', str(value).strip())
+    if not _PHONE_RE.fullmatch(compact):
         raise serializers.ValidationError(
-            'Enter a valid phone number (9–15 digits, with optional country code).',
+            'Enter a valid phone number (digits only, 9–15 digits, optional leading +).',
         )
-    return value
+    return compact
 
 
 def leave_date_ranges_overlap(start_a, end_a, start_b, end_b) -> bool:

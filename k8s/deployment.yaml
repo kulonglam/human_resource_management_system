@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hrmis-web
+  labels:
+    app: hrmis-web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: hrmis-web
+  template:
+    metadata:
+      labels:
+        app: hrmis-web
+    spec:
+      containers:
+        - name: web
+          image: hrmis:latest
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - secretRef:
+                name: hrmis-secrets
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health/
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health/
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hrmis-web
+spec:
+  selector:
+    app: hrmis-web
+  ports:
+    - port: 80
+      targetPort: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hrmis-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "12m"
+spec:
+  rules:
+    - host: hrmis.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: hrmis-web
+                port:
+                  number: 80
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hrmis-web-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: hrmis-web
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70

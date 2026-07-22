@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import SettingsBackLink from '../components/SettingsBackLink';
 
 export default function SensitiveAccessLogs() {
   const { user } = useAuth();
@@ -22,6 +23,7 @@ export default function SensitiveAccessLogs() {
 
   return (
     <div>
+      <SettingsBackLink />
       <h1 className="page-heading mb-3">
         <i className="bi bi-shield-exclamation" /> Sensitive Data Access Log
       </h1>

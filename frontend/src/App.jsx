@@ -23,6 +23,9 @@ import IntegrationsSettings from './pages/IntegrationsSettings';
 import LeavePolicies from './pages/LeavePolicies';
 import Leaves from './pages/Leaves';
 import Login from './pages/Login';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
+import Privacy from './pages/Privacy';
 import OrgChart from './pages/OrgChart';
 import ModulePage from './pages/ModulePage';
 import Payroll from './pages/Payroll';
@@ -33,6 +36,7 @@ import Reports from './pages/Reports';
 import UsersSettings from './pages/UsersSettings';
 import SensitiveAccessLogs from './pages/SensitiveAccessLogs';
 import OpsCenter from './pages/OpsCenter';
+import Settings from './pages/Settings';
 import SecuritySettings from './pages/SecuritySettings';
 import Surveys from './pages/Surveys';
 import SurveyTake from './pages/SurveyTake';
@@ -42,12 +46,17 @@ import ApplicationDetail from './pages/ApplicationDetail';
 import Careers from './pages/Careers';
 import CareerApply from './pages/CareerApply';
 import OfferSign from './pages/OfferSign';
+import MobileClock from './pages/MobileClock';
 
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/privacy" element={<Privacy />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/mobile" element={<MobileClock />} />
       <Route path="/careers" element={<Careers />} />
       <Route path="/careers/:jobId" element={<CareerApply />} />
       <Route path="/offers/:offerId" element={<OfferSign />} />
@@ -90,7 +99,8 @@ export default function App() {
         <Route path="surveys/:id/take" element={<SurveyTake />} />
         <Route path="kin" element={<ModulePage title="Next of Kin" icon="bi-people" tabs={kinTabs} />} />
         <Route path="audit-logs" element={<PermissionRoute check={(u) => u.is_admin}><AuditLogs /></PermissionRoute>} />
-        <Route path="settings/sensitive-access" element={<SensitiveAccessLogs />} />
+        <Route path="settings" element={<Settings />} />
+        <Route path="settings/sensitive-access" element={<PermissionRoute check={(u) => u.is_admin}><SensitiveAccessLogs /></PermissionRoute>} />
         <Route path="settings/ops" element={<PermissionRoute check={(u) => u.is_admin}><OpsCenter /></PermissionRoute>} />
         <Route path="settings/users" element={<PermissionRoute check={(u) => u.is_admin}><UsersSettings /></PermissionRoute>} />
         <Route path="settings/security" element={<SecuritySettings />} />

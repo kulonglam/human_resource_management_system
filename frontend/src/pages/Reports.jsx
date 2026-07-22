@@ -51,13 +51,13 @@ export default function Reports() {
   });
 
   useEffect(() => {
-    api.getReportsAnalytics()
-      .then(setOverview)
-      .catch((err) => setError(err.message))
-      .finally(() => setOverviewLoading(false));
     api.getReportFilters()
-      .then(setFilters)
-      .catch(() => setError('Report filters could not be loaded. Refresh the page and try again.'));
+      .then((data) => {
+        setFilters(data);
+        setOverview(data.overview || null);
+      })
+      .catch((err) => setError(err.message || 'Report filters could not be loaded. Refresh the page and try again.'))
+      .finally(() => setOverviewLoading(false));
     api.getSavedReports()
       .then(setSavedReports)
       .catch(() => {});

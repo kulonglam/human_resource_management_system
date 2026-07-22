@@ -41,8 +41,12 @@ class ReportAPITests(HRAPITestCase):
     def test_manager_can_access_management_reports(self):
         self.login('manager', 'ManagerPass123!')
 
-        self.assertEqual(self.client.get('/api/v1/reports/analytics/').status_code, 200)
+        filters = self.client.get('/api/v1/reports/filters/')
+        self.assertEqual(filters.status_code, 200)
+        self.assertIn('overview', filters.data)
         self.assertEqual(self.client.get('/api/v1/reports/payroll/').status_code, 200)
+        # Deprecated alias remains available until sunset.
+        self.assertEqual(self.client.get('/api/v1/reports/analytics/').status_code, 200)
 
     def test_payroll_workbook_is_branded_and_uses_ugx(self):
         self.login('manager', 'ManagerPass123!')

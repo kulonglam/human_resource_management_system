@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { ALL_PERMISSIONS, PERMISSION_LABELS } from '../utils/permissions';
 import { errorMessage } from '../utils/apiErrors';
+import SettingsBackLink from '../components/SettingsBackLink';
 
 const EMPTY_FORM = {
   username: '',
@@ -288,6 +289,7 @@ export default function UsersSettings() {
 
   return (
     <>
+      <SettingsBackLink />
       <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <h4 className="page-heading mb-0">
           <i className="bi bi-people-fill" style={{ color: 'var(--fca-lime)' }} /> User Management

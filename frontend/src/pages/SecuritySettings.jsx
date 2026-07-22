@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import SettingsBackLink from '../components/SettingsBackLink';
 
 export default function SecuritySettings() {
   const { user, refreshUser } = useAuth();
@@ -22,6 +23,8 @@ export default function SecuritySettings() {
 
   if (!user?.is_admin) {
     return (
+      <div>
+        <SettingsBackLink />
       <div className="card">
         <div className="card-body">
           <h5 className="card-title">
@@ -59,11 +62,14 @@ export default function SecuritySettings() {
           )}
         </div>
       </div>
+      </div>
     );
   }
 
   if (user.mfa_enabled) {
     return (
+      <div>
+        <SettingsBackLink />
       <div className="card">
         <div className="card-body">
           <h5 className="card-title">
@@ -73,6 +79,7 @@ export default function SecuritySettings() {
             Multi-factor authentication is enabled for your account.
           </div>
         </div>
+      </div>
       </div>
     );
   }
@@ -95,6 +102,8 @@ export default function SecuritySettings() {
   };
 
   return (
+    <div>
+      <SettingsBackLink />
     <div className="card">
       <div className="card-body">
         <h5 className="card-title">
@@ -156,6 +165,7 @@ export default function SecuritySettings() {
           </>
         )}
       </div>
+    </div>
     </div>
   );
 }

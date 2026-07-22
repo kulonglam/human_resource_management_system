@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import ConfirmModal from '../components/ConfirmModal';
 import { api } from '../api/client';
 import { errorMessage } from '../utils/apiErrors';
 
@@ -111,6 +112,8 @@ export default function Departments() {
   const [error, setError] = useState('');
   const [modalDepartment, setModalDepartment] = useState(undefined);
   const [showModal, setShowModal] = useState(false);
+  const [departmentToDelete, setDepartmentToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const loadDepartments = () => {
     setLoading(true);
@@ -134,13 +137,17 @@ export default function Departments() {
     setShowModal(true);
   };
 
-  const handleDelete = async (department) => {
-    if (!window.confirm(`Delete department "${department.name}"?`)) return;
+  const confirmDeleteDepartment = async () => {
+    if (!departmentToDelete) return;
+    setDeleting(true);
     try {
-      await api.deleteDepartment(department.id);
+      await api.deleteDepartment(departmentToDelete.id);
+      setDepartmentToDelete(null);
       loadDepartments();
     } catch (err) {
       setError(err.data?.detail || err.message);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -194,7 +201,8 @@ export default function Departments() {
                       <button
                         type="button"
                         className="btn btn-outline-danger btn-sm"
-                        onClick={() => handleDelete(dept)}
+                        onClick={() => setDepartmentToDelete(dept)}
+                        aria-label={`Delete ${dept.name}`}
                       >
                         <i className="bi bi-trash" />
                       </button>
@@ -222,6 +230,21 @@ export default function Departments() {
           onSaved={loadDepartments}
         />
       )}
+
+      <ConfirmModal
+        open={Boolean(departmentToDelete)}
+        title="Delete department"
+        message={
+          departmentToDelete
+            ? `Delete department "${departmentToDelete.name}"? This cannot be undone.`
+            : ''
+        }
+        confirmLabel="Delete"
+        confirmVariant="danger"
+        busy={deleting}
+        onCancel={() => !deleting && setDepartmentToDelete(null)}
+        onConfirm={confirmDeleteDepartment}
+      />
     </>
   );
 }

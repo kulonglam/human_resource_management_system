@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import ConfirmModal from './ConfirmModal';
 import NotificationBell from './NotificationBell';
 import { useAuth } from '../context/AuthContext';
 import { canManageReports, canViewPayroll } from '../utils/permissions';
@@ -9,6 +10,7 @@ const navItems = [
   { to: '/employees', icon: 'bi-people', label: 'Employees' },
   { to: '/departments', icon: 'bi-building', label: 'Departments' },
   { to: '/attendance', icon: 'bi-calendar-check', label: 'Attendance' },
+  { to: '/mobile', icon: 'bi-phone', label: 'Mobile clock' },
   { to: '/leaves', icon: 'bi-calendar-x', label: 'Leaves' },
   { to: '/recruitment', icon: 'bi-briefcase', label: 'Recruitment' },
   { to: '/payroll', icon: 'bi-cash-coin', label: 'Payroll', requiresPayroll: true },
@@ -34,15 +36,9 @@ const managerNavItems = [
 
 const adminNavItems = [
   { to: '/approvals', icon: 'bi-inbox', label: 'Approvals' },
-  { to: '/settings/users', icon: 'bi-people-fill', label: 'Users' },
   { to: '/org-chart', icon: 'bi-diagram-3', label: 'Org Chart' },
   { to: '/workforce-structure', icon: 'bi-person-workspace', label: 'Workforce Structure' },
-  { to: '/audit-logs', icon: 'bi-journal-text', label: 'Audit Log' },
-  { to: '/settings/sensitive-access', icon: 'bi-shield-exclamation', label: 'Sensitive Access' },
-  { to: '/settings/ops', icon: 'bi-hdd-rack', label: 'Operations' },
-  { to: '/settings/security', icon: 'bi-shield-lock', label: 'Security' },
-  { to: '/settings/integrations', icon: 'bi-plug', label: 'Integrations' },
-  { to: '/settings/compliance', icon: 'bi-shield-check', label: 'Compliance' },
+  { to: '/settings', icon: 'bi-gear', label: 'Settings' },
 ];
 
 function canSeeNavItem(item, user) {
@@ -56,22 +52,34 @@ export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const closeSidebar = () => setSidebarOpen(false);
 
   const handleLogout = async () => {
-    await logout();
-    navigate('/login');
+    setLoggingOut(true);
+    try {
+      await logout();
+      navigate('/login');
+    } finally {
+      setLoggingOut(false);
+      setShowLogoutConfirm(false);
+    }
   };
 
   return (
     <>
       <div className={`sidebar ${sidebarOpen ? 'active' : ''}`} id="sidebarNav">
         <Link to="/dashboard" className="sidebar-brand" onClick={closeSidebar}>
-          <i className="bi bi-house" /> FCA HRMIS
+          <span className="sidebar-brand-mark" aria-hidden="true">
+            <i className="bi bi-hexagon-fill" />
+          </span>
+          <span className="sidebar-brand-text">FCA HRMIS</span>
+          <span className="sidebar-brand-tag">Workforce platform</span>
         </Link>
 
-        <nav className="sidebar-nav">
+        <nav className="sidebar-nav" aria-label="Primary">
           {navItems
             .filter((item) => canSeeNavItem(item, user))
             .map((item) => (
@@ -81,16 +89,14 @@ export default function Layout() {
               className={({ isActive }) => (isActive ? 'active' : undefined)}
               onClick={closeSidebar}
             >
-              <i className={`bi ${item.icon}`} />
+              <i className={`bi ${item.icon}`} aria-hidden="true" />
               <span>{item.label}</span>
             </NavLink>
             ))}
 
           {user?.is_manager && !user?.is_admin && (
             <>
-              <div className="sidebar-section-label px-3 py-2 small text-muted text-uppercase">
-                Management
-              </div>
+              <div className="sidebar-section-label">Management</div>
               {managerNavItems.map((item) => (
                 <NavLink
                   key={item.to}
@@ -107,13 +113,12 @@ export default function Layout() {
 
           {user?.is_admin && (
             <>
-              <div className="sidebar-section-label px-3 py-2 small text-muted text-uppercase">
-                Administration
-              </div>
+              <div className="sidebar-section-label">Administration</div>
               {adminNavItems.map((item) => (
                 <NavLink
                   key={item.to}
                   to={item.to}
+                  end={item.to === '/settings' ? false : undefined}
                   className={({ isActive }) => (isActive ? 'active' : undefined)}
                   onClick={closeSidebar}
                 >
@@ -122,6 +127,17 @@ export default function Layout() {
                 </NavLink>
               ))}
             </>
+          )}
+
+          {!user?.is_admin && (
+            <NavLink
+              to="/settings"
+              className={({ isActive }) => (isActive ? 'active' : undefined)}
+              onClick={closeSidebar}
+            >
+              <i className="bi bi-gear" />
+              <span>Settings</span>
+            </NavLink>
           )}
         </nav>
       </div>
@@ -144,15 +160,16 @@ export default function Layout() {
           >
             <i className="bi bi-list" />
           </button>
-          <div className="top-bar-user d-flex align-items-center gap-2">
+          <div className="top-bar-user">
             <NotificationBell />
             <span className="top-bar-username">
-              <i className="bi bi-person-circle" /> {user?.username}
+              <i className="bi bi-person-circle" aria-hidden="true" />
+              {user?.username}
             </span>
             <button
               type="button"
               className="btn btn-danger btn-sm top-bar-logout"
-              onClick={handleLogout}
+              onClick={() => setShowLogoutConfirm(true)}
             >
               <i className="bi bi-box-arrow-right" />
               <span className="top-bar-logout-label">Logout</span>
@@ -174,6 +191,17 @@ export default function Layout() {
         )}
         <NavLink to="/employees" onClick={closeSidebar}><i className="bi bi-people" /><span>People</span></NavLink>
       </nav>
+
+      <ConfirmModal
+        open={showLogoutConfirm}
+        title="Log out"
+        message="Are you sure you want to log out of FCA HRMIS?"
+        confirmLabel="Log out"
+        confirmVariant="danger"
+        busy={loggingOut}
+        onCancel={() => setShowLogoutConfirm(false)}
+        onConfirm={handleLogout}
+      />
     </>
   );
 }

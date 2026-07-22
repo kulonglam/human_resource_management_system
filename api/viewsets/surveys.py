@@ -4,16 +4,18 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from api.mixins import AuditedModelViewSet
+from api.mixins import AuditedModelViewSet, OrganizationQuerysetMixin
 from api.permissions import IsAdminOrManagerOrReadOnly
 from api.serializers import SurveyQuestionSerializer, SurveyResponseSerializer, SurveySerializer
 from employees.models import Employee
 from surveys.models import Survey, SurveyQuestion, SurveyResponse
 
 
-class SurveyViewSet(AuditedModelViewSet):
-    queryset = Survey.objects.all().order_by('-created_at')
+class SurveyViewSet(OrganizationQuerysetMixin, AuditedModelViewSet):
     serializer_class = SurveySerializer
+
+    def get_queryset(self):
+        return self.scope_to_organization(Survey.objects.all().order_by('-created_at'))
 
     def get_permissions(self):
         if self.action in ('list', 'retrieve', 'available', 'submit', 'results'):
@@ -32,7 +34,7 @@ class SurveyViewSet(AuditedModelViewSet):
     def available(self, request):
         from surveys.services import get_active_surveys
 
-        qs = get_active_surveys()
+        qs = self.scope_to_organization(get_active_surveys())
         return Response(self.get_serializer(qs, many=True).data)
 
     @action(detail=True, methods=['post'])

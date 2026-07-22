@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import SettingsBackLink from '../components/SettingsBackLink';
 
 export default function ComplianceSettings() {
   const { user } = useAuth();
@@ -91,6 +92,8 @@ export default function ComplianceSettings() {
   };
 
   return (
+    <div>
+      <SettingsBackLink />
     <div className="card">
       <div className="card-body">
         <h5 className="card-title">
@@ -226,21 +229,45 @@ export default function ComplianceSettings() {
             </p>
 
             <h6 className="mt-4">Evidence pack (audit)</h6>
-            <p className="small text-muted">Control catalogue for SOC2/ISO-style evidence reviews.</p>
+            <p className="small text-muted">
+              Control catalogue for SOC2/ISO-style evidence reviews (access, encryption, DR, pen-test,
+              change management, availability/SLO, access reviews). Seed with{' '}
+              <code>python manage.py seed_compliance_evidence</code>. See SECURITY_ASSURANCE.md.
+            </p>
             {evidence.length === 0 ? (
               <p className="small text-muted">No evidence packs yet. Create via API <code>/compliance/evidence-packs/</code>.</p>
             ) : (
               <div className="table-responsive mb-3">
                 <table className="table table-sm">
                   <thead>
-                    <tr><th>Control</th><th>Title</th><th>Status</th><th>Next review</th></tr>
+                    <tr><th>Control</th><th>Title</th><th>Owner</th><th>Status</th><th>Next review</th></tr>
                   </thead>
                   <tbody>
                     {evidence.map((row) => (
                       <tr key={row.id}>
-                        <td>{row.control_label}</td>
-                        <td>{row.title}</td>
-                        <td><span className="badge bg-secondary">{row.status}</span></td>
+                        <td>{row.control_label || row.control}</td>
+                        <td>
+                          {row.title}
+                          {row.evidence_url ? (
+                            <div className="small">
+                              <a href={row.evidence_url} target="_blank" rel="noreferrer">Evidence link</a>
+                            </div>
+                          ) : null}
+                        </td>
+                        <td className="small">{row.owner || '—'}</td>
+                        <td>
+                          <span
+                            className={`badge ${
+                              row.status === 'ready'
+                                ? 'bg-success'
+                                : row.status === 'gap'
+                                  ? 'bg-warning text-dark'
+                                  : 'bg-secondary'
+                            }`}
+                          >
+                            {row.status}
+                          </span>
+                        </td>
                         <td className="small">{row.next_review_at || '—'}</td>
                       </tr>
                     ))}
@@ -279,6 +306,7 @@ export default function ComplianceSettings() {
           </>
         )}
       </div>
+    </div>
     </div>
   );
 }

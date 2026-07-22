@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import PublicFooter from '../components/PublicFooter';
 
 export default function Login() {
   const { user, login, verifyMfa } = useAuth();
@@ -69,9 +70,11 @@ export default function Login() {
       redirectAfterLogin(result);
     } catch (err) {
       const message =
-        err.data?.non_field_errors?.[0] ||
-        err.data?.detail ||
-        'Invalid username or password.';
+        err.status === 0 || /cannot reach the api/i.test(err.message || '')
+          ? (err.message || 'Cannot reach the API. Start the Django backend on port 8000, then refresh.')
+          : err.data?.non_field_errors?.[0] ||
+            err.data?.detail ||
+            'Invalid username or password.';
       setError(message);
     } finally {
       setSubmitting(false);
@@ -94,131 +97,170 @@ export default function Login() {
 
   return (
     <div className="auth-page">
-      <div className="card shadow" style={{ width: '100%', maxWidth: 480 }}>
-        <div className="card-body p-4">
-          <h4 className="card-title text-center mb-4">
-            <i className="bi bi-person-lock" /> HRMIS Login
-          </h4>
+      <section className="auth-hero" aria-label="FCA HRMIS">
+        <div className="auth-hero-inner">
+          <p className="auth-hero-eyebrow">Workforce platform</p>
+          <h1 className="auth-hero-brand">
+            FCA <span>HRMIS</span>
+          </h1>
+          <p className="auth-hero-line">
+            People operations for one organization — attendance, leave, payroll, and more.
+          </p>
+          <ul className="auth-hero-points">
+            <li>
+              <i className="bi bi-check-circle-fill" aria-hidden="true" />
+              <span>Leave, attendance, and approvals in one place</span>
+            </li>
+            <li>
+              <i className="bi bi-check-circle-fill" aria-hidden="true" />
+              <span>Uganda payroll and statutory reporting</span>
+            </li>
+            <li>
+              <i className="bi bi-check-circle-fill" aria-hidden="true" />
+              <span>Secure access with roles and MFA</span>
+            </li>
+          </ul>
+        </div>
+      </section>
 
-          {error && <div className="alert alert-danger" role="alert">{error}</div>}
+      <div className="auth-panel">
+        <div className="auth-panel-card">
+          <div className="card-body">
+            <h2 className="auth-panel-title">
+              {mfaStep ? 'Verify identity' : 'Sign in'}
+            </h2>
+            <p className="auth-panel-sub">
+              {mfaStep
+                ? 'Enter the 6-digit code from your authenticator app.'
+                : 'Use your FCA HRMIS account to continue.'}
+            </p>
 
-          {!mfaStep ? (
-            <form onSubmit={handleSubmit}>
-              <div className="mb-3">
-                <label className="form-label" htmlFor="login-username">Username</label>
-                <input
-                  type="text"
-                  id="login-username"
-                  className="form-control"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Username"
-                  required
-                />
-              </div>
+            {error && <div className="alert alert-danger" role="alert">{error}</div>}
 
-              <div className="mb-3">
-                <label className="form-label" htmlFor="login-password">Password</label>
-                <div className="position-relative">
+            {!mfaStep ? (
+              <form onSubmit={handleSubmit}>
+                <div className="mb-3">
+                  <label className="form-label" htmlFor="login-username">Username</label>
                   <input
-                    type={showPassword ? 'text' : 'password'}
-                    id="login-password"
+                    type="text"
+                    id="login-username"
                     className="form-control"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Password"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Username"
+                    autoComplete="username"
                     required
-                    style={{ paddingRight: '2.5rem' }}
                   />
-                  <button
-                    type="button"
-                    className="btn btn-link position-absolute end-0 top-50 translate-middle-y"
-                    onClick={() => setShowPassword((v) => !v)}
-                    style={{ zIndex: 10 }}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  >
-                    <i className={`bi ${showPassword ? 'bi-eye-slash' : 'bi-eye'}`} aria-hidden="true" />
+                </div>
+
+                <div className="mb-3">
+                  <div className="d-flex justify-content-between align-items-center mb-1">
+                    <label className="form-label mb-0" htmlFor="login-password">Password</label>
+                    <Link to="/forgot-password" className="small">
+                      Forgot password?
+                    </Link>
+                  </div>
+                  <div className="position-relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      id="login-password"
+                      className="form-control"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Password"
+                      autoComplete="current-password"
+                      required
+                      style={{ paddingRight: '2.5rem' }}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-link position-absolute end-0 top-50 translate-middle-y"
+                      onClick={() => setShowPassword((v) => !v)}
+                      style={{ zIndex: 10 }}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      <i className={`bi ${showPassword ? 'bi-eye-slash' : 'bi-eye'}`} aria-hidden="true" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="d-grid">
+                  <button type="submit" className="btn btn-primary" disabled={submitting}>
+                    <i className="bi bi-box-arrow-in-right" aria-hidden="true" />{' '}
+                    {submitting ? 'Signing in…' : 'Sign in'}
                   </button>
                 </div>
-              </div>
-
-              <div className="d-grid">
-                <button type="submit" className="btn btn-primary" disabled={submitting}>
-                  <i className="bi bi-box-arrow-in-right" /> {submitting ? 'Signing in...' : 'Login'}
-                </button>
-              </div>
-            </form>
-          ) : (
-            <form onSubmit={handleMfaSubmit}>
-              <p className="text-muted">
-                Enter the 6-digit code from your authenticator app.
-              </p>
-              <div className="mb-3">
-                <label className="form-label" htmlFor="login-mfa-code">Verification code</label>
-                <input
-                  type="text"
-                  id="login-mfa-code"
-                  className="form-control"
-                  value={mfaCode}
-                  onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  placeholder="000000"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  required
-                />
-              </div>
-              <div className="d-grid gap-2">
-                <button type="submit" className="btn btn-primary" disabled={submitting}>
-                  {submitting ? 'Verifying...' : 'Verify'}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-outline-secondary"
-                  onClick={() => {
-                    setMfaStep(false);
-                    setMfaCode('');
-                    setMfaToken('');
-                  }}
-                >
-                  Back
-                </button>
-              </div>
-            </form>
-          )}
-
-          {allowRegistration && !mfaStep && (
-            <p className="text-center mt-3 mb-0">
-              No account? <Link to="/register">Register</Link>
-            </p>
-          )}
-
-          {ssoProviders.length > 0 && !mfaStep && (
-            <div className="mt-4">
-              <div className="text-center text-muted small mb-2">Or continue with</div>
-              <div className="d-grid gap-2">
-                {ssoProviders.map((provider) => (
+              </form>
+            ) : (
+              <form onSubmit={handleMfaSubmit}>
+                <div className="mb-3">
+                  <label className="form-label" htmlFor="login-mfa-code">Verification code</label>
+                  <input
+                    type="text"
+                    id="login-mfa-code"
+                    className="form-control"
+                    value={mfaCode}
+                    onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="000000"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    required
+                  />
+                </div>
+                <div className="d-grid gap-2">
+                  <button type="submit" className="btn btn-primary" disabled={submitting}>
+                    {submitting ? 'Verifying…' : 'Verify'}
+                  </button>
                   <button
-                    key={provider.id}
                     type="button"
                     className="btn btn-outline-secondary"
-                    onClick={async () => {
-                      try {
-                        const { authorization_url: url } = await api.startSso(provider.id);
-                        window.location.href = url;
-                      } catch (err) {
-                        setError(err.message || 'Unable to start SSO login.');
-                      }
+                    onClick={() => {
+                      setMfaStep(false);
+                      setMfaCode('');
+                      setMfaToken('');
                     }}
                   >
-                    <i className={`bi ${provider.id === 'microsoft' ? 'bi-microsoft' : 'bi-google'}`} />{' '}
-                    Sign in with {provider.name}
+                    Back
                   </button>
-                ))}
+                </div>
+              </form>
+            )}
+
+            {allowRegistration && !mfaStep && (
+              <p className="text-center mt-3 mb-0">
+                No account? <Link to="/register">Register</Link>
+              </p>
+            )}
+
+            {ssoProviders.length > 0 && !mfaStep && (
+              <div className="mt-4">
+                <div className="text-center text-muted small mb-2">Or continue with</div>
+                <div className="d-grid gap-2">
+                  {ssoProviders.map((provider) => (
+                    <button
+                      key={provider.id}
+                      type="button"
+                      className="btn btn-outline-secondary"
+                      onClick={async () => {
+                        try {
+                          const { authorization_url: url } = await api.startSso(provider.id);
+                          window.location.href = url;
+                        } catch (err) {
+                          setError(err.message || 'Unable to start SSO login.');
+                        }
+                      }}
+                    >
+                      <i className={`bi ${provider.id === 'microsoft' ? 'bi-microsoft' : 'bi-google'}`} aria-hidden="true" />{' '}
+                      Sign in with {provider.name}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
+      <PublicFooter showLoginLink={false} />
     </div>
   );
 }

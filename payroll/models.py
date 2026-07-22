@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
+from accounts.tenancy import organization_fk
 from employees.models import Employee
 from datetime import datetime
 from payroll.uganda import calculate_statutory_payroll
@@ -17,6 +18,7 @@ class PayrollRun(models.Model):
     year = models.PositiveIntegerField()
     status = models.CharField(max_length=12, choices=STATUS_CHOICES, default='draft')
     notes = models.TextField(blank=True)
+    organization = organization_fk(related_name='payroll_runs')
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -36,7 +38,7 @@ class PayrollRun(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        unique_together = ('month', 'year')
+        unique_together = ('month', 'year', 'organization')
         ordering = ['-year', '-month']
 
     def __str__(self):

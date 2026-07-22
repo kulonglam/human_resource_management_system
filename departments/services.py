@@ -4,11 +4,16 @@ from departments.models import Department
 from employees.models import Employee
 
 
-def build_org_chart():
-    departments = list(Department.objects.select_related('parent').all().order_by('name'))
+def build_org_chart(organization_id=None):
+    dept_qs = Department.objects.select_related('parent').all().order_by('name')
+    emp_qs = Employee.objects.filter(is_active=True)
+    if organization_id:
+        dept_qs = dept_qs.filter(organization_id=organization_id)
+        emp_qs = emp_qs.filter(organization_id=organization_id)
+    departments = list(dept_qs)
     employee_counts = {
         row['department_id']: row['count']
-        for row in Employee.objects.filter(is_active=True, department_id__isnull=False)
+        for row in emp_qs.filter(department_id__isnull=False)
         .values('department_id')
         .annotate(count=Count('id'))
     }
@@ -35,7 +40,7 @@ def build_org_chart():
         else:
             roots.append(node)
 
-    unassigned = Employee.objects.filter(is_active=True, department__isnull=True).count()
+    unassigned = emp_qs.filter(department__isnull=True).count()
     return {
         'roots': roots,
         'total_departments': len(departments),

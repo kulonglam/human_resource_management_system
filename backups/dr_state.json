@@ -1,0 +1,31 @@
+{
+  "drill": {
+    "backup_name": "sqlite_20260719_120855.sqlite3",
+    "checked_at": "2026-07-19T09:09:16.418812+00:00",
+    "details": {
+      "integrity_check": "ok",
+      "migration_count": 115,
+      "ok": true,
+      "table_count": 101,
+      "user_count": 3
+    },
+    "event_type": "drill",
+    "mode": "sqlite_scratch_restore",
+    "ok": true,
+    "restore_seconds": 0.03
+  },
+  "verify": {
+    "backup_name": "sqlite_20260719_120855.sqlite3",
+    "checked_at": "2026-07-19T09:09:13.826577+00:00",
+    "details": {
+      "integrity_check": "ok",
+      "migration_count": 115,
+      "ok": true,
+      "table_count": 101,
+      "user_count": 3
+    },
+    "engine": "sqlite",
+    "event_type": "verify",
+    "ok": true
+  }
+}

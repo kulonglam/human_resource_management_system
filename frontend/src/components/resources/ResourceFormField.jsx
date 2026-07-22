@@ -1,17 +1,28 @@
+import { inputModeForKind, sanitizeByKind } from '../../utils/inputKinds';
+
 export function defaultLabel(key) {
   return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export default function ResourceFormField({ field, value, onChange, options = {}, existingUrl }) {
-  const { name, label, type = 'text', required, choices, step, accept } = field;
+  const { name, label, type = 'text', required, choices, step, accept, inputKind } = field;
   const fieldId = `field-${name}`;
+  const handleChange = (e) => {
+    if (!inputKind || e.target.type === 'checkbox' || e.target.type === 'file') {
+      onChange(e);
+      return;
+    }
+    const next = sanitizeByKind(e.target.value, inputKind);
+    onChange({ target: { name, value: next, type: e.target.type || 'text' } });
+  };
   const common = {
     name,
     id: fieldId,
     className: 'form-control form-control-sm',
     value: type === 'file' ? undefined : (value ?? ''),
-    onChange,
+    onChange: handleChange,
     required: type === 'file' ? required && !existingUrl : required,
+    inputMode: inputKind ? inputModeForKind(inputKind) : undefined,
   };
 
   if (type === 'file') {
@@ -33,7 +44,7 @@ export default function ResourceFormField({ field, value, onChange, options = {}
     return (
       <div className="mb-3">
         <label className="form-label" htmlFor={fieldId}>{label || defaultLabel(name)}</label>
-        <select {...common} className="form-select form-select-sm">
+        <select {...common} onChange={onChange} className="form-select form-select-sm">
           <option value="">Select...</option>
           {opts.map((opt) => (
             <option key={opt.value} value={opt.value}>

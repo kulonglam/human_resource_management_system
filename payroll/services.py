@@ -49,6 +49,12 @@ def approve_payroll_run(payroll_run, *, approved_by):
         payroll_run.approved_by = approved_by
         payroll_run.approved_at = timezone.now()
         payroll_run.save(update_fields=['status', 'approved_by', 'approved_at', 'updated_at'])
+        from events.services import publish_event
+        publish_event('payroll.approved', {
+            'id': payroll_run.id,
+            'month': payroll_run.month,
+            'year': payroll_run.year,
+        })
         return payroll_run
 
 

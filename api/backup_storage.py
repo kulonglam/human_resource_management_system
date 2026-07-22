@@ -85,16 +85,22 @@ def _primary_fernet():
     return _derive_fernet(_encrypt_key_material())
 
 
+def _read_first_text_line(path: Path) -> str:
+    """Return the first line as text, or '' for binary / unreadable files."""
+    try:
+        with path.open('rb') as handle:
+            raw = handle.readline()
+        return raw.decode('utf-8').strip()
+    except (OSError, UnicodeDecodeError):
+        return ''
+
+
 def is_stream_encrypted(path: Path) -> bool:
-    with path.open('r', encoding='utf-8') as handle:
-        first = handle.readline().strip()
-    return first == STREAM_HEADER
+    return _read_first_text_line(path) == STREAM_HEADER
 
 
 def is_legacy_encrypted(path: Path) -> bool:
-    with path.open('r', encoding='utf-8') as handle:
-        first = handle.readline().strip()
-    return first.startswith('enc:v1:')
+    return _read_first_text_line(path).startswith('enc:v1:')
 
 
 def encrypt_stream(readable, destination: Path) -> Path:

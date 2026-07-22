@@ -66,7 +66,7 @@ export default function Employees() {
         <input
           type="text"
           className="form-control form-control-sm"
-          placeholder="Search by name, title, department…"
+          placeholder="Search by ID, name, title, department…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
@@ -100,6 +100,7 @@ export default function Employees() {
               <thead>
                 <tr>
                   <th>Photo</th>
+                  <th>Employee ID</th>
                   <th>Name</th>
                   <th>Job Title</th>
                   <th>Department</th>
@@ -113,6 +114,9 @@ export default function Employees() {
                   <tr key={emp.id}>
                     <td>
                       <EmployeeAvatar employee={emp} />
+                    </td>
+                    <td>
+                      <code className="small">{emp.employee_number || '—'}</code>
                     </td>
                     <td className="fw-semibold">{emp.full_name}</td>
                     <td>{emp.job_title}</td>
@@ -137,7 +141,7 @@ export default function Employees() {
                 ))}
                 {!employees.length && (
                   <tr>
-                    <td colSpan="7" className="text-center py-4 text-muted">
+                    <td colSpan="8" className="text-center py-4 text-muted">
                       No employees found{search ? ` for "${search}"` : ''}.
                     </td>
                   </tr>

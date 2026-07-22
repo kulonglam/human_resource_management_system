@@ -71,9 +71,10 @@ class Command(BaseCommand):
             results['scheduled_reports'] = str(exc)
 
         try:
-            from api.ops_monitoring import emit_ops_alerts
+            from api.ops_monitoring import emit_ops_alerts, prune_ops_alert_history
 
             results['ops_alerts'] = emit_ops_alerts()
+            results['ops_alert_prune'] = prune_ops_alert_history(keep_days=90)
         except Exception as exc:
             results['ops_alerts'] = str(exc)
 

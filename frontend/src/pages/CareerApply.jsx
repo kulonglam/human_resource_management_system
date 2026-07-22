@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api/client';
+import PublicFooter from '../components/PublicFooter';
 
 export default function CareerApply() {
   const { jobId } = useParams();
@@ -58,6 +59,7 @@ export default function CareerApply() {
         <div className="text-center py-5">
           <div className="spinner-border text-primary" role="status" />
         </div>
+        <PublicFooter tone="dark" />
       </div>
     );
   }
@@ -69,6 +71,7 @@ export default function CareerApply() {
           <div className="alert alert-danger">{error}</div>
           <Link to="/careers" className="btn btn-outline-primary btn-sm">Back to careers</Link>
         </main>
+        <PublicFooter tone="dark" />
       </div>
     );
   }
@@ -86,6 +89,7 @@ export default function CareerApply() {
             </div>
           </div>
         </main>
+        <PublicFooter tone="dark" />
       </div>
     );
   }
@@ -170,6 +174,7 @@ export default function CareerApply() {
           </div>
         </div>
       </main>
+      <PublicFooter tone="dark" />
     </div>
   );
 }

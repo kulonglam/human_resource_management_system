@@ -1,6 +1,7 @@
 from django.db import models
 from employees.models import Employee
 from django.utils import timezone
+from accounts.tenancy import organization_fk
 
 class Asset(models.Model):
     ASSET_STATUS_CHOICES = [
@@ -21,6 +22,7 @@ class Asset(models.Model):
     serial_number = models.CharField(max_length=100, blank=True, unique=True, null=True)
     warranty_expiry = models.DateField(blank=True, null=True)
     depreciation_value = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    organization = organization_fk(related_name='assets')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -1,14 +1,16 @@
 """Benefit enrollment HTTP adapters."""
-from api.mixins import AuditedModelViewSet, EmployeeQuerysetMixin
+from api.mixins import AuditedModelViewSet, EmployeeQuerysetMixin, OrganizationQuerysetMixin
 from api.permissions import IsAdminOrManagerOrReadOnly
 from api.serializers import BenefitSerializer, EmployeeBenefitSerializer
 from benefits.models import Benefit, EmployeeBenefit
 
 
-class BenefitViewSet(AuditedModelViewSet):
-    queryset = Benefit.objects.filter(is_active=True).order_by('name')
+class BenefitViewSet(OrganizationQuerysetMixin, AuditedModelViewSet):
     serializer_class = BenefitSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
+
+    def get_queryset(self):
+        return self.scope_to_organization(Benefit.objects.filter(is_active=True).order_by('name'))
 
 
 class EmployeeBenefitViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):

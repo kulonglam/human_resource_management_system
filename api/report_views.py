@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 
 from attendance.models import Attendance
 from departments.models import Department
+from employees.models import Employee
 from leaves.models import Leave, LeaveBalance
 from payroll.models import Salary
 from performance.models import PerformanceAppraisal, PerformanceGoal
@@ -15,6 +16,31 @@ from recruitment.models import Application, JobPosting
 
 from .permissions import IsAdminOrManager
 from .report_exports import export_key_value_xlsx, export_rows_csv, export_rows_pdf, export_rows_xlsx
+
+
+def build_reports_overview():
+    """Workforce snapshot cards for the Reports overview tab."""
+    today = timezone.now().date()
+    return {
+        'total_employees': Employee.objects.filter(is_active=True).count(),
+        'new_joiners': Employee.objects.filter(
+            date_joined__gte=today - timedelta(days=30), is_active=True
+        ).count(),
+        'present_today': Attendance.objects.filter(date=today, status='present').count(),
+        'absent_today': Attendance.objects.filter(date=today, status='absent').count(),
+        'late_today': Attendance.objects.filter(date=today, status='late').count(),
+        'pending_leaves': Leave.objects.filter(status='pending').count(),
+        'leaves_used_this_year': Leave.objects.filter(
+            status='approved', start_date__year=today.year
+        ).count(),
+        'open_positions': JobPosting.objects.filter(is_open=True).count(),
+        'pending_applications': Application.objects.filter(status='received').count(),
+        'active_goals': PerformanceGoal.objects.filter(status='in_progress').count(),
+        'appraisals_due': PerformanceAppraisal.objects.filter(
+            status__in=['draft', 'submitted'],
+            appraisal_period_end__lte=today,
+        ).count(),
+    }
 
 
 def _maybe_export(request, payload, columns, filename_prefix):
@@ -360,7 +386,7 @@ class RecruitmentReportView(APIView):
 
 
 class ReportFiltersView(APIView):
-    """Metadata for report filter dropdowns."""
+    """Report filter dropdowns plus overview metrics (successor to /reports/analytics/)."""
 
     permission_classes = [IsAdminOrManager]
 
@@ -376,4 +402,5 @@ class ReportFiltersView(APIView):
                     start=1,
                 )
             ],
+            'overview': build_reports_overview(),
         })

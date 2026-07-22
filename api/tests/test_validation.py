@@ -185,3 +185,82 @@ class EmployeeValidationTests(HRAPITestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn('date_of_birth', response.data)
+
+    def test_rejects_digits_in_first_name(self):
+        self.login('admin', 'AdminPass123!')
+        response = self.client.post(
+            '/api/v1/employees/',
+            {
+                'first_name': 'John2',
+                'last_name': 'Doe',
+                'date_of_birth': '1990-01-01',
+                'gender': 'Male',
+                'email': 'name.digits@test.local',
+                'mobile': '0700123456',
+                'address': 'Kampala',
+                'emergency_contact': '0700111222',
+                'job_title': 'Clerk',
+                'department': self.department.id,
+                'date_joined': '2024-01-01',
+                'account_number': '111222',
+                'bank': 'Test Bank',
+                'salary': '1000',
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('first_name', response.data)
+
+    def test_rejects_letters_in_account_number(self):
+        self.login('admin', 'AdminPass123!')
+        response = self.client.post(
+            '/api/v1/employees/',
+            {
+                'first_name': 'Jane',
+                'last_name': 'Doe',
+                'date_of_birth': '1990-01-01',
+                'gender': 'Female',
+                'email': 'acct.letters@test.local',
+                'mobile': '0700123456',
+                'address': 'Kampala',
+                'emergency_contact': '0700111222',
+                'job_title': 'Clerk',
+                'department': self.department.id,
+                'date_joined': '2024-01-01',
+                'account_number': 'ABC123',
+                'bank': 'Test Bank',
+                'salary': '1000',
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('account_number', response.data)
+
+    def test_accepts_alphanumeric_employee_id_and_job_title(self):
+        self.login('admin', 'AdminPass123!')
+        response = self.client.post(
+            '/api/v1/employees/',
+            {
+                'employee_number': 'FCA-42',
+                'first_name': 'Mary-Jane',
+                'last_name': "O'Neil",
+                'date_of_birth': '1990-01-01',
+                'gender': 'Female',
+                'email': 'alpha.ok@test.local',
+                'mobile': '+256700123456',
+                'address': 'Plot 12, Kampala Rd',
+                'emergency_contact': '0700111222',
+                'job_title': 'Engineer II',
+                'department': self.department.id,
+                'date_joined': '2024-01-01',
+                'account_number': '1234567890',
+                'bank': 'Stanbic Bank',
+                'salary': '2500',
+                'cost_center': 'CC-100',
+                'national_id_number': 'CM123456789ABC',
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data['employee_number'], 'FCA-42')
+        self.assertEqual(response.data['job_title'], 'Engineer II')

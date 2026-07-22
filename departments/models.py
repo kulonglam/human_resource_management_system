@@ -1,5 +1,7 @@
 from django.db import models
 
+from accounts.tenancy import organization_fk
+
 
 class Department(models.Model):
     name = models.CharField(max_length=100)
@@ -7,6 +9,7 @@ class Department(models.Model):
     history = models.TextField(max_length=1000, blank=True)
     manager_name = models.CharField(max_length=100, blank=True)
     manager_contact = models.CharField(max_length=20, blank=True)
+    organization = organization_fk(related_name='departments')
     parent = models.ForeignKey(
         'self', on_delete=models.SET_NULL, null=True, blank=True, related_name='children',
     )

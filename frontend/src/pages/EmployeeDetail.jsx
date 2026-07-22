@@ -59,7 +59,14 @@ export default function EmployeeDetail() {
   return (
     <>
       <div className="d-flex justify-content-between align-items-center mb-4">
-        <h4 className="page-heading">{employee.full_name}</h4>
+        <div>
+          <h4 className="page-heading mb-0">{employee.full_name}</h4>
+          {employee.employee_number && (
+            <div className="text-muted small mt-1">
+              Employee ID: <code>{employee.employee_number}</code>
+            </div>
+          )}
+        </div>
         <div className="d-flex gap-2">
           {(user?.is_admin || user?.is_manager) && (
             <button
@@ -106,8 +113,8 @@ export default function EmployeeDetail() {
             <div className="card-body">
               <h5 className="card-title">Employment</h5>
               <dl className="row mb-0">
-                <dt className="col-sm-4">Employee Number</dt>
-                <dd className="col-sm-8">{employee.employee_number}</dd>
+                <dt className="col-sm-4">Employee ID</dt>
+                <dd className="col-sm-8"><code>{employee.employee_number}</code></dd>
                 <dt className="col-sm-4">Job Title</dt>
                 <dd className="col-sm-8">{employee.job_title}</dd>
                 <dt className="col-sm-4">Position</dt>

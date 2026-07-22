@@ -1,6 +1,7 @@
 from django.db import models
 from employees.models import Employee
 from departments.models import Department
+from accounts.tenancy import organization_fk
 
 class LeavePolicy(models.Model):
     LEAVE_TYPE_CHOICES = [
@@ -20,6 +21,7 @@ class LeavePolicy(models.Model):
     description = models.TextField(blank=True)
     applicable_to_all = models.BooleanField(default=False)
     departments = models.ManyToManyField(Department, blank=True, related_name='leave_policies')
+    organization = organization_fk(related_name='leave_policies')
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

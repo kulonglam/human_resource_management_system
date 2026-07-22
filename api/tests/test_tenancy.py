@@ -29,8 +29,12 @@ class OrganizationScopingTests(HRAPITestCase):
             organization=cls.org_a,
         )
 
-        cls.dept_a = Department.objects.create(name='Org A Dept', location='A')
-        cls.dept_b = Department.objects.create(name='Org B Dept', location='B')
+        cls.dept_a = Department.objects.create(
+            name='Org A Dept', location='A', organization=cls.org_a,
+        )
+        cls.dept_b = Department.objects.create(
+            name='Org B Dept', location='B', organization=cls.org_b,
+        )
 
         cls.emp_a = Employee.objects.create(
             first_name='Alice', last_name='OrgA',
@@ -143,3 +147,54 @@ class OrganizationScopingTests(HRAPITestCase):
         response = self.client.get('/api/v1/users/')
         usernames = {u['username'] for u in self._results(response.json())}
         self.assertNotIn('admin_b', usernames)
+
+    def test_org_admin_sees_only_own_departments(self):
+        self._login('admin_a', 'AdminPass123!')
+        response = self.client.get('/api/v1/departments/')
+        self.assertEqual(response.status_code, 200)
+        names = {d['name'] for d in self._results(response.json())}
+        self.assertIn('Org A Dept', names)
+        self.assertNotIn('Org B Dept', names)
+
+    def test_org_admin_job_postings_scoped(self):
+        from recruitment.models import JobPosting
+
+        job_a = JobPosting.objects.create(
+            title='Role A', department='Eng', description='d', requirements='r',
+            deadline=datetime.date(2026, 12, 1), organization=self.org_a,
+        )
+        JobPosting.objects.create(
+            title='Role B', department='Eng', description='d', requirements='r',
+            deadline=datetime.date(2026, 12, 1), organization=self.org_b,
+        )
+        self._login('admin_a', 'AdminPass123!')
+        response = self.client.get('/api/v1/jobs/')
+        self.assertEqual(response.status_code, 200)
+        titles = {j['title'] for j in self._results(response.json())}
+        self.assertIn(job_a.title, titles)
+        self.assertNotIn('Role B', titles)
+
+    def test_org_admin_payroll_runs_scoped(self):
+        from payroll.models import PayrollRun
+
+        run_a = PayrollRun.objects.create(
+            month=1, year=2026, organization=self.org_a, created_by=self.admin_a,
+        )
+        PayrollRun.objects.create(
+            month=1, year=2026, organization=self.org_b, created_by=self.admin_user,
+        )
+        self._login('admin_a', 'AdminPass123!')
+        response = self.client.get('/api/v1/payroll-runs/')
+        self.assertEqual(response.status_code, 200)
+        ids = {r['id'] for r in self._results(response.json())}
+        self.assertIn(run_a.id, ids)
+        self.assertEqual(len(ids), 1)
+
+    def test_department_create_stamps_organization(self):
+        self._login('admin_a', 'AdminPass123!')
+        response = self.client.post('/api/v1/departments/', {
+            'name': 'New Org A Dept', 'location': 'HQ',
+        }, format='json')
+        self.assertEqual(response.status_code, 201, response.content)
+        dept = Department.objects.get(name='New Org A Dept')
+        self.assertEqual(dept.organization_id, self.org_a.id)

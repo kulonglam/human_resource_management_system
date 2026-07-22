@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import SettingsBackLink from '../components/SettingsBackLink';
 
 export default function AuditLogs() {
   const { user } = useAuth();
@@ -22,6 +23,8 @@ export default function AuditLogs() {
   }
 
   return (
+    <div>
+      <SettingsBackLink />
     <div className="card">
       <div className="card-body">
         <h5 className="card-title d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -87,6 +90,7 @@ export default function AuditLogs() {
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 }

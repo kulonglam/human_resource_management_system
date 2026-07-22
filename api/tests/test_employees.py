@@ -65,6 +65,40 @@ class EmployeeAPITests(HRAPITestCase):
             ).exists()
         )
 
+    def test_admin_can_set_employee_id_on_create(self):
+        self.login('admin', 'AdminPass123!')
+        response = self.client.post(
+            '/api/v1/employees/',
+            {
+                'employee_number': 'FCA-1001',
+                'first_name': 'Custom',
+                'last_name': 'IdUser',
+                'date_of_birth': '1990-01-01',
+                'gender': 'Male',
+                'email': 'custom.id@test.local',
+                'mobile': '0700555666',
+                'address': 'Kampala',
+                'emergency_contact': '0700777888',
+                'job_title': 'Officer',
+                'department': self.department.id,
+                'date_joined': '2025-02-01',
+                'account_number': '1111222233',
+                'bank': 'Test Bank',
+                'salary': 50000,
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['employee_number'], 'FCA-1001')
+
+    def test_employee_list_search_by_employee_id(self):
+        self.login('admin', 'AdminPass123!')
+        emp_id = self.employee.employee_number
+        response = self.client.get('/api/v1/employees/', {'q': emp_id})
+        self.assertEqual(response.status_code, 200)
+        ids = [row['id'] for row in response.data['results']]
+        self.assertIn(self.employee.id, ids)
+
     def test_admin_can_terminate_employee(self):
         self.login('admin', 'AdminPass123!')
         response = self.client.post(

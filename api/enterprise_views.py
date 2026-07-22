@@ -10,8 +10,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from api.permissions import IsAdmin, IsAdminOrManager, HasAPIKeyScope
-from api.audit import log_action
+from api.permissions import IsAdmin, IsAdminOrManager
 from api.dr_monitoring import get_dr_snapshot
 from api.ops_monitoring import get_ops_alerts_snapshot, get_slo_snapshot
 from api.redis_config import infrastructure_snapshot
@@ -53,7 +52,7 @@ API_CHANGELOG = [
         'version': '1.2.0',
         'released': '2026-07-15',
         'changes': [
-            'Added organization tenancy, SCIM Users, ops/SLO endpoints.',
+            'Added organization tenancy, SCIM Users/Groups, device attendance, ops/SLO endpoints.',
             'Webhook deliveries include attempt count and signed payloads.',
             'Deprecation headers for successor-version migrations.',
         ],
@@ -179,12 +178,15 @@ class OpsStatusView(APIView):
             ),
         }
 
+        from api.ops_monitoring import get_usage_snapshot
+
         return Response({
             'jobs': jobs,
             'backups': backups,
             'backup_retention': retention,
             'disaster_recovery': get_dr_snapshot(),
             'alerts': _safe_ops_alerts_snapshot(),
+            'usage': get_usage_snapshot(),
             'infrastructure': infrastructure_snapshot(getattr(settings, 'REDIS_URL', '') or None),
             'runbooks': RUNBOOKS,
             'worker_hint': 'Start worker with: python manage.py qcluster',
@@ -196,87 +198,6 @@ class SLOMetricsView(APIView):
 
     def get(self, request):
         return Response(get_slo_snapshot())
-
-
-class ScimUsersView(APIView):
-    """Minimal SCIM 2.0 Users endpoint for IdP provisioning."""
-
-    permission_classes = [IsAdmin, HasAPIKeyScope]
-    throttle_classes = [__import__('api.throttles', fromlist=['SCIMRateThrottle']).SCIMRateThrottle]
-    required_api_scopes = ['scim', 'admin']
-
-    def get(self, request):
-        from accounts.models import CustomUser
-
-        start = int(request.query_params.get('startIndex', 1))
-        count = min(int(request.query_params.get('count', 100)), 200)
-        qs = CustomUser.objects.select_related('role', 'organization').order_by('id')
-        filter_query = request.query_params.get('filter', '')
-        if 'userName eq' in filter_query:
-            username = filter_query.split('"')[1] if '"' in filter_query else ''
-            qs = qs.filter(username=username)
-        total = qs.count()
-        users = qs[start - 1:start - 1 + count]
-        resources = [self._to_scim(user) for user in users]
-        return Response({
-            'schemas': ['urn:ietf:params:scim:api:messages:2.0:ListResponse'],
-            'totalResults': total,
-            'startIndex': start,
-            'itemsPerPage': len(resources),
-            'Resources': resources,
-        })
-
-    def post(self, request):
-        from accounts.models import CustomUser, Organization, Role
-
-        email = (request.data.get('emails') or [{}])[0].get('value') or request.data.get('userName')
-        username = request.data.get('userName') or (email or '').split('@')[0]
-        if not username or not email:
-            return Response({'detail': 'userName and emails[0].value required'}, status=400)
-        if CustomUser.objects.filter(username=username).exists():
-            return Response({'detail': 'User already exists'}, status=409)
-        role_name = Role.EMPLOYEE
-        for group in request.data.get('groups') or []:
-            display = (group.get('display') or '').lower()
-            if display in (Role.ADMIN, Role.MANAGER, Role.EMPLOYEE):
-                role_name = display
-        role, _ = Role.objects.get_or_create(name=role_name)
-        org = None
-        if request.user.organization_id:
-            org = request.user.organization
-        from django.utils.crypto import get_random_string
-
-        user = CustomUser.objects.create_user(
-            username=username,
-            email=email,
-            password=get_random_string(32),
-            role=role,
-            organization=org,
-            external_id=request.data.get('externalId', ''),
-            first_name=(request.data.get('name') or {}).get('givenName', ''),
-            last_name=(request.data.get('name') or {}).get('familyName', ''),
-            is_active=request.data.get('active', True),
-        )
-        log_action(request, 'create', 'CustomUser', user.id, username, 'SCIM provisioned')
-        return Response(self._to_scim(user), status=status.HTTP_201_CREATED)
-
-    def _to_scim(self, user):
-        return {
-            'schemas': ['urn:ietf:params:scim:schemas:core:2.0:User'],
-            'id': str(user.id),
-            'externalId': user.external_id or '',
-            'userName': user.username,
-            'name': {
-                'givenName': user.first_name,
-                'familyName': user.last_name,
-            },
-            'emails': [{'value': user.email, 'primary': True}],
-            'active': user.is_active,
-            'meta': {
-                'resourceType': 'User',
-                'location': f'/api/v1/scim/v2/Users/{user.id}',
-            },
-        }
 
 
 class OrganizationViewSet(viewsets.ModelViewSet):

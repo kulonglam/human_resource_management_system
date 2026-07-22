@@ -130,6 +130,7 @@ INSTALLED_APPS = [
     'documents',
     'integrations',
     'compliance',
+    'events',
     'django_q',
 ]
 
@@ -173,11 +174,15 @@ WSGI_APPLICATION = 'avvento_hrmis.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
+# PgBouncer transaction pooling requires CONN_MAX_AGE=0 (no persistent connections).
+_USE_PGBOUNCER = os.environ.get('USE_PGBOUNCER', 'False') == 'True'
+_DB_CONN_MAX_AGE = 0 if _USE_PGBOUNCER else int(os.environ.get('DB_CONN_MAX_AGE', '600'))
+
 if os.environ.get('DATABASE_URL'):
     DATABASES = {
         'default': dj_database_url.config(
             default=os.environ['DATABASE_URL'],
-            conn_max_age=600,
+            conn_max_age=_DB_CONN_MAX_AGE,
             ssl_require=not DEBUG,
         )
     }
@@ -190,6 +195,7 @@ elif os.environ.get('POSTGRES_NAME'):
             'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
             'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
             'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+            'CONN_MAX_AGE': _DB_CONN_MAX_AGE,
         }
     }
 else:
@@ -199,6 +205,14 @@ else:
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
+
+if os.environ.get('DATABASE_REPLICA_URL'):
+    DATABASES['replica'] = dj_database_url.config(
+        default=os.environ['DATABASE_REPLICA_URL'],
+        conn_max_age=_DB_CONN_MAX_AGE,
+        ssl_require=not DEBUG,
+    )
+    DATABASE_ROUTERS = ['avvento_hrmis.db_router.PrimaryReplicaRouter']
 
 
 # Password validation
@@ -302,6 +316,10 @@ MICROSOFT_OAUTH_CLIENT_SECRET = os.environ.get('MICROSOFT_OAUTH_CLIENT_SECRET', 
 MICROSOFT_OAUTH_TENANT = os.environ.get('MICROSOFT_OAUTH_TENANT', 'common')
 SSO_CALLBACK_BASE_URL = os.environ.get('SSO_CALLBACK_BASE_URL', 'http://localhost:8000')
 SSO_FRONTEND_REDIRECT = os.environ.get('SSO_FRONTEND_REDIRECT', 'http://localhost:5173/dashboard')
+FRONTEND_BASE_URL = os.environ.get(
+    'FRONTEND_BASE_URL',
+    SSO_FRONTEND_REDIRECT.rsplit('/', 1)[0] if SSO_FRONTEND_REDIRECT else 'http://localhost:5173',
+)
 SSO_AUTO_PROVISION = os.environ.get('SSO_AUTO_PROVISION', 'False') == 'True'
 WEBHOOKS_ENABLED = os.environ.get('WEBHOOKS_ENABLED', 'True') == 'True'
 
@@ -381,6 +399,7 @@ REST_FRAMEWORK = {
         'user': os.environ.get('API_THROTTLE_USER', '600/minute'),
         'login': os.environ.get('API_THROTTLE_LOGIN', '10/minute'),
         'mfa': os.environ.get('API_THROTTLE_MFA', '10/minute'),
+        'password_reset': os.environ.get('API_THROTTLE_PASSWORD_RESET', '5/minute'),
         'export': os.environ.get('API_THROTTLE_EXPORT', '30/minute'),
         'scim': os.environ.get('API_THROTTLE_SCIM', '60/minute'),
     },

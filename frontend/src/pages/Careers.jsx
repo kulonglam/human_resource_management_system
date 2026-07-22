@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
+import PublicFooter from '../components/PublicFooter';
 
 export default function Careers() {
   const [jobs, setJobs] = useState([]);
@@ -58,6 +59,7 @@ export default function Careers() {
           </div>
         )}
       </main>
+      <PublicFooter tone="dark" />
     </div>
   );
 }

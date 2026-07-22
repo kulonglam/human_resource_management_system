@@ -40,6 +40,10 @@ class ComplianceEvidencePack(models.Model):
         ('data_retention', 'Data retention'),
         ('incident_response', 'Incident response'),
         ('vulnerability_mgmt', 'Vulnerability management'),
+        ('penetration_testing', 'Penetration testing'),
+        ('change_management', 'Change management'),
+        ('availability_slo', 'Availability / SLO'),
+        ('access_reviews', 'Access reviews'),
     ]
 
     control = models.CharField(max_length=40, choices=CONTROL_CHOICES)

@@ -1,7 +1,14 @@
 """Attendance domain serializers."""
 from rest_framework import serializers
 
-from attendance.models import Attendance, OvertimeRecord, PublicHoliday, Timesheet
+from attendance.models import (
+    Attendance,
+    AttendanceDevice,
+    DevicePunch,
+    OvertimeRecord,
+    PublicHoliday,
+    Timesheet,
+)
 
 class AttendanceSerializer(serializers.ModelSerializer):
     employee_name = serializers.CharField(source='employee.full_name', read_only=True)
@@ -57,4 +64,35 @@ class OvertimeRecordSerializer(serializers.ModelSerializer):
         model = OvertimeRecord
         fields = '__all__'
         read_only_fields = ['approved_by', 'approved_at', 'created_at']
+
+
+class AttendanceDeviceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AttendanceDevice
+        fields = [
+            'id', 'name', 'device_code', 'device_type', 'location', 'organization',
+            'is_active', 'token_prefix', 'last_seen_at', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['token_prefix', 'last_seen_at', 'created_at', 'updated_at']
+
+
+class AttendanceDeviceCreateSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=120)
+    device_code = serializers.SlugField(max_length=64)
+    device_type = serializers.ChoiceField(choices=AttendanceDevice.DEVICE_TYPES, default='fingerprint')
+    location = serializers.CharField(max_length=200, required=False, allow_blank=True)
+
+
+class DevicePunchSerializer(serializers.ModelSerializer):
+    employee_name = serializers.CharField(source='employee.full_name', read_only=True, default=None)
+    device_name = serializers.CharField(source='device.name', read_only=True, default=None)
+
+    class Meta:
+        model = DevicePunch
+        fields = [
+            'id', 'device', 'device_name', 'employee', 'employee_name', 'badge_id',
+            'punched_at', 'punch_type', 'source', 'client_punch_id', 'applied',
+            'error_message', 'attendance', 'created_at',
+        ]
+        read_only_fields = fields
 

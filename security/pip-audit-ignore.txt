@@ -1,0 +1,3 @@
+# One CVE id per line to temporarily accept after risk review.
+# Example:
+# GHSA-xxxx-xxxx-xxxx

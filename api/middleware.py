@@ -44,6 +44,7 @@ class RequestIDMiddleware(MiddlewareMixin):
 
     def _record_slo(self, path, status_code, elapsed_ms):
         hour_key = time.strftime('%Y%m%d%H')
+        day_key = time.strftime('%Y%m%d')
         requests_key = f'slo:requests:{hour_key}'
         errors_key = f'slo:errors:{hour_key}'
         latency_key = f'slo:latency_ms:{hour_key}'
@@ -57,8 +58,33 @@ class RequestIDMiddleware(MiddlewareMixin):
             # Approximate sum of latency for average computation
             current = cache.get(latency_key) or 0.0
             cache.set(latency_key, float(current) + float(elapsed_ms), 60 * 60 * 26)
+            self._record_usage(path, day_key)
         except Exception:
             pass
+
+    def _record_usage(self, path, day_key):
+        """Track coarse path usage for cost/ops observability."""
+        total_key = f'usage:requests:{day_key}'
+        cache.add(total_key, 0, 60 * 60 * 48)
+        try:
+            cache.incr(total_key)
+        except Exception:
+            pass
+        # Normalize to first three path segments (e.g. /api/v1/employees/)
+        parts = [p for p in path.split('/') if p]
+        bucket = '/' + '/'.join(parts[:3]) + '/' if parts else path
+        path_key = f'usage:path:{day_key}:{bucket}'
+        cache.add(path_key, 0, 60 * 60 * 48)
+        try:
+            cache.incr(path_key)
+        except Exception:
+            pass
+        # Remember path keys for aggregation
+        index_key = f'usage:paths:{day_key}'
+        paths = cache.get(index_key) or []
+        if bucket not in paths:
+            paths = list(paths) + [bucket]
+            cache.set(index_key, paths[:50], 60 * 60 * 48)
 
 
 class DeprecationMiddleware(MiddlewareMixin):

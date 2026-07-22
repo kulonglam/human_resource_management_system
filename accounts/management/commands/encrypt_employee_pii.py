@@ -23,7 +23,8 @@ class Command(BaseCommand):
         updated = 0
 
         with connection.cursor() as cursor:
-            cursor.execute(f'SELECT {columns} FROM {table}')
+            # Identifiers come from Django model meta / fixed field list, not user input.
+            cursor.execute(f'SELECT {columns} FROM {table}')  # nosec B608
             rows = cursor.fetchall()
 
         for row in rows:
@@ -38,7 +39,8 @@ class Command(BaseCommand):
             set_clause = ', '.join(f'{field} = %s' for field in changes)
             params = [*changes.values(), employee_id]
             with connection.cursor() as cursor:
-                cursor.execute(f'UPDATE {table} SET {set_clause} WHERE id = %s', params)
+                sql = f'UPDATE {table} SET {set_clause} WHERE id = %s'  # nosec B608
+                cursor.execute(sql, params)
             updated += 1
 
         self.stdout.write(self.style.SUCCESS(f'Encrypted PII for {updated} employee(s).'))

@@ -31,6 +31,30 @@ KNOWN_ALERT_KEYS = (
 )
 
 
+def get_usage_snapshot(*, now=None):
+    """Daily request totals and top API path buckets for cost/ops visibility."""
+    now = now or timezone.now()
+    day_key = now.strftime('%Y%m%d')
+    total = int(cache.get(f'usage:requests:{day_key}') or 0)
+    paths = cache.get(f'usage:paths:{day_key}') or []
+    if not isinstance(paths, list):
+        paths = []
+    top = []
+    for path in paths:
+        count = int(cache.get(f'usage:path:{day_key}:{path}') or 0)
+        if count:
+            top.append({'path': path, 'requests': count})
+    top.sort(key=lambda item: item['requests'], reverse=True)
+    return {
+        'window': 'current_day',
+        'day': day_key,
+        'total_requests': total,
+        'top_paths': top[:15],
+        'checked_at': now.isoformat(),
+        'note': 'Coarse path counters for capacity/cost planning; not billable metering.',
+    }
+
+
 def get_health_snapshot():
     db_ok = True
     error = ''
@@ -217,9 +241,47 @@ def get_cooldown_status(alert_key, *, now=None, cooldown_minutes=None):
 
 
 def _append_alert_history(entry):
+    """Persist alert history to DB; keep a short cache mirror for fast reads."""
+    from accounts.models import OpsAlertEvent
+
+    OpsAlertEvent.objects.create(
+        key=entry.get('key', ''),
+        level=entry.get('level', 'warning'),
+        title=entry.get('title', '')[:200],
+        message=entry.get('message', ''),
+        outcome=entry.get('outcome', 'emitted'),
+        payload=entry.get('payload') or {},
+        emitted_at=_parse_emitted_at(entry.get('at')) or timezone.now(),
+    )
     history = list(cache.get(OPS_ALERT_HISTORY_KEY) or [])
     history.insert(0, entry)
     cache.set(OPS_ALERT_HISTORY_KEY, history[:OPS_ALERT_HISTORY_LIMIT], 60 * 60 * 24 * 14)
+
+
+def _load_recent_alert_history(limit=OPS_ALERT_HISTORY_LIMIT):
+    from accounts.models import OpsAlertEvent
+
+    rows = OpsAlertEvent.objects.order_by('-emitted_at')[:limit]
+    return [
+        {
+            'key': row.key,
+            'title': row.title,
+            'message': row.message,
+            'level': row.level,
+            'outcome': row.outcome,
+            'at': row.emitted_at.isoformat(),
+            'payload': row.payload or {},
+        }
+        for row in rows
+    ]
+
+
+def prune_ops_alert_history(*, keep_days=90):
+    from accounts.models import OpsAlertEvent
+
+    cutoff = timezone.now() - timedelta(days=keep_days)
+    deleted, _ = OpsAlertEvent.objects.filter(emitted_at__lt=cutoff).delete()
+    return deleted
 
 
 def get_ops_alerts_snapshot(*, now=None):
@@ -239,10 +301,7 @@ def get_ops_alerts_snapshot(*, now=None):
         if status['active'] or status['breaching']:
             cooldowns.append(status)
 
-    history = cache.get(OPS_ALERT_HISTORY_KEY) or []
-    if not isinstance(history, list):
-        history = []
-    history = [entry for entry in history if isinstance(entry, dict)]
+    history = _load_recent_alert_history()
     return {
         'cooldown_minutes': cooldown_minutes,
         'checked_at': now.isoformat(),

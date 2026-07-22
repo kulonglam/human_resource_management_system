@@ -6,7 +6,7 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
 from api.approval_integration import process_recruitment_decision
-from api.mixins import AuditedModelViewSet
+from api.mixins import AuditedModelViewSet, OrganizationQuerysetMixin
 from api.notifications import notify_application_status
 from api.permissions import IsAdminOrManager, IsAdminOrManagerOrReadOnly
 from api.serializers import (
@@ -50,19 +50,24 @@ from recruitment.services import (
 )
 
 
-class JobPostingViewSet(AuditedModelViewSet):
-    queryset = JobPosting.objects.all().order_by('-posted_on')
+class JobPostingViewSet(OrganizationQuerysetMixin, AuditedModelViewSet):
     serializer_class = JobPostingSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
 
+    def get_queryset(self):
+        return self.scope_to_organization(JobPosting.objects.all().order_by('-posted_on'))
 
-class ApplicationViewSet(AuditedModelViewSet):
+
+class ApplicationViewSet(OrganizationQuerysetMixin, AuditedModelViewSet):
     serializer_class = ApplicationSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
+    organization_join_field = 'job__organization_id'
+    assign_organization_on_create = False
 
     def get_queryset(self):
         qs = Application.objects.select_related('job').order_by('-applied_on')
+        qs = self.scope_to_organization(qs)
         job_id = self.request.query_params.get('job')
         if job_id:
             qs = qs.filter(job_id=job_id)
@@ -115,12 +120,15 @@ class ApplicationViewSet(AuditedModelViewSet):
         return Response(ApplicationSerializer(application, context={'request': request}).data)
 
 
-class ApplicationNoteViewSet(AuditedModelViewSet):
+class ApplicationNoteViewSet(OrganizationQuerysetMixin, AuditedModelViewSet):
     serializer_class = ApplicationNoteSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
+    organization_join_field = 'application__job__organization_id'
+    assign_organization_on_create = False
 
     def get_queryset(self):
         qs = ApplicationNote.objects.select_related('application', 'author')
+        qs = self.scope_to_organization(qs)
         application_id = self.request.query_params.get('application')
         if application_id:
             qs = qs.filter(application_id=application_id)
@@ -130,12 +138,15 @@ class ApplicationNoteViewSet(AuditedModelViewSet):
         serializer.save(author=self.request.user)
 
 
-class InterviewViewSet(AuditedModelViewSet):
+class InterviewViewSet(OrganizationQuerysetMixin, AuditedModelViewSet):
     serializer_class = InterviewSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
+    organization_join_field = 'application__job__organization_id'
+    assign_organization_on_create = False
 
     def get_queryset(self):
         qs = Interview.objects.select_related('application', 'created_by')
+        qs = self.scope_to_organization(qs)
         application_id = self.request.query_params.get('application')
         if application_id:
             qs = qs.filter(application_id=application_id)
@@ -146,44 +157,55 @@ class InterviewViewSet(AuditedModelViewSet):
         after_interview_created(interview=interview)
 
 
-class JobPipelineStageViewSet(AuditedModelViewSet):
+class JobPipelineStageViewSet(OrganizationQuerysetMixin, AuditedModelViewSet):
     serializer_class = JobPipelineStageSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
+    organization_join_field = 'job__organization_id'
+    assign_organization_on_create = False
 
     def get_queryset(self):
         qs = JobPipelineStage.objects.select_related('job')
+        qs = self.scope_to_organization(qs)
         job_id = self.request.query_params.get('job')
         if job_id:
             qs = qs.filter(job_id=job_id)
         return qs
 
 
-class HiringTeamMemberViewSet(AuditedModelViewSet):
+class HiringTeamMemberViewSet(OrganizationQuerysetMixin, AuditedModelViewSet):
     serializer_class = HiringTeamMemberSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
+    organization_join_field = 'job__organization_id'
+    assign_organization_on_create = False
 
     def get_queryset(self):
         qs = HiringTeamMember.objects.select_related('user', 'job')
+        qs = self.scope_to_organization(qs)
         job_id = self.request.query_params.get('job')
         if job_id:
             qs = qs.filter(job_id=job_id)
         return qs
 
 
-class ScorecardCriterionViewSet(AuditedModelViewSet):
+class ScorecardCriterionViewSet(OrganizationQuerysetMixin, AuditedModelViewSet):
     serializer_class = ScorecardCriterionSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
+    organization_join_field = 'job__organization_id'
+    assign_organization_on_create = False
 
     def get_queryset(self):
         qs = ScorecardCriterion.objects.select_related('job')
+        qs = self.scope_to_organization(qs)
         job_id = self.request.query_params.get('job')
         if job_id:
             qs = qs.filter(job_id=job_id)
         return qs
 
 
-class ApplicationScorecardViewSet(AuditedModelViewSet):
+class ApplicationScorecardViewSet(OrganizationQuerysetMixin, AuditedModelViewSet):
     permission_classes = [IsAdminOrManagerOrReadOnly]
+    organization_join_field = 'application__job__organization_id'
+    assign_organization_on_create = False
 
     def get_serializer_class(self):
         if self.action in ('create', 'update', 'partial_update'):
@@ -192,24 +214,30 @@ class ApplicationScorecardViewSet(AuditedModelViewSet):
 
     def get_queryset(self):
         qs = ApplicationScorecard.objects.select_related('reviewer', 'application').prefetch_related('ratings__criterion')
+        qs = self.scope_to_organization(qs)
         application_id = self.request.query_params.get('application')
         if application_id:
             qs = qs.filter(application_id=application_id)
         return qs
 
 
-class OfferTemplateViewSet(AuditedModelViewSet):
-    queryset = OfferTemplate.objects.filter(is_active=True).order_by('name')
+class OfferTemplateViewSet(OrganizationQuerysetMixin, AuditedModelViewSet):
     serializer_class = OfferTemplateSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
 
+    def get_queryset(self):
+        return self.scope_to_organization(OfferTemplate.objects.filter(is_active=True).order_by('name'))
 
-class JobOfferViewSet(AuditedModelViewSet):
+
+class JobOfferViewSet(OrganizationQuerysetMixin, AuditedModelViewSet):
     serializer_class = JobOfferSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
+    organization_join_field = 'application__job__organization_id'
+    assign_organization_on_create = False
 
     def get_queryset(self):
         qs = JobOffer.objects.select_related('application', 'template', 'created_by')
+        qs = self.scope_to_organization(qs)
         application_id = self.request.query_params.get('application')
         if application_id:
             qs = qs.filter(application_id=application_id)
@@ -260,13 +288,16 @@ class JobOfferViewSet(AuditedModelViewSet):
         return Response(JobOfferSerializer(offer).data)
 
 
-class HireOnboardingViewSet(AuditedModelViewSet):
+class HireOnboardingViewSet(OrganizationQuerysetMixin, AuditedModelViewSet):
     serializer_class = HireOnboardingSerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
     http_method_names = ['get', 'patch', 'head', 'options', 'post']
+    organization_join_field = 'application__job__organization_id'
+    assign_organization_on_create = False
 
     def get_queryset(self):
         qs = HireOnboarding.objects.select_related('application', 'employee').order_by('-created_at')
+        qs = self.scope_to_organization(qs)
         application_id = self.request.query_params.get('application')
         if application_id:
             qs = qs.filter(application_id=application_id)

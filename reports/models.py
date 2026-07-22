@@ -1,6 +1,7 @@
 from django.db import models
 
 from accounts.models import CustomUser
+from accounts.tenancy import organization_fk
 
 
 class SavedReport(models.Model):
@@ -20,6 +21,7 @@ class SavedReport(models.Model):
     description = models.TextField(blank=True)
     report_type = models.CharField(max_length=50, choices=REPORT_TYPES)
     filters = models.JSONField(default=dict, help_text='Saved filter parameters')
+    organization = organization_fk(related_name='saved_reports')
     created_by = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -39,6 +41,7 @@ class ReportSnapshot(models.Model):
     title = models.CharField(max_length=200)
     report_data = models.JSONField()
     filters_used = models.JSONField(default=dict)
+    organization = organization_fk(related_name='report_snapshots')
     generated_by = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True)
     generated_at = models.DateTimeField(auto_now_add=True)
 
@@ -70,6 +73,7 @@ class ScheduledReport(models.Model):
     export_format = models.CharField(max_length=10, choices=FORMAT_CHOICES, default='xlsx')
     recipient_emails = models.JSONField(default=list, help_text='List of email addresses')
     is_active = models.BooleanField(default=True)
+    organization = organization_fk(related_name='scheduled_reports')
     last_run_at = models.DateTimeField(null=True, blank=True)
     created_by = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)

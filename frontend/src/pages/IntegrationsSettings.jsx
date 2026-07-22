@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import ConfirmModal from '../components/ConfirmModal';
+import SettingsBackLink from '../components/SettingsBackLink';
 
 function DeliveryLogTable({ deliveries, loading, onSelectPayload }) {
   if (loading) {
@@ -101,6 +103,8 @@ export default function IntegrationsSettings() {
   const [createdKey, setCreatedKey] = useState('');
   const [webhookForm, setWebhookForm] = useState({ name: '', url: '', events: [] });
   const [error, setError] = useState('');
+  const [webhookToDelete, setWebhookToDelete] = useState(null);
+  const [deletingWebhook, setDeletingWebhook] = useState(false);
 
   const loadDeliveries = useCallback(async () => {
     setLoadingDeliveries(true);
@@ -180,14 +184,18 @@ export default function IntegrationsSettings() {
     }
   };
 
-  const deleteWebhook = async (hook) => {
-    if (!window.confirm(`Delete webhook "${hook.name}"?`)) return;
+  const confirmDeleteWebhook = async () => {
+    if (!webhookToDelete) return;
+    setDeletingWebhook(true);
     try {
-      await api.remove('webhooks', hook.id);
+      await api.remove('webhooks', webhookToDelete.id);
+      setWebhookToDelete(null);
       load();
       loadDeliveries();
     } catch (err) {
       setError(err.message);
+    } finally {
+      setDeletingWebhook(false);
     }
   };
 
@@ -202,6 +210,7 @@ export default function IntegrationsSettings() {
 
   return (
     <>
+      <SettingsBackLink />
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h4 className="page-heading mb-0">
           <i className="bi bi-plug" style={{ color: 'var(--fca-lime)' }} /> Integrations
@@ -290,7 +299,7 @@ export default function IntegrationsSettings() {
                       {hook.is_active ? 'Disable' : 'Enable'}
                     </button>
                     <button type="button" className="btn btn-outline-danger btn-sm"
-                      onClick={() => deleteWebhook(hook)}>
+                      onClick={() => setWebhookToDelete(hook)}>
                       Delete
                     </button>
                   </div>
@@ -367,6 +376,21 @@ export default function IntegrationsSettings() {
           <div className="modal-backdrop show" />
         </>
       )}
+
+      <ConfirmModal
+        open={Boolean(webhookToDelete)}
+        title="Delete webhook"
+        message={
+          webhookToDelete
+            ? `Delete webhook "${webhookToDelete.name}"? This cannot be undone.`
+            : ''
+        }
+        confirmLabel="Delete"
+        confirmVariant="danger"
+        busy={deletingWebhook}
+        onCancel={() => !deletingWebhook && setWebhookToDelete(null)}
+        onConfirm={confirmDeleteWebhook}
+      />
     </>
   );
 }

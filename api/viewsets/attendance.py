@@ -1,31 +1,42 @@
 """Attendance domain HTTP adapters."""
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from rest_framework import status
 from rest_framework.decorators import action
-from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from api.audit import log_action
-from api.mixins import AuditedModelViewSet, EmployeeQuerysetMixin
-from api.permissions import CanApproveAttendance, IsAdminOrManagerOrReadOnly
+from api.mixins import AuditedModelViewSet, EmployeeQuerysetMixin, OrganizationQuerysetMixin
+from api.permissions import CanApproveAttendance, IsAdmin, IsAdminOrManagerOrReadOnly
 from api.serializers import (
+    AttendanceDeviceCreateSerializer,
+    AttendanceDeviceSerializer,
     AttendanceSerializer,
+    DevicePunchSerializer,
     OvertimeRecordSerializer,
     PublicHolidaySerializer,
     TimesheetSerializer,
 )
-from attendance.models import Attendance, OvertimeRecord, PublicHoliday, Timesheet
+from attendance.models import Attendance, AttendanceDevice, DevicePunch, OvertimeRecord, PublicHoliday, Timesheet
 from attendance.services import (
     approve_attendance,
     approve_overtime,
     approve_timesheet,
+    authenticate_attendance_device,
+    create_attendance_device,
     finalize_attendance_record,
     import_attendance_csv,
+    ingest_device_punch,
     reject_attendance,
     reject_overtime,
     submit_attendance,
     submit_timesheet,
+    sync_offline_punches,
 )
+from employees.models import Employee
 
 
 class AttendanceViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
@@ -101,10 +112,12 @@ class AttendanceViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
         return Response(result)
 
 
-class PublicHolidayViewSet(AuditedModelViewSet):
-    queryset = PublicHoliday.objects.all()
+class PublicHolidayViewSet(OrganizationQuerysetMixin, AuditedModelViewSet):
     serializer_class = PublicHolidaySerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
+
+    def get_queryset(self):
+        return self.scope_to_organization(PublicHoliday.objects.all())
 
 
 class TimesheetViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
@@ -164,3 +177,124 @@ class OvertimeRecordViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
         except ValueError as exc:
             return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(OvertimeRecordSerializer(record, context={'request': request}).data)
+
+
+class AttendanceDeviceViewSet(OrganizationQuerysetMixin, AuditedModelViewSet):
+    """Admin management of biometric / device terminals."""
+
+    permission_classes = [IsAdmin]
+    http_method_names = ['get', 'post', 'patch', 'head', 'options']
+
+    def get_queryset(self):
+        return self.scope_to_organization(AttendanceDevice.objects.all().order_by('name'))
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return AttendanceDeviceCreateSerializer
+        return AttendanceDeviceSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = AttendanceDeviceCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        org = getattr(request.user, 'organization', None)
+        device, raw_token = create_attendance_device(
+            organization=org,
+            **serializer.validated_data,
+        )
+        log_action(request, 'create', 'AttendanceDevice', device.id, device.name, 'Device registered')
+        data = AttendanceDeviceSerializer(device).data
+        data['device_token'] = raw_token
+        return Response(data, status=status.HTTP_201_CREATED)
+
+
+class DevicePunchViewSet(AuditedModelViewSet):
+    """Read-only punch log for ops / attendance admins."""
+
+    serializer_class = DevicePunchSerializer
+    permission_classes = [IsAdminOrManagerOrReadOnly]
+    http_method_names = ['get', 'head', 'options']
+
+    def get_queryset(self):
+        from django.db.models import Q
+
+        qs = DevicePunch.objects.select_related('employee', 'device').order_by('-punched_at')
+        org_id = getattr(self.request.user, 'organization_id', None)
+        if org_id:
+            qs = qs.filter(
+                Q(employee__organization_id=org_id)
+                | Q(device__organization_id=org_id),
+            )
+        return qs
+
+
+class DevicePunchIngestView(APIView):
+    """Hardware terminal punch ingest authenticated by device token."""
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        raw = (
+            request.META.get('HTTP_X_DEVICE_TOKEN')
+            or request.headers.get('X-Device-Token')
+            or ''
+        )
+        device = authenticate_attendance_device(raw)
+        if not device:
+            return Response({'detail': 'Invalid device token.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        badge_id = request.data.get('badge_id') or request.data.get('employee_number') or ''
+        punched_at = request.data.get('punched_at')
+        if punched_at:
+            punched_at = parse_datetime(str(punched_at).replace('Z', '+00:00'))
+        punch = ingest_device_punch(
+            device=device,
+            badge_id=badge_id,
+            punched_at=punched_at,
+            punch_type=request.data.get('punch_type', 'auto'),
+            source='device',
+            client_punch_id=request.data.get('client_punch_id', ''),
+            raw_payload=request.data if isinstance(request.data, dict) else {},
+        )
+        return Response(DevicePunchSerializer(punch).data, status=status.HTTP_201_CREATED)
+
+
+class MobilePunchView(APIView):
+    """Authenticated mobile clock in/out (online)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            employee = Employee.objects.get(email=request.user.email, is_active=True)
+        except Employee.DoesNotExist:
+            return Response({'detail': 'No employee profile linked to your account.'}, status=400)
+
+        punched_at = request.data.get('punched_at')
+        if punched_at:
+            punched_at = parse_datetime(str(punched_at).replace('Z', '+00:00'))
+        punch = ingest_device_punch(
+            employee=employee,
+            badge_id=employee.device_badge_id or employee.employee_number,
+            punched_at=punched_at,
+            punch_type=request.data.get('punch_type', 'auto'),
+            source='mobile',
+            client_punch_id=request.data.get('client_punch_id', ''),
+            raw_payload=request.data if isinstance(request.data, dict) else {},
+        )
+        return Response(DevicePunchSerializer(punch).data, status=status.HTTP_201_CREATED)
+
+
+class MobilePunchSyncView(APIView):
+    """Flush offline-queued punches from the mobile client."""
+
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request):
+        try:
+            employee = Employee.objects.get(email=request.user.email, is_active=True)
+        except Employee.DoesNotExist:
+            return Response({'detail': 'No employee profile linked to your account.'}, status=400)
+        results = sync_offline_punches(employee, request.data.get('punches') or [])
+        return Response({'synced': len(results), 'results': results})

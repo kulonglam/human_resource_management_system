@@ -68,3 +68,9 @@ class OpsAlertTests(HRAPITestCase):
         )
         history = cache.get(OPS_ALERT_HISTORY_KEY) or []
         self.assertTrue(any(item['key'] == 'slo_breach' for item in history))
+        from accounts.models import OpsAlertEvent
+        self.assertTrue(
+            OpsAlertEvent.objects.filter(key='slo_breach', outcome='emitted').exists(),
+        )
+        self.assertIn('usage', response.data)
+        self.assertIn('total_requests', response.data['usage'])

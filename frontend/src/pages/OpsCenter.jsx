@@ -7,6 +7,8 @@ import OpsBackupsCard from '../components/ops/OpsBackupsCard';
 import OpsJobsCard from '../components/ops/OpsJobsCard';
 import OpsRunbooksPanel from '../components/ops/OpsRunbooksPanel';
 import OpsSLOCard from '../components/ops/OpsSLOCard';
+import OpsUsageCard from '../components/ops/OpsUsageCard';
+import SettingsBackLink from '../components/SettingsBackLink';
 
 export default function OpsCenter() {
   const { user } = useAuth();
@@ -65,6 +67,7 @@ export default function OpsCenter() {
 
   return (
     <div>
+      <SettingsBackLink />
       <h1 className="page-heading mb-3">
         <i className="bi bi-hdd-rack" aria-hidden="true" /> Operations Center
       </h1>
@@ -88,6 +91,7 @@ export default function OpsCenter() {
           <OpsSLOCard slos={slos} />
           <OpsBackupsCard ops={ops} />
           <OpsAlertsCard alerts={ops?.alerts} />
+          <OpsUsageCard usage={ops?.usage} />
           <OpsRunbooksPanel runbooks={ops?.runbooks} />
         </div>
       )}

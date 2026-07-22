@@ -23,8 +23,17 @@ class DashboardTests(HRAPITestCase):
         self.assertIn('exec_analytics', response.data)
         self.assertIn('exec_brief', response.data)
 
-    def test_reports_analytics(self):
+    def test_reports_overview_via_filters(self):
+        self.login('admin', 'AdminPass123!')
+        response = self.client.get('/api/v1/reports/filters/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('departments', response.data)
+        self.assertIn('overview', response.data)
+        self.assertIn('present_today', response.data['overview'])
+
+    def test_reports_analytics_deprecated_alias(self):
         self.login('admin', 'AdminPass123!')
         response = self.client.get('/api/v1/reports/analytics/')
         self.assertEqual(response.status_code, 200)
         self.assertIn('present_today', response.data)
+        self.assertEqual(response.get('Deprecation'), 'true')

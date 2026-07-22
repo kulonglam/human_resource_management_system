@@ -5,17 +5,19 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
 from api.approval_integration import process_expense_decision
-from api.mixins import AuditedModelViewSet, EmployeeQuerysetMixin
+from api.mixins import AuditedModelViewSet, EmployeeQuerysetMixin, OrganizationQuerysetMixin
 from api.notifications import notify_expense_decision
 from api.permissions import IsAdminOrManager, IsAdminOrManagerOrReadOnly
 from api.serializers import ExpenseCategorySerializer, ExpenseSerializer
 from expenses.models import Expense, ExpenseCategory
 
 
-class ExpenseCategoryViewSet(AuditedModelViewSet):
-    queryset = ExpenseCategory.objects.filter(is_active=True).order_by('name')
+class ExpenseCategoryViewSet(OrganizationQuerysetMixin, AuditedModelViewSet):
     serializer_class = ExpenseCategorySerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
+
+    def get_queryset(self):
+        return self.scope_to_organization(ExpenseCategory.objects.filter(is_active=True).order_by('name'))
 
 
 class ExpenseViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):

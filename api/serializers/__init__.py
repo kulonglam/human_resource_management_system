@@ -1,6 +1,14 @@
 """Domain-split serializers package."""
 from .accounts import UserSerializer, LoginSerializer, RegisterSerializer, RoleSerializer, AdminUserCreateSerializer, AdminUserUpdateSerializer, DocumentAccessRuleSerializer, SensitiveDataAccessLogSerializer, OrganizationSerializer, AuditLogSerializer, ApprovalStepSerializer, ApprovalWorkflowSerializer, ApprovalDecisionSerializer, ApprovalRequestSerializer, NotificationSerializer, HRDocumentSerializer
-from .attendance import AttendanceSerializer, PublicHolidaySerializer, TimesheetSerializer, OvertimeRecordSerializer
+from .attendance import (
+    AttendanceDeviceCreateSerializer,
+    AttendanceDeviceSerializer,
+    AttendanceSerializer,
+    DevicePunchSerializer,
+    OvertimeRecordSerializer,
+    PublicHolidaySerializer,
+    TimesheetSerializer,
+)
 from .employees import DepartmentSerializer, JobGradeSerializer, PositionSerializer, EmploymentContractSerializer, EmploymentHistorySerializer, EmployeeSerializer, EmployeeTerminateSerializer
 from .leaves import LeaveSerializer, LeaveBalanceSerializer, LeavePolicySerializer, LeavePolicyAllocationSerializer
 from .ops import ExitProcessSerializer, ExitChecklistSerializer, AssetSerializer, AssetAssignmentSerializer, ShiftSerializer, ShiftAssignmentSerializer, ExpenseCategorySerializer, ExpenseSerializer, BenefitSerializer, EmployeeBenefitSerializer, DisciplineSerializer, DisciplineAppealSerializer, KinSerializer, SurveySerializer, SurveyQuestionSerializer, SurveyResponseSerializer
@@ -31,6 +39,9 @@ __all__ = [
     'PublicHolidaySerializer',
     'TimesheetSerializer',
     'OvertimeRecordSerializer',
+    'AttendanceDeviceSerializer',
+    'AttendanceDeviceCreateSerializer',
+    'DevicePunchSerializer',
     'DepartmentSerializer',
     'JobGradeSerializer',
     'PositionSerializer',

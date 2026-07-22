@@ -11,6 +11,10 @@ DEFAULT_EVIDENCE = [
     ('data_retention', 'Retention policies and scheduled purge jobs', 'ready', 'Compliance'),
     ('vulnerability_mgmt', 'Vulnerability finding SLA tracker', 'draft', 'Security'),
     ('incident_response', 'Incident response playbook (INCIDENT_RESPONSE.md)', 'ready', 'Ops'),
+    ('penetration_testing', 'Annual penetration test report', 'gap', 'Security'),
+    ('change_management', 'CI release gates (tests, audits, ZAP, Bandit)', 'ready', 'Engineering'),
+    ('availability_slo', 'Load / soak test evidence', 'draft', 'Ops'),
+    ('access_reviews', 'Quarterly privileged access review', 'gap', 'Security'),
 ]
 
 

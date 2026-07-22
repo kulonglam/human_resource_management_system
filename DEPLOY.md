@@ -1,6 +1,8 @@
 # Deploy checklist — FCA HRMIS
 
-Use this guide to sync **staging** and **production** on Render after pushing code changes.
+Single-organization deployment (one employer). Use this guide to sync **staging** and **production** on Render after pushing code changes.
+
+After go-live, keep [SECURITY_ASSURANCE.md](SECURITY_ASSURANCE.md) and [loadtest/SOAK_RESULTS.md](loadtest/SOAK_RESULTS.md) current for audit evidence.
 
 ## 1. Sync the Render blueprint
 
@@ -79,7 +81,8 @@ Full reference: **[ENV.md](ENV.md)**. Set these in the Render dashboard for **pr
 |----------|-------|
 | `SECRET_KEY` | Auto-generated |
 | `DATABASE_URL` | Linked from database |
-| `SEED_ADMIN_PASSWORD` | Auto-generated; used only when creating the initial administrator |
+| `SEED_ADMIN_PASSWORD` | Required for `bootstrap_admin` / hosted `seed_data` (no published demo default when `DATABASE_URL` is set) |
+| `SEED_MANAGER_PASSWORD` / `SEED_EMPLOYEE_PASSWORD` | Required for hosted `seed_data` when creating/resetting those users |
 
 ### Security (defaults in blueprint)
 
@@ -300,7 +303,12 @@ After blueprint sync, confirm cron and worker services appear in the Render dash
 | `/api/v1/ops/status/` | Queue counts, backups, runbooks, **alert history / cooldown** |
 | `/api/v1/ops/slos/` | Availability & latency for current hour |
 | `/api/v1/api-changelog/` | Versioned deprecation policy |
-| `/api/v1/scim/v2/Users` | SCIM user list/provision |
+| `/api/v1/scim/v2/Users` | SCIM user list/provision (also detail PATCH/DELETE) |
+| `/api/v1/scim/v2/Groups` | SCIM groups mapped to HR roles |
+| `/api/v1/scim/v2/ServiceProviderConfig` | SCIM capability discovery |
+| `/api/v1/device-punches/ingest/` | Biometric terminal punches (`X-Device-Token`) |
+| `/api/v1/attendance/mobile-punch/` | Mobile clock (session auth) |
+| `/mobile` | Installable offline-capable clock UI (English) |
 | `/settings/ops` | Admin Operations Center UI (includes active breaches + recent emissions) |
 
 Active alerting:
@@ -347,3 +355,14 @@ python manage.py test api.tests.test_api_contract.OpenAPISchemaTests.test_openap
 ```
 
 Playwright E2E: `cd frontend ; npx playwright install ; npm run e2e` (with app + API running).
+
+## 8. Docker, PgBouncer, replicas, WAF
+
+- **Compose**: `docker compose up --build` (Postgres, Redis, PgBouncer, web). Set `USE_PGBOUNCER=True` so `CONN_MAX_AGE=0`.
+- **Read replica**: set `DATABASE_REPLICA_URL` to a hot standby; Django routes reads via `PrimaryReplicaRouter`.
+- **K8s**: manifests under `k8s/` including HPA (CPU 70%, min 2 / max 8).
+- **Edge WAF**: put Cloudflare (or equivalent) in front of origin; origin nginx baseline in `deploy/nginx.conf` (rate limits + security headers).
+- **Outbox**: `python manage.py process_outbox` (also safe to cron alongside scheduled tasks).
+- **Load tests**: see [loadtest/README.md](loadtest/README.md).
+- **Secrets / BCP / exit**: [SECRETS_ROTATION.md](SECRETS_ROTATION.md), [BUSINESS_CONTINUITY.md](BUSINESS_CONTINUITY.md), [VENDOR_EXIT.md](VENDOR_EXIT.md).
+- **Autoscaling policy**: prefer HPA on CPU 70% with minReplicas ≥ 2; scale on sustained RPS growth seen in Ops usage card / SLO metrics.

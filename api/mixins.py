@@ -1,4 +1,5 @@
 from accounts.access_control import can_access_employee, get_user_accessible_employees
+from accounts.tenancy import assign_organization, filter_queryset_for_organization
 from rest_framework import viewsets
 from rest_framework.exceptions import PermissionDenied
 
@@ -64,6 +65,32 @@ class AuditLogMixin:
 
 class AuditedModelViewSet(AuditLogMixin, viewsets.ModelViewSet):
     pass
+
+
+class OrganizationQuerysetMixin:
+    """Scope catalog / org-owned rows by the caller's organization."""
+
+    organization_field = 'organization_id'
+    organization_join_field = None  # e.g. 'job__organization_id' for child resources
+    assign_organization_on_create = True
+
+    def scope_to_organization(self, queryset):
+        field = self.organization_join_field or self.organization_field
+        return filter_queryset_for_organization(
+            queryset, self.request.user, org_field=field,
+        )
+
+    def perform_create(self, serializer):
+        kwargs = {}
+        if self.assign_organization_on_create:
+            org_id = getattr(self.request.user, 'organization_id', None)
+            if org_id and 'organization' not in serializer.validated_data:
+                kwargs['organization_id'] = org_id
+        instance = serializer.save(**kwargs)
+        if self.assign_organization_on_create:
+            if assign_organization(instance, self.request.user):
+                instance.save(update_fields=['organization_id'])
+        return instance
 
 
 class EmployeeQuerysetMixin:

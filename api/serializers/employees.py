@@ -2,7 +2,14 @@
 from rest_framework import serializers
 
 from accounts.access_control import can_view_sensitive_data, mask_sensitive_value
-from api.validation import parse_positive_decimal, validate_employee_dates, validate_mobile_number
+from api.validation import (
+    parse_positive_decimal,
+    validate_alphanumeric,
+    validate_digits_only,
+    validate_employee_dates,
+    validate_letters_only,
+    validate_mobile_number,
+)
 from departments.models import Department
 from employees.models import Employee, EmploymentContract, EmploymentHistory, JobGrade, Position
 
@@ -78,12 +85,12 @@ class EmployeeSerializer(serializers.ModelSerializer):
             'tax_identification_number', 'nssf_number', 'job_title', 'department',
             'department_name', 'position', 'position_title', 'grade', 'grade_name',
             'supervisor', 'supervisor_name', 'employment_type', 'date_joined',
-            'probation_end_date', 'work_location', 'cost_center', 'is_active', 'account_number',
-            'bank', 'salary', 'termination_date', 'exit_reason', 'exit_notes',
+            'probation_end_date', 'work_location', 'cost_center', 'device_badge_id', 'is_active',
+            'account_number', 'bank', 'salary', 'termination_date', 'exit_reason', 'exit_notes',
             'created_at', 'updated_at',
         ]
         read_only_fields = [
-            'employee_number', 'created_at', 'updated_at', 'termination_date',
+            'created_at', 'updated_at', 'termination_date',
             'exit_reason', 'exit_notes',
         ]
 
@@ -111,8 +118,78 @@ class EmployeeSerializer(serializers.ModelSerializer):
     def validate_mobile(self, value):
         return validate_mobile_number(value)
 
+    def validate_emergency_contact(self, value):
+        return validate_mobile_number(value)
+
+    def validate_first_name(self, value):
+        return validate_letters_only(value, field_label='First name')
+
+    def validate_last_name(self, value):
+        return validate_letters_only(value, field_label='Last name')
+
+    def validate_bank(self, value):
+        return validate_letters_only(value, field_label='Bank')
+
+    def validate_language(self, value):
+        if value is None or value == '':
+            return value
+        return validate_letters_only(value, field_label='Language')
+
+    def validate_account_number(self, value):
+        return validate_digits_only(value, field_label='Account number', min_length=3, max_length=30)
+
+    def validate_nssf_number(self, value):
+        if value is None or value == '':
+            return value
+        return validate_digits_only(value, field_label='NSSF number', min_length=5, max_length=20)
+
     def validate_salary(self, value):
         return parse_positive_decimal(value, field_name='salary')
+
+    def validate_employee_number(self, value):
+        value = (value or '').strip().upper()
+        if not value:
+            return value
+        value = validate_alphanumeric(value, field_label='Employee ID')
+        if len(value) > 30:
+            raise serializers.ValidationError('Employee ID must be 30 characters or fewer.')
+        qs = Employee.objects.filter(employee_number__iexact=value)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError('This Employee ID is already in use.')
+        return value
+
+    def validate_national_id_number(self, value):
+        if value is None or value == '':
+            return value
+        return validate_alphanumeric(value, field_label='National ID')
+
+    def validate_tax_identification_number(self, value):
+        if value is None or value == '':
+            return value
+        return validate_alphanumeric(value, field_label='Tax identification number')
+
+    def validate_cost_center(self, value):
+        if value is None or value == '':
+            return value
+        return validate_alphanumeric(value, field_label='Cost centre')
+
+    def validate_device_badge_id(self, value):
+        if value is None or value == '':
+            return value
+        return validate_alphanumeric(value, field_label='Device badge ID')
+
+    def validate_job_title(self, value):
+        return validate_alphanumeric(value, field_label='Job title')
+
+    def validate_work_location(self, value):
+        if value is None or value == '':
+            return value
+        return validate_alphanumeric(value, field_label='Work location')
+
+    def validate_address(self, value):
+        return validate_alphanumeric(value, field_label='Address', allow_punctuation=True)
 
     def validate(self, attrs):
         validate_employee_dates(attrs, instance=self.instance)

@@ -3,6 +3,7 @@ from django.utils import timezone
 from django.core.validators import MinValueValidator, MaxValueValidator
 from employees.models import Employee
 from accounts.models import CustomUser
+from accounts.tenancy import organization_fk
 
 
 class PerformanceGoal(models.Model):
@@ -137,6 +138,7 @@ class FeedbackRound(models.Model):
     start_date = models.DateField()
     end_date = models.DateField()
     status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='planned')
+    organization = organization_fk(related_name='feedback_rounds')
     created_by = models.ForeignKey(
         CustomUser, on_delete=models.SET_NULL, null=True, related_name='feedback_rounds_created'
     )

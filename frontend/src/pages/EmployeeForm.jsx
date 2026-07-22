@@ -2,8 +2,16 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { errorMessage } from '../utils/apiErrors';
+import {
+  INPUT_KIND,
+  inputModeForKind,
+  isValidByKind,
+  kindHint,
+  sanitizeByKind,
+} from '../utils/inputKinds';
 
 const emptyForm = {
+  employee_number: '',
   first_name: '',
   last_name: '',
   date_of_birth: '',
@@ -30,6 +38,35 @@ const emptyForm = {
   bank: '',
   salary: '',
 };
+
+/** Field → character kind (letters | digits | phone | alphanumeric | address). */
+const FIELD_KINDS = {
+  employee_number: INPUT_KIND.alphanumeric,
+  first_name: INPUT_KIND.letters,
+  last_name: INPUT_KIND.letters,
+  mobile: INPUT_KIND.phone,
+  emergency_contact: INPUT_KIND.phone,
+  language: INPUT_KIND.letters,
+  address: 'address',
+  national_id_number: INPUT_KIND.alphanumeric,
+  tax_identification_number: INPUT_KIND.alphanumeric,
+  nssf_number: INPUT_KIND.digits,
+  job_title: INPUT_KIND.alphanumeric,
+  work_location: INPUT_KIND.alphanumeric,
+  cost_center: INPUT_KIND.alphanumeric,
+  account_number: INPUT_KIND.digits,
+  bank: INPUT_KIND.letters,
+};
+
+function FieldLabel({ children, kind }) {
+  const hint = kind ? kindHint(kind) : '';
+  return (
+    <label className="form-label">
+      {children}
+      {hint && <span className="text-muted fw-normal small ms-1">({hint})</span>}
+    </label>
+  );
+}
 
 export default function EmployeeForm() {
   const { id } = useParams();
@@ -63,6 +100,7 @@ export default function EmployeeForm() {
     api.getEmployee(id)
       .then((emp) => {
         setForm({
+          employee_number: emp.employee_number || '',
           first_name: emp.first_name || '',
           last_name: emp.last_name || '',
           date_of_birth: emp.date_of_birth || '',
@@ -96,12 +134,21 @@ export default function EmployeeForm() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    const kind = FIELD_KINDS[name];
+    const next = kind ? sanitizeByKind(value, kind) : value;
+    setForm((prev) => ({ ...prev, [name]: next }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    for (const [name, kind] of Object.entries(FIELD_KINDS)) {
+      if (!isValidByKind(form[name], kind)) {
+        setError(`${name.replace(/_/g, ' ')}: invalid characters for this field.`);
+        return;
+      }
+    }
 
     if (form.date_of_birth && form.date_joined && form.date_joined < form.date_of_birth) {
       setError('date_joined: Date joined cannot be before date of birth.');
@@ -117,6 +164,7 @@ export default function EmployeeForm() {
 
     const payload = {
       ...form,
+      employee_number: form.employee_number.trim() || undefined,
       department: form.department ? Number(form.department) : null,
       position: form.position ? Number(form.position) : null,
       grade: form.grade ? Number(form.grade) : null,
@@ -124,6 +172,9 @@ export default function EmployeeForm() {
       probation_end_date: form.probation_end_date || null,
       salary: form.salary,
     };
+    if (!payload.employee_number) {
+      delete payload.employee_number;
+    }
 
     try {
       if (isEdit) {
@@ -148,6 +199,20 @@ export default function EmployeeForm() {
     );
   }
 
+  const typedInput = (name, props = {}) => {
+    const kind = FIELD_KINDS[name];
+    return (
+      <input
+        name={name}
+        className="form-control"
+        value={form[name]}
+        onChange={handleChange}
+        inputMode={kind ? inputModeForKind(kind) : undefined}
+        {...props}
+      />
+    );
+  };
+
   return (
     <>
       <div className="d-flex justify-content-between align-items-center mb-4">
@@ -162,21 +227,31 @@ export default function EmployeeForm() {
       <form onSubmit={handleSubmit} className="card">
         <div className="card-body">
           <div className="row g-3">
-            <div className="col-md-6">
-              <label className="form-label">First Name</label>
-              <input name="first_name" className="form-control" value={form.first_name} onChange={handleChange} required />
+            <div className="col-md-4">
+              <FieldLabel kind={FIELD_KINDS.employee_number}>Employee ID</FieldLabel>
+              {typedInput('employee_number', {
+                placeholder: isEdit ? '' : 'e.g. EMP-0001 (auto if blank)',
+                maxLength: 30,
+              })}
+              {!isEdit && (
+                <div className="form-text">Leave blank to auto-assign the next ID (EMP-0001, EMP-0002, …).</div>
+              )}
             </div>
-            <div className="col-md-6">
-              <label className="form-label">Last Name</label>
-              <input name="last_name" className="form-control" value={form.last_name} onChange={handleChange} required />
+            <div className="col-md-4">
+              <FieldLabel kind={FIELD_KINDS.first_name}>First Name</FieldLabel>
+              {typedInput('first_name', { required: true })}
+            </div>
+            <div className="col-md-4">
+              <FieldLabel kind={FIELD_KINDS.last_name}>Last Name</FieldLabel>
+              {typedInput('last_name', { required: true })}
             </div>
             <div className="col-md-6">
               <label className="form-label">Email</label>
               <input type="email" name="email" className="form-control" value={form.email} onChange={handleChange} required />
             </div>
             <div className="col-md-6">
-              <label className="form-label">Mobile</label>
-              <input name="mobile" className="form-control" value={form.mobile} onChange={handleChange} required />
+              <FieldLabel kind={FIELD_KINDS.mobile}>Mobile</FieldLabel>
+              {typedInput('mobile', { required: true, maxLength: 16 })}
             </div>
             <div className="col-md-4">
               <label className="form-label">Date of Birth</label>
@@ -191,32 +266,32 @@ export default function EmployeeForm() {
               </select>
             </div>
             <div className="col-md-4">
-              <label className="form-label">Language</label>
-              <input name="language" className="form-control" value={form.language} onChange={handleChange} />
+              <FieldLabel kind={FIELD_KINDS.language}>Language</FieldLabel>
+              {typedInput('language')}
             </div>
             <div className="col-md-12">
-              <label className="form-label">Address</label>
-              <input name="address" className="form-control" value={form.address} onChange={handleChange} required />
+              <FieldLabel kind={FIELD_KINDS.address}>Address</FieldLabel>
+              {typedInput('address', { required: true })}
             </div>
             <div className="col-md-6">
-              <label className="form-label">Emergency Contact</label>
-              <input name="emergency_contact" className="form-control" value={form.emergency_contact} onChange={handleChange} required />
+              <FieldLabel kind={FIELD_KINDS.emergency_contact}>Emergency Contact</FieldLabel>
+              {typedInput('emergency_contact', { required: true, maxLength: 16 })}
             </div>
             <div className="col-md-4">
-              <label className="form-label">National ID Number (NIN)</label>
-              <input name="national_id_number" className="form-control" value={form.national_id_number} onChange={handleChange} />
+              <FieldLabel kind={FIELD_KINDS.national_id_number}>National ID Number (NIN)</FieldLabel>
+              {typedInput('national_id_number')}
             </div>
             <div className="col-md-4">
-              <label className="form-label">Tax Identification Number</label>
-              <input name="tax_identification_number" className="form-control" value={form.tax_identification_number} onChange={handleChange} />
+              <FieldLabel kind={FIELD_KINDS.tax_identification_number}>Tax Identification Number</FieldLabel>
+              {typedInput('tax_identification_number')}
             </div>
             <div className="col-md-4">
-              <label className="form-label">NSSF Number</label>
-              <input name="nssf_number" className="form-control" value={form.nssf_number} onChange={handleChange} />
+              <FieldLabel kind={FIELD_KINDS.nssf_number}>NSSF Number</FieldLabel>
+              {typedInput('nssf_number', { inputMode: 'numeric' })}
             </div>
             <div className="col-md-6">
-              <label className="form-label">Job Title</label>
-              <input name="job_title" className="form-control" value={form.job_title} onChange={handleChange} required />
+              <FieldLabel kind={FIELD_KINDS.job_title}>Job Title</FieldLabel>
+              {typedInput('job_title', { required: true })}
             </div>
             <div className="col-md-6">
               <label className="form-label">Department</label>
@@ -271,23 +346,23 @@ export default function EmployeeForm() {
               <input type="date" name="probation_end_date" className="form-control" value={form.probation_end_date} onChange={handleChange} />
             </div>
             <div className="col-md-4">
-              <label className="form-label">Work Location</label>
-              <input name="work_location" className="form-control" value={form.work_location} onChange={handleChange} />
+              <FieldLabel kind={FIELD_KINDS.work_location}>Work Location</FieldLabel>
+              {typedInput('work_location')}
             </div>
             <div className="col-md-4">
-              <label className="form-label">Cost Centre</label>
-              <input name="cost_center" className="form-control" value={form.cost_center} onChange={handleChange} />
+              <FieldLabel kind={FIELD_KINDS.cost_center}>Cost Centre</FieldLabel>
+              {typedInput('cost_center')}
             </div>
             <div className="col-md-4">
-              <label className="form-label">Account Number</label>
-              <input name="account_number" className="form-control" value={form.account_number} onChange={handleChange} required />
+              <FieldLabel kind={FIELD_KINDS.account_number}>Account Number</FieldLabel>
+              {typedInput('account_number', { required: true, inputMode: 'numeric' })}
             </div>
             <div className="col-md-4">
-              <label className="form-label">Bank</label>
-              <input name="bank" className="form-control" value={form.bank} onChange={handleChange} required />
+              <FieldLabel kind={FIELD_KINDS.bank}>Bank</FieldLabel>
+              {typedInput('bank', { required: true })}
             </div>
             <div className="col-md-4">
-              <label className="form-label">Salary</label>
+              <label className="form-label">Salary <span className="text-muted fw-normal small">(numbers)</span></label>
               <input type="number" step="0.01" min="0.01" name="salary" className="form-control" value={form.salary} onChange={handleChange} required />
             </div>
           </div>

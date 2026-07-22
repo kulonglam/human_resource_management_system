@@ -39,7 +39,7 @@ from .mfa import (
 )
 from .ops_monitoring import get_health_snapshot
 from .permissions import IsAdmin, IsAdminOrManager
-from .throttles import LoginRateThrottle, MFARateThrottle
+from .throttles import LoginRateThrottle, MFARateThrottle, PasswordResetRateThrottle
 from .serializers import (
     LoginSerializer,
     RegisterSerializer,
@@ -221,6 +221,104 @@ class CurrentUserView(APIView):
         return Response(UserSerializer(request.user).data)
 
 
+class PasswordResetRequestView(APIView):
+    """Send a password-reset link. Always returns success to avoid account enumeration."""
+
+    permission_classes = [AllowAny]
+    throttle_classes = [PasswordResetRateThrottle]
+
+    def post(self, request):
+        from django.contrib.auth.tokens import default_token_generator
+        from django.utils.encoding import force_bytes
+        from django.utils.http import urlsafe_base64_encode
+
+        from .notifications import notify_password_reset
+
+        email = (request.data.get('email') or '').strip()
+        username = (request.data.get('username') or '').strip()
+
+        user = None
+        if email:
+            user = CustomUser.objects.filter(email__iexact=email, is_active=True).first()
+        elif username:
+            user = CustomUser.objects.filter(username__iexact=username, is_active=True).first()
+
+        if user and user.email:
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            token = default_token_generator.make_token(user)
+            base = settings.FRONTEND_BASE_URL.rstrip('/')
+            reset_url = f'{base}/reset-password?uid={uid}&token={token}'
+            notify_password_reset(user, reset_url)
+            log_security_event('password_reset_requested', user.username, request=request)
+
+        return Response({
+            'detail': (
+                'If an account matches that email or username, '
+                'password reset instructions have been sent.'
+            ),
+        })
+
+
+class PasswordResetConfirmView(APIView):
+    """Set a new password using a valid uid + token from the reset email."""
+
+    permission_classes = [AllowAny]
+    throttle_classes = [PasswordResetRateThrottle]
+
+    def post(self, request):
+        from django.contrib.auth.tokens import default_token_generator
+        from django.utils.encoding import force_str
+        from django.utils.http import urlsafe_base64_decode
+        from rest_framework import serializers as drf_serializers
+
+        from api.validation import validate_user_password
+
+        uid = (request.data.get('uid') or '').strip()
+        token = (request.data.get('token') or '').strip()
+        password = request.data.get('password') or ''
+        password_confirm = request.data.get('password_confirm') or ''
+
+        if not uid or not token:
+            return Response(
+                {'detail': 'Invalid or expired reset link.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if password != password_confirm:
+            return Response(
+                {'password_confirm': ['Passwords do not match.']},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            user_id = force_str(urlsafe_base64_decode(uid))
+            user = CustomUser.objects.get(pk=user_id, is_active=True)
+        except (CustomUser.DoesNotExist, ValueError, TypeError, OverflowError):
+            return Response(
+                {'detail': 'Invalid or expired reset link.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not default_token_generator.check_token(user, token):
+            return Response(
+                {'detail': 'Invalid or expired reset link.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            validate_user_password(password, user=user)
+        except drf_serializers.ValidationError as exc:
+            return Response({'password': exc.detail}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.set_password(password)
+        user.save(update_fields=['password'])
+        clear_failed_logins(user.username)
+        log_security_event('password_reset_completed', user.username, request=request)
+        log_action(
+            request, 'update', 'CustomUser', user.id, user.username, 'Password reset completed',
+        )
+        return Response({'detail': 'Password updated. You can sign in with your new password.'})
+
+
 class DashboardView(APIView):
     def get(self, request):
         user = request.user
@@ -294,27 +392,11 @@ class DashboardView(APIView):
 
 
 class ReportsAnalyticsView(APIView):
+    """Deprecated: use GET /api/v1/reports/filters/ (includes ``overview``)."""
+
     permission_classes = [IsAdminOrManager]
 
     def get(self, request):
-        today = timezone.now().date()
-        return Response({
-            'total_employees': Employee.objects.filter(is_active=True).count(),
-            'new_joiners': Employee.objects.filter(
-                date_joined__gte=today - timedelta(days=30), is_active=True
-            ).count(),
-            'present_today': Attendance.objects.filter(date=today, status='present').count(),
-            'absent_today': Attendance.objects.filter(date=today, status='absent').count(),
-            'late_today': Attendance.objects.filter(date=today, status='late').count(),
-            'pending_leaves': Leave.objects.filter(status='pending').count(),
-            'leaves_used_this_year': Leave.objects.filter(
-                status='approved', start_date__year=today.year
-            ).count(),
-            'open_positions': JobPosting.objects.filter(is_open=True).count(),
-            'pending_applications': Application.objects.filter(status='received').count(),
-            'active_goals': PerformanceGoal.objects.filter(status='in_progress').count(),
-            'appraisals_due': PerformanceAppraisal.objects.filter(
-                status__in=['draft', 'submitted'],
-                appraisal_period_end__lte=today,
-            ).count(),
-        })
+        from .report_views import build_reports_overview
+
+        return Response(build_reports_overview())

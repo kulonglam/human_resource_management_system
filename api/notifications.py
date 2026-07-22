@@ -198,3 +198,14 @@ def notify_benefit_enrollment_decision(enrollment, decision):
         'status': enrollment.get_status_display(),
     })
     return _send(subject, message, [employee.email])
+
+
+def notify_password_reset(user, reset_url):
+    if not user.email:
+        return False
+    subject = '[HRMIS] Reset your password'
+    message = _render('emails/password_reset.txt', {
+        'username': user.username,
+        'reset_url': reset_url,
+    })
+    return _send(subject, message, [user.email])

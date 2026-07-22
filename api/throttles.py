@@ -9,6 +9,10 @@ class MFARateThrottle(AnonRateThrottle):
     scope = 'mfa'
 
 
+class PasswordResetRateThrottle(AnonRateThrottle):
+    scope = 'password_reset'
+
+
 class ExportRateThrottle(UserRateThrottle):
     scope = 'export'
 

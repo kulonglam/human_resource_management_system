@@ -8,8 +8,9 @@ from rest_framework.response import Response
 
 from accounts.models import AuditLog, CustomUser, Role
 from api.audit import log_action
-from api.mixins import AuditedModelViewSet
+from api.mixins import AuditedModelViewSet, OrganizationQuerysetMixin
 from api.permissions import IsAdmin, IsAdminOrManager, IsAdminOrManagerOrReadOnly
+from accounts.tenancy import filter_queryset_for_organization
 from api.serializers import AuditLogSerializer
 from api.serializers.accounts import (
     ApprovalRequestSerializer,
@@ -55,6 +56,7 @@ class HRDocumentViewSet(AuditedModelViewSet):
         from documents.models import HRDocument
 
         qs = HRDocument.objects.filter(is_active=True).select_related('employee', 'uploaded_by')
+        qs = filter_queryset_for_organization(qs, self.request.user)
         qs = filter_documents_for_user(qs, self.request.user)
         if not self.request.user.is_admin:
             try:
@@ -85,7 +87,11 @@ class HRDocumentViewSet(AuditedModelViewSet):
         upload = serializer.validated_data.get('file')
         if upload:
             validate_upload(upload, kind='document')
-        serializer.save(uploaded_by=self.request.user)
+        kwargs = {'uploaded_by': self.request.user}
+        org_id = getattr(self.request.user, 'organization_id', None)
+        if org_id and not serializer.validated_data.get('organization'):
+            kwargs['organization_id'] = org_id
+        serializer.save(**kwargs)
 
     @action(detail=True, methods=['post'])
     def acknowledge(self, request, pk=None):
@@ -116,7 +122,8 @@ class ApprovalWorkflowViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         from workflows.models import ApprovalWorkflow
-        return ApprovalWorkflow.objects.filter(is_active=True).prefetch_related('steps')
+        qs = ApprovalWorkflow.objects.filter(is_active=True).prefetch_related('steps')
+        return filter_queryset_for_organization(qs, self.request.user)
 
     def get_permissions(self):
         return [IsAdminOrManagerOrReadOnly()]

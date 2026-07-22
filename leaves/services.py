@@ -102,7 +102,7 @@ def submit_leave(*, leave, balance=None, submitted_by=None):
         if submitted_by is not None:
             start_leave_approval(leave, submitted_by)
 
-    dispatch_webhook('leave.submitted', {
+    payload = {
         'id': leave.id,
         'employee_id': leave.employee_id,
         'employee_name': leave.employee.full_name,
@@ -110,7 +110,10 @@ def submit_leave(*, leave, balance=None, submitted_by=None):
         'start_date': str(leave.start_date),
         'end_date': str(leave.end_date),
         'duration': leave.duration,
-    })
+    }
+    from events.services import publish_event
+    publish_event('leave.submitted', payload)
+    dispatch_webhook('leave.submitted', payload)
     return leave
 
 

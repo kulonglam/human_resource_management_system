@@ -1,7 +1,7 @@
 import os
 from datetime import date
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from accounts.models import CustomUser, Role
@@ -46,6 +46,24 @@ DEFAULT_USERS = [
 ]
 
 
+def resolve_seed_password(spec):
+    """Env password wins. Hosted (DATABASE_URL) rejects published demo defaults."""
+    from_env = os.environ.get(spec['password_env'])
+    if from_env:
+        return from_env
+    hosted = bool(os.environ.get('DATABASE_URL'))
+    allow_defaults = os.environ.get('ALLOW_DEFAULT_SEED_PASSWORDS', '').lower() in (
+        '1', 'true', 'yes',
+    )
+    if hosted and not allow_defaults:
+        raise CommandError(
+            f'Set {spec["password_env"]} before seeding on a hosted database. '
+            'Demo defaults are blocked when DATABASE_URL is set '
+            '(override with ALLOW_DEFAULT_SEED_PASSWORDS=1 only for temporary demos).'
+        )
+    return spec['default_password']
+
+
 class Command(BaseCommand):
     help = 'Create default roles, login users, and sample HR data for local/Render deploys.'
 
@@ -54,6 +72,11 @@ class Command(BaseCommand):
             '--reset-password',
             action='store_true',
             help='Reset passwords for seed users from environment variables (or defaults).',
+        )
+        parser.add_argument(
+            '--demo',
+            action='store_true',
+            help='Also seed full demo data for every major page (see seed_demo_data).',
         )
 
     @transaction.atomic
@@ -67,9 +90,9 @@ class Command(BaseCommand):
 
         created_users = []
         updated_users = []
+        passwords_used = {}
 
         for spec in DEFAULT_USERS:
-            password = os.environ.get(spec['password_env'], spec['default_password'])
             role = roles[spec['role']]
 
             user, created = CustomUser.objects.get_or_create(
@@ -84,17 +107,24 @@ class Command(BaseCommand):
                 },
             )
 
-            if created:
+            if created or reset_password:
+                password = resolve_seed_password(spec)
+                passwords_used[spec['username']] = password
                 user.set_password(password)
+                if reset_password and not created:
+                    user.role = role
+                    user.is_superuser = spec['is_superuser']
+                    user.is_staff = spec['is_staff']
                 user.save()
-                created_users.append(spec['username'])
-            elif reset_password:
-                user.set_password(password)
-                user.role = role
-                user.is_superuser = spec['is_superuser']
-                user.is_staff = spec['is_staff']
-                user.save()
-                updated_users.append(spec['username'])
+                if created:
+                    created_users.append(spec['username'])
+                else:
+                    updated_users.append(spec['username'])
+            elif not os.environ.get('DATABASE_URL'):
+                # Local: show known defaults for convenience without resetting.
+                passwords_used[spec['username']] = os.environ.get(
+                    spec['password_env'], spec['default_password']
+                )
 
         dept, dept_created = Department.objects.get_or_create(
             name='Human Resources',
@@ -162,7 +192,30 @@ class Command(BaseCommand):
             self.stdout.write(f'  Passwords reset for: {", ".join(updated_users)}')
 
         self.stdout.write('')
-        self.stdout.write(self.style.WARNING('Login credentials (set env vars on Render to override passwords):'))
-        for spec in DEFAULT_USERS:
-            password = os.environ.get(spec['password_env'], spec['default_password'])
-            self.stdout.write(f'  {spec["role"].upper():8}  username: {spec["username"]:<10}  password: {password}')
+        if os.environ.get('DATABASE_URL') and not os.environ.get('ALLOW_DEFAULT_SEED_PASSWORDS'):
+            self.stdout.write(
+                self.style.WARNING(
+                    'Login usernames (passwords come from SEED_*_PASSWORD env vars; not printed):'
+                )
+            )
+            for spec in DEFAULT_USERS:
+                self.stdout.write(f'  {spec["role"].upper():8}  username: {spec["username"]}')
+        else:
+            self.stdout.write(
+                self.style.WARNING(
+                    'Local login credentials (override with SEED_*_PASSWORD env vars):'
+                )
+            )
+            for spec in DEFAULT_USERS:
+                password = passwords_used.get(
+                    spec['username'],
+                    os.environ.get(spec['password_env'], spec['default_password']),
+                )
+                self.stdout.write(
+                    f'  {spec["role"].upper():8}  username: {spec["username"]:<10}  '
+                    f'password: {password}'
+                )
+
+        if options.get('demo'):
+            from django.core.management import call_command
+            call_command('seed_demo_data', skip_base=True)

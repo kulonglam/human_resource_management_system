@@ -1,6 +1,7 @@
 from django.db import models
 
 from accounts.models import CustomUser
+from accounts.tenancy import organization_fk
 from employees.models import Employee
 
 
@@ -17,6 +18,7 @@ class HRDocument(models.Model):
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='other')
     description = models.TextField(blank=True)
     file = models.FileField(upload_to='hr_documents/')
+    organization = organization_fk(related_name='hr_documents')
     employee = models.ForeignKey(
         Employee, on_delete=models.CASCADE, null=True, blank=True, related_name='documents',
     )

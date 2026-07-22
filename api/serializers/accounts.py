@@ -146,6 +146,14 @@ class AdminUserCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('This username is already taken.')
         return value
 
+    def validate_first_name(self, value):
+        from api.validation import validate_letters_only
+        return validate_letters_only(value, field_label='First name')
+
+    def validate_last_name(self, value):
+        from api.validation import validate_letters_only
+        return validate_letters_only(value, field_label='Last name')
+
     def validate_password(self, value):
         candidate = CustomUser(
             username=self.initial_data.get('username', ''),
@@ -165,6 +173,18 @@ class AdminUserUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
         fields = ['email', 'first_name', 'last_name', 'role', 'is_active', 'managed_department']
+
+    def validate_first_name(self, value):
+        from api.validation import validate_letters_only
+        if value is None or value == '':
+            return value
+        return validate_letters_only(value, field_label='First name')
+
+    def validate_last_name(self, value):
+        from api.validation import validate_letters_only
+        if value is None or value == '':
+            return value
+        return validate_letters_only(value, field_label='Last name')
 
     def validate(self, attrs):
         request = self.context.get('request')

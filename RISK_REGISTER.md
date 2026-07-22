@@ -14,6 +14,8 @@ Living register of material risks for the HRMIS. Review at least quarterly with 
 | R-08 | Webhook secret or SSO misconfiguration | L | M | Signed webhooks, dashboard secrets, SSO env isolation staging vs prod | Ops | Open — monitor |
 | R-09 | Observability gap delays detection | M | M | Sentry, `check_ops_alerts`, health/SLO endpoints, `HR_NOTIFY_EMAIL` | Ops | Open — monitor |
 | R-10 | Incomplete GDPR erasure / export | L | H | Subject export + admin erasure APIs, compliance settings UI | Compliance | Open — monitor |
+| R-11 | Undetected app vulns after major releases | M | H | Annual pen-test + CI ZAP/Bandit; evidence control `penetration_testing` ([SECURITY_ASSURANCE.md](SECURITY_ASSURANCE.md)) | Security | Open — monitor |
+| R-12 | Performance degradation under peak HR/payroll load | M | M | Locust CI smoke + staging soak log; SLO/Ops alerts; `record_loadtest_evidence` | Ops | Open — monitor |
 
 **Status values:** `Open — monitor` · `Mitigating` · `Accepted` · `Closed`
 

@@ -17,9 +17,17 @@ from .enterprise_views import (
     APIChangelogView,
     OpsStatusView,
     OrganizationViewSet,
-    ScimUsersView,
     SLOMetricsView,
     StatutoryReconciliationView,
+)
+from .scim_views import (
+    ScimGroupDetailView,
+    ScimGroupsView,
+    ScimResourceTypesView,
+    ScimSchemasView,
+    ScimServiceProviderConfigView,
+    ScimUserDetailView,
+    ScimUsersView,
 )
 from .careers_views import PublicApplyView, PublicJobDetailView, PublicJobListView
 from .recruitment_views import RecruitmentSummaryView
@@ -52,6 +60,8 @@ router.register('attendance', viewsets.AttendanceViewSet, basename='attendance')
 router.register('public-holidays', viewsets.PublicHolidayViewSet, basename='public-holiday')
 router.register('timesheets', viewsets.TimesheetViewSet, basename='timesheet')
 router.register('overtime-records', viewsets.OvertimeRecordViewSet, basename='overtime-record')
+router.register('attendance-devices', viewsets.AttendanceDeviceViewSet, basename='attendance-device')
+router.register('device-punches', viewsets.DevicePunchViewSet, basename='device-punch')
 router.register('jobs', viewsets.JobPostingViewSet, basename='job')
 router.register('applications', viewsets.ApplicationViewSet, basename='application')
 router.register('application-notes', viewsets.ApplicationNoteViewSet, basename='application-note')
@@ -126,6 +136,12 @@ urlpatterns = [
     path('auth/logout/', views.LogoutView.as_view(), name='api-logout'),
     path('auth/register/', views.RegisterView.as_view(), name='api-register'),
     path('auth/me/', views.CurrentUserView.as_view(), name='api-me'),
+    path('auth/password-reset/', views.PasswordResetRequestView.as_view(), name='api-password-reset'),
+    path(
+        'auth/password-reset/confirm/',
+        views.PasswordResetConfirmView.as_view(),
+        name='api-password-reset-confirm',
+    ),
     path('dashboard/', views.DashboardView.as_view(), name='api-dashboard'),
     path('recruitment/summary/', RecruitmentSummaryView.as_view(), name='api-recruitment-summary'),
     path('recruitment/eeo-report/', RecruitmentEEOReportView.as_view(), name='api-recruitment-eeo'),
@@ -139,8 +155,20 @@ urlpatterns = [
     path('ops/status/', OpsStatusView.as_view(), name='api-ops-status'),
     path('ops/slos/', SLOMetricsView.as_view(), name='api-ops-slos'),
     path('api-changelog/', APIChangelogView.as_view(), name='api-changelog'),
+    path('scim/v2/ServiceProviderConfig', ScimServiceProviderConfigView.as_view(), name='api-scim-sp-config'),
+    path('scim/v2/ResourceTypes', ScimResourceTypesView.as_view(), name='api-scim-resource-types'),
+    path('scim/v2/Schemas', ScimSchemasView.as_view(), name='api-scim-schemas'),
     path('scim/v2/Users', ScimUsersView.as_view(), name='api-scim-users'),
     path('scim/v2/Users/', ScimUsersView.as_view(), name='api-scim-users-slash'),
+    path('scim/v2/Users/<str:pk>', ScimUserDetailView.as_view(), name='api-scim-user-detail'),
+    path('scim/v2/Users/<str:pk>/', ScimUserDetailView.as_view(), name='api-scim-user-detail-slash'),
+    path('scim/v2/Groups', ScimGroupsView.as_view(), name='api-scim-groups'),
+    path('scim/v2/Groups/', ScimGroupsView.as_view(), name='api-scim-groups-slash'),
+    path('scim/v2/Groups/<str:pk>', ScimGroupDetailView.as_view(), name='api-scim-group-detail'),
+    path('scim/v2/Groups/<str:pk>/', ScimGroupDetailView.as_view(), name='api-scim-group-detail-slash'),
+    path('device-punches/ingest/', viewsets.DevicePunchIngestView.as_view(), name='api-device-punch-ingest'),
+    path('attendance/mobile-punch/', viewsets.MobilePunchView.as_view(), name='api-mobile-punch'),
+    path('attendance/mobile-sync/', viewsets.MobilePunchSyncView.as_view(), name='api-mobile-sync'),
     path('payroll/reconciliation/', StatutoryReconciliationView.as_view(), name='api-payroll-reconciliation'),
     path('reports/analytics/', views.ReportsAnalyticsView.as_view(), name='api-reports-analytics'),
     path('reports/filters/', ReportFiltersView.as_view(), name='api-reports-filters'),

@@ -11,7 +11,17 @@ from .accounts import (
     UserViewSet,
 )
 from .assets import AssetAssignmentViewSet, AssetViewSet
-from .attendance import AttendanceViewSet, OvertimeRecordViewSet, PublicHolidayViewSet, TimesheetViewSet
+from .attendance import (
+    AttendanceDeviceViewSet,
+    AttendanceViewSet,
+    DevicePunchIngestView,
+    DevicePunchViewSet,
+    MobilePunchSyncView,
+    MobilePunchView,
+    OvertimeRecordViewSet,
+    PublicHolidayViewSet,
+    TimesheetViewSet,
+)
 from .benefits import BenefitViewSet, EmployeeBenefitViewSet
 from .discipline import DisciplineAppealViewSet, DisciplineViewSet
 from .employees import (
@@ -75,6 +85,11 @@ __all__ = [
     'PublicHolidayViewSet',
     'TimesheetViewSet',
     'OvertimeRecordViewSet',
+    'AttendanceDeviceViewSet',
+    'DevicePunchViewSet',
+    'DevicePunchIngestView',
+    'MobilePunchView',
+    'MobilePunchSyncView',
     'EmployeeViewSet',
     'JobGradeViewSet',
     'PositionViewSet',

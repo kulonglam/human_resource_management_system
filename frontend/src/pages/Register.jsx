@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { errorMessage } from '../utils/apiErrors';
+import PublicFooter from '../components/PublicFooter';
 
 export default function Register() {
   const { user, register } = useAuth();
@@ -65,81 +66,119 @@ export default function Register() {
 
   return (
     <div className="auth-page">
-      <div className="card shadow" style={{ width: '100%', maxWidth: 520 }}>
-        <div className="card-body p-4">
-          <h4 className="card-title text-center mb-4">
-            <i className="bi bi-person-plus" /> Create Account
-          </h4>
-
-          {error && <div className="alert alert-danger">{error}</div>}
-
-          <form onSubmit={handleSubmit}>
-            <div className="mb-3">
-              <label className="form-label">Username</label>
-              <input
-                name="username"
-                className="form-control"
-                value={form.username}
-                onChange={handleChange}
-                required
-              />
-            </div>
-            <div className="mb-3">
-              <label className="form-label">Email</label>
-              <input
-                type="email"
-                name="email"
-                className="form-control"
-                value={form.email}
-                onChange={handleChange}
-                required
-              />
-            </div>
-            <div className="mb-3">
-              <label className="form-label">Role</label>
-              <select name="role" className="form-select" value={form.role} onChange={handleChange}>
-                <option value="">Select role</option>
-                {roles.map((role) => (
-                  <option key={role.id} value={role.id}>
-                    {role.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="mb-3">
-              <label className="form-label">Password</label>
-              <input
-                type="password"
-                name="password1"
-                className="form-control"
-                value={form.password1}
-                onChange={handleChange}
-                required
-              />
-            </div>
-            <div className="mb-3">
-              <label className="form-label">Confirm Password</label>
-              <input
-                type="password"
-                name="password2"
-                className="form-control"
-                value={form.password2}
-                onChange={handleChange}
-                required
-              />
-            </div>
-            <div className="d-grid">
-              <button type="submit" className="btn btn-primary" disabled={submitting}>
-                {submitting ? 'Creating account...' : 'Register'}
-              </button>
-            </div>
-          </form>
-
-          <p className="text-center mt-3 mb-0">
-            Already have an account? <Link to="/login">Login</Link>
+      <section className="auth-hero" aria-label="FCA HRMIS">
+        <div className="auth-hero-inner">
+          <p className="auth-hero-eyebrow">Workforce platform</p>
+          <h1 className="auth-hero-brand">
+            FCA <span>HRMIS</span>
+          </h1>
+          <p className="auth-hero-line">
+            Create an account to access your organization&apos;s workforce tools.
           </p>
+          <ul className="auth-hero-points">
+            <li>
+              <i className="bi bi-check-circle-fill" aria-hidden="true" />
+              <span>Role-based access for your team</span>
+            </li>
+            <li>
+              <i className="bi bi-check-circle-fill" aria-hidden="true" />
+              <span>Self-service leave and attendance</span>
+            </li>
+            <li>
+              <i className="bi bi-check-circle-fill" aria-hidden="true" />
+              <span>Secure sign-in for your organization</span>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <div className="auth-panel">
+        <div className="auth-panel-card">
+          <div className="card-body">
+            <h2 className="auth-panel-title">Create account</h2>
+            <p className="auth-panel-sub">Join FCA HRMIS with your work credentials.</p>
+
+            {error && <div className="alert alert-danger" role="alert">{error}</div>}
+
+            <form onSubmit={handleSubmit}>
+              <div className="mb-3">
+                <label className="form-label" htmlFor="register-username">Username</label>
+                <input
+                  id="register-username"
+                  name="username"
+                  className="form-control"
+                  value={form.username}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+              <div className="mb-3">
+                <label className="form-label" htmlFor="register-email">Email</label>
+                <input
+                  id="register-email"
+                  type="email"
+                  name="email"
+                  className="form-control"
+                  value={form.email}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+              <div className="mb-3">
+                <label className="form-label" htmlFor="register-role">Role</label>
+                <select
+                  id="register-role"
+                  name="role"
+                  className="form-select"
+                  value={form.role}
+                  onChange={handleChange}
+                >
+                  <option value="">Select role</option>
+                  {roles.map((role) => (
+                    <option key={role.id} value={role.id}>
+                      {role.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="mb-3">
+                <label className="form-label" htmlFor="register-password1">Password</label>
+                <input
+                  id="register-password1"
+                  type="password"
+                  name="password1"
+                  className="form-control"
+                  value={form.password1}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+              <div className="mb-3">
+                <label className="form-label" htmlFor="register-password2">Confirm password</label>
+                <input
+                  id="register-password2"
+                  type="password"
+                  name="password2"
+                  className="form-control"
+                  value={form.password2}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+              <div className="d-grid">
+                <button type="submit" className="btn btn-primary" disabled={submitting}>
+                  {submitting ? 'Creating account…' : 'Register'}
+                </button>
+              </div>
+            </form>
+
+            <p className="text-center mt-3 mb-0">
+              Already have an account? <Link to="/login">Sign in</Link>
+            </p>
+          </div>
         </div>
       </div>
+      <PublicFooter showLoginLink={false} />
     </div>
   );
 }

@@ -9,11 +9,15 @@ export default function ResourceToolbar({
   onImportCsv,
 }) {
   return (
-    <div className="d-flex justify-content-between align-items-center mb-4">
-      <h4 className="page-heading mb-0">
-        {icon && <i className={`bi ${icon}`} style={{ color: 'var(--fca-lime)' }} aria-hidden="true" />} {title}
-      </h4>
-      <div className="d-flex gap-2">
+    <div className="page-header">
+      <div className="page-header-main">
+        <p className="page-eyebrow">Module</p>
+        <h1 className="page-heading mb-0">
+          {icon && <i className={`bi ${icon}`} aria-hidden="true" />}
+          {title}
+        </h1>
+      </div>
+      <div className="d-flex flex-wrap gap-2">
         {canUseTabCreate && (
           <button type="button" className="btn btn-primary btn-sm" onClick={onCreate}>
             <i className="bi bi-plus-lg" aria-hidden="true" /> {tab.createLabel || 'Add'}

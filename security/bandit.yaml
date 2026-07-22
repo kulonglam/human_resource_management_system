@@ -1,0 +1,13 @@
+# Bandit config — fail CI on Medium/High (-ll).
+skips: []
+exclude_dirs:
+  - hrmis_env
+  - .venv
+  - venv
+  - frontend
+  - node_modules
+  - migrations
+  - loadtest
+  - api/tests
+  - accounts/tests
+  - tests

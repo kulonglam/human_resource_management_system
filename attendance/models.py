@@ -1,6 +1,7 @@
 from django.db import models
 
 from accounts.models import CustomUser
+from accounts.tenancy import organization_fk
 from employees.models import Employee
 from shifts.models import ShiftAssignment
 
@@ -13,6 +14,7 @@ class PublicHoliday(models.Model):
         help_text='If true, holiday repeats annually on the same month/day.',
     )
     notes = models.TextField(blank=True)
+    organization = organization_fk(related_name='public_holidays')
 
     class Meta:
         ordering = ['date']
@@ -39,6 +41,8 @@ class Attendance(models.Model):
         ('manual', 'Manual'),
         ('import', 'Import'),
         ('timesheet', 'Timesheet'),
+        ('device', 'Biometric / device'),
+        ('mobile', 'Mobile'),
     ]
 
     employee = models.ForeignKey(
@@ -131,3 +135,77 @@ class OvertimeRecord(models.Model):
 
     def __str__(self):
         return f'{self.employee} — {self.date} ({self.hours}h)'
+
+
+class AttendanceDevice(models.Model):
+    """Registered biometric / RFID / mobile attendance terminal."""
+
+    DEVICE_TYPES = [
+        ('fingerprint', 'Fingerprint'),
+        ('face', 'Face recognition'),
+        ('rfid', 'RFID / badge'),
+        ('mobile', 'Mobile app'),
+        ('other', 'Other'),
+    ]
+
+    name = models.CharField(max_length=120)
+    device_code = models.SlugField(max_length=64, unique=True)
+    device_type = models.CharField(max_length=20, choices=DEVICE_TYPES, default='fingerprint')
+    location = models.CharField(max_length=200, blank=True)
+    organization = organization_fk(related_name='attendance_devices')
+    is_active = models.BooleanField(default=True)
+    token_prefix = models.CharField(max_length=12, unique=True, editable=False)
+    token_hash = models.CharField(max_length=64, editable=False)
+    last_seen_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return f'{self.name} ({self.device_code})'
+
+
+class DevicePunch(models.Model):
+    """Raw punch from a device or mobile offline sync."""
+
+    PUNCH_TYPES = [
+        ('in', 'Clock in'),
+        ('out', 'Clock out'),
+        ('auto', 'Auto'),
+    ]
+
+    device = models.ForeignKey(
+        AttendanceDevice, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='punches',
+    )
+    employee = models.ForeignKey(
+        Employee, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='device_punches',
+    )
+    badge_id = models.CharField(max_length=64, blank=True, db_index=True)
+    punched_at = models.DateTimeField(db_index=True)
+    punch_type = models.CharField(max_length=8, choices=PUNCH_TYPES, default='auto')
+    source = models.CharField(max_length=20, default='device')  # device | mobile | offline_sync
+    client_punch_id = models.CharField(
+        max_length=64, blank=True, db_index=True,
+        help_text='Idempotency key from mobile offline queue.',
+    )
+    raw_payload = models.JSONField(default=dict, blank=True)
+    attendance = models.ForeignKey(
+        Attendance, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='device_punches',
+    )
+    applied = models.BooleanField(default=False)
+    error_message = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-punched_at']
+        indexes = [
+            models.Index(fields=['client_punch_id']),
+        ]
+
+    def __str__(self):
+        return f'{self.badge_id or self.employee_id} @ {self.punched_at}'

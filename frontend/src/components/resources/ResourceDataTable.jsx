@@ -23,9 +23,10 @@ export default function ResourceDataTable({
 
   if (loading) {
     return (
-      <div className="text-center py-4" role="status" aria-live="polite">
+      <div className="empty-state" role="status" aria-live="polite">
         <div className="spinner-border text-primary" aria-hidden="true" />
         <span className="visually-hidden">Loading records</span>
+        <p>Loading records…</p>
       </div>
     );
   }
@@ -127,8 +128,11 @@ export default function ResourceDataTable({
           ))}
           {!rows.length && (
             <tr>
-              <td colSpan={colSpan} className="text-center py-4 text-muted">
-                No records found.
+              <td colSpan={colSpan}>
+                <div className="empty-state py-5">
+                  <i className="bi bi-inbox" aria-hidden="true" />
+                  <p>No records found.</p>
+                </div>
               </td>
             </tr>
           )}

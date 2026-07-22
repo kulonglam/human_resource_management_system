@@ -17,29 +17,42 @@ async function request(path, options = {}) {
     headers['X-CSRFToken'] = csrfToken;
   }
 
-  const response = await fetch(`${API_BASE}${path}`, {
-    credentials: 'include',
-    ...options,
-    headers,
-    body:
-      options.body instanceof FormData || options.body == null
-        ? options.body
-        : JSON.stringify(options.body),
-  });
+  let response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      credentials: 'include',
+      ...options,
+      headers,
+      body:
+        options.body instanceof FormData || options.body == null
+          ? options.body
+          : JSON.stringify(options.body),
+    });
+  } catch {
+    const error = new Error(
+      'Cannot reach the API. Start the Django backend on port 8000, then refresh.',
+    );
+    error.status = 0;
+    error.data = { detail: error.message };
+    throw error;
+  }
 
   const contentType = response.headers.get('content-type') || '';
   const isJson = contentType.includes('application/json');
   const data = isJson ? await response.json() : await response.text();
 
   if (!response.ok) {
-    const message = typeof data === 'string'
-      ? (data.trimStart().startsWith('<')
-        ? `Server error (${response.status}). If this persists, ensure database migrations are applied.`
-        : data)
-      : (data?.detail || 'Request failed');
+    const proxyDown = response.status >= 500 && typeof data === 'string' && /ECONNREFUSED|proxy error/i.test(data);
+    const message = proxyDown
+      ? 'Cannot reach the API. Start the Django backend on port 8000, then refresh.'
+      : typeof data === 'string'
+        ? (data.trimStart().startsWith('<')
+          ? `Server error (${response.status}). If this persists, ensure database migrations are applied.`
+          : data)
+        : (data?.detail || 'Request failed');
     const error = new Error(message);
     error.status = response.status;
-    error.data = typeof data === 'object' ? data : null;
+    error.data = typeof data === 'object' ? data : { detail: message };
     throw error;
   }
 
@@ -54,6 +67,10 @@ export const api = {
   ensureCsrf: () => request('/auth/csrf/'),
   login: (username, password) =>
     request('/auth/login/', { method: 'POST', body: { username, password } }),
+  requestPasswordReset: (payload) =>
+    request('/auth/password-reset/', { method: 'POST', body: payload }),
+  confirmPasswordReset: (payload) =>
+    request('/auth/password-reset/confirm/', { method: 'POST', body: payload }),
   verifyMfa: (mfaToken, code) =>
     request('/auth/mfa/verify/', { method: 'POST', body: { mfa_token: mfaToken, code } }),
   getMfaSetup: () => request('/auth/mfa/setup/'),
@@ -175,7 +192,6 @@ export const api = {
     link.click();
     window.URL.revokeObjectURL(url);
   },
-  getReportsAnalytics: () => request('/reports/analytics/'),
   getReportFilters: () => request('/reports/filters/'),
   getReport: (type, query = '') =>
     request(`/reports/${type}/${query ? `?${query}` : ''}`),
@@ -208,6 +224,10 @@ export const api = {
   updateScheduledReport: (id, payload) => request(`/scheduled-reports/${id}/`, { method: 'PATCH', body: payload }),
   runScheduledReport: (id) => request(`/scheduled-reports/${id}/run_now/`, { method: 'POST', body: {} }),
   getSensitiveAccessLogs: () => request('/sensitive-access-logs/').then(unwrapList),
+  mobilePunch: (payload) =>
+    request('/attendance/mobile-punch/', { method: 'POST', body: payload }),
+  syncMobilePunches: (punches) =>
+    request('/attendance/mobile-sync/', { method: 'POST', body: { punches } }),
   importAttendanceCsv: async (file) => {
     const formData = new FormData();
     formData.append('file', file);

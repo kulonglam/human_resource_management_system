@@ -3,6 +3,7 @@ from django.utils import timezone
 from django.core.validators import MinValueValidator, MaxValueValidator
 from employees.models import Employee
 from accounts.models import CustomUser
+from accounts.tenancy import organization_fk
 
 
 class Skill(models.Model):
@@ -25,6 +26,7 @@ class Skill(models.Model):
         ]
     )
     description = models.TextField(blank=True)
+    organization = organization_fk(related_name='skills')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -103,6 +105,7 @@ class TrainingCourse(models.Model):
     status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='planned')
     related_skills = models.ManyToManyField(Skill, blank=True, related_name='courses')
     notes = models.TextField(blank=True)
+    organization = organization_fk(related_name='training_courses')
     created_by = models.ForeignKey(
         CustomUser, on_delete=models.SET_NULL, null=True, related_name='courses_created'
     )
@@ -177,6 +180,7 @@ class Certification(models.Model):
         max_length=255, blank=True,
         help_text="Comma-separated job titles that require this certification"
     )
+    organization = organization_fk(related_name='certifications')
     created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:

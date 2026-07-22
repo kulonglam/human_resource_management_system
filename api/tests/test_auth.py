@@ -57,3 +57,50 @@ class AuthTests(HRAPITestCase):
         with override_settings(ALLOW_PUBLIC_REGISTRATION=False):
             response = self.client.get('/api/v1/roles/')
             self.assertIn(response.status_code, (401, 403))
+
+    def test_password_reset_request_and_confirm(self):
+        from django.contrib.auth.tokens import default_token_generator
+        from django.core import mail
+        from django.utils.encoding import force_bytes
+        from django.utils.http import urlsafe_base64_encode
+
+        response = self.client.post(
+            '/api/v1/auth/password-reset/',
+            {'email': self.admin_user.email},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('Reset your password', mail.outbox[0].subject)
+
+        uid = urlsafe_base64_encode(force_bytes(self.admin_user.pk))
+        token = default_token_generator.make_token(self.admin_user)
+        new_password = 'BrandNewPass123!'
+        confirm = self.client.post(
+            '/api/v1/auth/password-reset/confirm/',
+            {
+                'uid': uid,
+                'token': token,
+                'password': new_password,
+                'password_confirm': new_password,
+            },
+            format='json',
+        )
+        self.assertEqual(confirm.status_code, 200)
+        self.admin_user.refresh_from_db()
+        self.assertTrue(self.admin_user.check_password(new_password))
+
+        login = self.client.post(
+            '/api/v1/auth/login/',
+            {'username': 'admin', 'password': new_password},
+            format='json',
+        )
+        self.assertEqual(login.status_code, 200)
+
+    def test_password_reset_unknown_email_still_ok(self):
+        response = self.client.post(
+            '/api/v1/auth/password-reset/',
+            {'email': 'nobody@example.com'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 200)

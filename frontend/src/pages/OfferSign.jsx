@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api/client';
+import PublicFooter from '../components/PublicFooter';
 
 export default function OfferSign() {
   const { offerId } = useParams();
@@ -35,6 +36,7 @@ export default function OfferSign() {
     return (
       <div className="careers-layout">
         <main className="careers-main"><div className="alert alert-danger">{error}</div></main>
+        <PublicFooter tone="dark" />
       </div>
     );
   }
@@ -43,6 +45,7 @@ export default function OfferSign() {
     return (
       <div className="careers-layout text-center py-5">
         <div className="spinner-border text-primary" role="status" />
+        <PublicFooter tone="dark" />
       </div>
     );
   }
@@ -57,6 +60,7 @@ export default function OfferSign() {
             <p className="text-muted">Thank you, {offer.signer_name || signerName}. We look forward to your start on {offer.start_date}.</p>
           </div></div>
         </main>
+        <PublicFooter tone="dark" />
       </div>
     );
   }
@@ -92,6 +96,7 @@ export default function OfferSign() {
           </div>
         </div>
       </main>
+      <PublicFooter tone="dark" />
     </div>
   );
 }

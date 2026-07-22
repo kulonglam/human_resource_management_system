@@ -1,6 +1,7 @@
 from django.db import models
 from employees.models import Employee
 from departments.models import Department
+from accounts.tenancy import organization_fk
 
 class Benefit(models.Model):
     BENEFIT_TYPE_CHOICES = [
@@ -22,6 +23,7 @@ class Benefit(models.Model):
     is_active = models.BooleanField(default=True)
     applicable_to_all = models.BooleanField(default=False)
     departments = models.ManyToManyField(Department, blank=True, related_name='benefits')
+    organization = organization_fk(related_name='benefits')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

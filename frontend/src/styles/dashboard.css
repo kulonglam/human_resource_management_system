@@ -3,10 +3,17 @@
 }
 
 .dashboard-hero {
-  background: linear-gradient(135deg, var(--fca-green) 0%, var(--fca-green-dark) 100%);
+  background:
+    radial-gradient(ellipse 70% 80% at 100% 0%, rgba(163, 209, 71, 0.22), transparent 55%),
+    linear-gradient(135deg, var(--fca-green) 0%, var(--fca-green-dark) 100%);
   color: var(--fca-white);
   padding: 1.75rem 1.5rem 0;
   border-left: 4px solid var(--fca-lime);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  /* Must stay visible: KPI row hangs below the hero with translateY */
+  overflow: visible;
+  margin-bottom: 2.75rem;
 }
 
 .dashboard-hero-eyebrow {
@@ -42,6 +49,7 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+  border-radius: var(--radius-sm);
 }
 
 .dashboard-as-of {
@@ -56,25 +64,26 @@
   margin-top: 1.5rem;
   transform: translateY(50%);
   position: relative;
-  z-index: 2;
+  z-index: 3;
 }
 
 .dashboard-kpi-card {
   display: flex;
   align-items: center;
   gap: 0.85rem;
-  background: var(--fca-white);
+  background: var(--surface-elevated);
   border: 1px solid var(--fca-border);
+  border-radius: var(--radius-lg);
   padding: 1rem 1.1rem;
   text-decoration: none;
   color: var(--fca-text);
-  box-shadow: 0 4px 14px rgba(0, 73, 36, 0.08);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: var(--shadow-md);
+  transition: transform var(--transition-fast), box-shadow var(--transition-med);
 }
 
 .dashboard-kpi-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(0, 73, 36, 0.12);
+  box-shadow: var(--shadow-lg);
   color: var(--fca-text);
   text-decoration: none;
 }
@@ -85,10 +94,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--fca-sage-muted);
+  background: var(--surface-tint);
   color: var(--fca-green);
   font-size: 1.15rem;
   flex-shrink: 0;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--fca-border);
 }
 
 .dashboard-kpi-value {
@@ -105,12 +116,14 @@
 }
 
 .dashboard-page > .row:first-of-type {
-  margin-top: 2.5rem;
+  margin-top: 3.25rem;
 }
 
 .dashboard-panel {
-  background: var(--fca-white);
+  background: var(--surface-elevated);
   border: 1px solid var(--fca-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
   padding: 1.25rem;
   height: 100%;
 }
@@ -175,6 +188,8 @@
   align-items: flex-end;
   background: var(--fca-sage-muted);
   border: 1px solid var(--fca-sage-light);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
 }
 
 .dashboard-chart-bar-fill {

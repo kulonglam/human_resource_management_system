@@ -1,6 +1,8 @@
 from django.conf import settings
 from django.db import models
 
+from accounts.tenancy import organization_fk
+
 
 class JobPosting(models.Model):
     title = models.CharField(max_length=100)
@@ -10,6 +12,7 @@ class JobPosting(models.Model):
     deadline = models.DateField()
     is_open = models.BooleanField(default=True)
     posted_on = models.DateTimeField(auto_now_add=True)
+    organization = organization_fk(related_name='job_postings')
 
     def __str__(self):
         return self.title
@@ -212,6 +215,7 @@ class OfferTemplate(models.Model):
         help_text='Use placeholders: {{candidate_name}}, {{job_title}}, {{department}}, {{salary}}, {{start_date}}, {{company}}',
     )
     is_active = models.BooleanField(default=True)
+    organization = organization_fk(related_name='offer_templates')
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

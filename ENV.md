@@ -13,6 +13,9 @@ Legend: **Required (prod)** = must be set for a safe production deploy · **Opti
 | `SECRET_KEY` | Yes (Secret) | Dev-only fallback | Blueprint auto-generates. Rotating invalidates sessions. |
 | `DEBUG` | Yes | `False` when `DATABASE_URL` set, else `True` | Always `False` on staging/production. |
 | `DATABASE_URL` | Yes on Render | — | Postgres URL from Render database. |
+| `DATABASE_REPLICA_URL` | Optional | — | Read replica URL; enables `PrimaryReplicaRouter`. |
+| `USE_PGBOUNCER` | Optional | `False` | When `True`, forces `CONN_MAX_AGE=0` for transaction pooling. |
+| `DB_CONN_MAX_AGE` | Optional | `600` | Ignored when `USE_PGBOUNCER=True`. |
 | `POSTGRES_NAME` / `USER` / `PASSWORD` / `HOST` / `PORT` | Local Postgres alt | — | Used when `DATABASE_URL` unset. |
 | `ALLOWED_HOSTS` | Custom domains | — | Comma-separated. Render hostname added automatically. |
 | `CSRF_TRUSTED_ORIGINS` | Custom domains | — | Comma-separated `https://…` origins. |
@@ -31,9 +34,10 @@ Legend: **Required (prod)** = must be set for a safe production deploy · **Opti
 
 | Variable | Required (prod) | Default | Notes |
 |----------|-----------------|---------|-------|
-| `SEED_ADMIN_PASSWORD` | First deploy (Secret) | — | Creates initial admin via `bootstrap_admin`; not reset later. |
-| `SEED_MANAGER_PASSWORD` | Optional (Secret) | — | `seed_data` demo users. |
-| `SEED_EMPLOYEE_PASSWORD` | Optional (Secret) | — | `seed_data` demo users. |
+| `SEED_ADMIN_PASSWORD` | First deploy (Secret) | — | Creates initial admin via `bootstrap_admin`; required for hosted `seed_data` create/reset. |
+| `SEED_MANAGER_PASSWORD` | Hosted seed create/reset | — | Required when `DATABASE_URL` is set and seeding/resetting manager. |
+| `SEED_EMPLOYEE_PASSWORD` | Hosted seed create/reset | — | Required when `DATABASE_URL` is set and seeding/resetting employee. |
+| `ALLOW_DEFAULT_SEED_PASSWORDS` | Demos only | unset | Set `1`/`true` to allow published local demo passwords on a hosted DB. |
 
 ## Auth / MFA / registration
 

@@ -5,16 +5,18 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from api.audit import log_action
-from api.mixins import AuditedModelViewSet, EmployeeQuerysetMixin
+from api.mixins import AuditedModelViewSet, EmployeeQuerysetMixin, OrganizationQuerysetMixin
 from api.permissions import IsAdmin, IsPayrollManager, IsPayrollUser, RequiresMFAForPayroll
 from api.serializers import PayrollRunSerializer, SalarySerializer
 from payroll.models import PayrollRun, Salary
 from payroll.utils import generate_salary_slip_pdf
 
 
-class PayrollRunViewSet(AuditedModelViewSet):
-    queryset = PayrollRun.objects.all()
+class PayrollRunViewSet(OrganizationQuerysetMixin, AuditedModelViewSet):
     serializer_class = PayrollRunSerializer
+
+    def get_queryset(self):
+        return self.scope_to_organization(PayrollRun.objects.all())
 
     def get_permissions(self):
         if self.action in ('list', 'retrieve'):
@@ -22,7 +24,11 @@ class PayrollRunViewSet(AuditedModelViewSet):
         return [IsPayrollManager(), RequiresMFAForPayroll()]
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        kwargs = {'created_by': self.request.user}
+        org_id = getattr(self.request.user, 'organization_id', None)
+        if org_id and not serializer.validated_data.get('organization'):
+            kwargs['organization_id'] = org_id
+        serializer.save(**kwargs)
 
     def update(self, request, *args, **kwargs):
         payroll_run = self.get_object()

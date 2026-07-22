@@ -1,6 +1,7 @@
 from django.db import models
 from employees.models import Employee
 from departments.models import Department
+from accounts.tenancy import organization_fk
 
 class Shift(models.Model):
     shift_name = models.CharField(max_length=100, unique=True)
@@ -10,6 +11,7 @@ class Shift(models.Model):
     working_hours = models.DecimalField(max_digits=5, decimal_places=2)
     description = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
+    organization = organization_fk(related_name='shifts')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

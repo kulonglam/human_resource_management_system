@@ -1,0 +1,5 @@
+# ZAP rule overrides (tab-separated: ruleId	newRisk	comment)
+# Informational noise that is expected for a SPA + API behind auth.
+10021	IGNORE	X-Content-Type-Options may already be set by Django middleware
+10036	IGNORE	Server banner disclosure is acceptable in ephemeral CI
+10038	IGNORE	CSP report-only noise in baseline scan

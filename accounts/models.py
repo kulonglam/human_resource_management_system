@@ -195,3 +195,31 @@ class SensitiveDataAccessLog(models.Model):
 
     def __str__(self):
         return f'{self.user} viewed {self.employee} at {self.accessed_at}'
+
+
+class OpsAlertEvent(models.Model):
+    """Durable ops alert history (survives cache/Redis restarts)."""
+
+    key = models.CharField(max_length=64, db_index=True)
+    level = models.CharField(max_length=16, default='warning')
+    title = models.CharField(max_length=200)
+    message = models.TextField(blank=True)
+    outcome = models.CharField(max_length=20, default='emitted')  # emitted | suppressed
+    payload = models.JSONField(default=dict, blank=True)
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='ops_alert_events',
+    )
+    emitted_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    class Meta:
+        ordering = ('-emitted_at',)
+        indexes = [
+            models.Index(fields=['key', '-emitted_at']),
+        ]
+
+    def __str__(self):
+        return f'{self.key} ({self.outcome}) @ {self.emitted_at}'

@@ -2,8 +2,23 @@ from django.db import models
 from django.conf import settings
 
 from accounts.fields import EncryptedCharField, EncryptedDecimalField
+from accounts.tenancy import organization_fk
 from departments.models import Department
-from uuid import uuid4
+
+
+def next_employee_number():
+    """Allocate the next sequential staff ID (EMP-0001, EMP-0002, …)."""
+    prefix = 'EMP-'
+    existing = (
+        Employee.objects.filter(employee_number__startswith=prefix)
+        .values_list('employee_number', flat=True)
+    )
+    max_n = 0
+    for value in existing:
+        suffix = value[len(prefix):]
+        if suffix.isdigit():
+            max_n = max(max_n, int(suffix))
+    return f'{prefix}{max_n + 1:04d}'
 
 
 class JobGrade(models.Model):
@@ -13,6 +28,7 @@ class JobGrade(models.Model):
     minimum_salary = models.DecimalField(max_digits=16, decimal_places=2, null=True, blank=True)
     maximum_salary = models.DecimalField(max_digits=16, decimal_places=2, null=True, blank=True)
     is_active = models.BooleanField(default=True)
+    organization = organization_fk(related_name='job_grades')
 
     class Meta:
         ordering = ['rank', 'code']
@@ -33,6 +49,7 @@ class Position(models.Model):
     )
     description = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
+    organization = organization_fk(related_name='positions')
 
     class Meta:
         ordering = ['department__name', 'title']
@@ -69,7 +86,12 @@ class Employee(models.Model):
     nssf_number = EncryptedCharField()
 
     # Employment Information
-    employee_number = models.CharField(max_length=30, unique=True, editable=False)
+    employee_number = models.CharField(
+        max_length=30,
+        unique=True,
+        blank=True,
+        help_text='Staff / employee ID used across HR, payroll, and attendance.',
+    )
     job_title = models.CharField(max_length=100)
     department = models.ForeignKey(
         Department, on_delete=models.SET_NULL, null=True, related_name='employees'
@@ -105,6 +127,10 @@ class Employee(models.Model):
     probation_end_date = models.DateField(null=True, blank=True)
     work_location = models.CharField(max_length=100, blank=True)
     cost_center = models.CharField(max_length=50, blank=True)
+    device_badge_id = models.CharField(
+        max_length=64, blank=True, db_index=True,
+        help_text='Biometric / RFID / device badge identifier for attendance terminals.',
+    )
     is_active = models.BooleanField(default=True)
 
     # Banking / Payroll
@@ -126,12 +152,17 @@ class Employee(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        ordering = ['last_name', 'first_name', 'id']
+
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
 
     def save(self, *args, **kwargs):
+        if self.employee_number:
+            self.employee_number = self.employee_number.strip().upper()
         if not self.employee_number:
-            self.employee_number = f'EMP-{uuid4().hex[:10].upper()}'
+            self.employee_number = next_employee_number()
         super().save(*args, **kwargs)
 
     @property

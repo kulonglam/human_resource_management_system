@@ -5,7 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from api.approval_integration import process_leave_decision
-from api.mixins import AuditedModelViewSet, EmployeeQuerysetMixin
+from api.mixins import AuditedModelViewSet, EmployeeQuerysetMixin, OrganizationQuerysetMixin
 from api.notifications import notify_leave_decision
 from api.permissions import IsAdmin, IsAdminOrManager, IsAdminOrManagerOrReadOnly
 from api.serializers import (
@@ -95,10 +95,12 @@ class LeaveBalanceViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
         return Response(carry_forward_balances(from_year, to_year))
 
 
-class LeavePolicyViewSet(AuditedModelViewSet):
-    queryset = LeavePolicy.objects.filter(is_active=True).order_by('name')
+class LeavePolicyViewSet(OrganizationQuerysetMixin, AuditedModelViewSet):
     serializer_class = LeavePolicySerializer
     permission_classes = [IsAdminOrManagerOrReadOnly]
+
+    def get_queryset(self):
+        return self.scope_to_organization(LeavePolicy.objects.filter(is_active=True).order_by('name'))
 
 
 class LeavePolicyAllocationViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):

@@ -1,6 +1,8 @@
 # Architecture
 
-Pragmatic enterprise layering for this Django/DRF + React HRMIS. Not a full hexagonal ports/adapters stack (no repository interfaces or duplicate entity DTOs).
+Pragmatic enterprise layering for this Django/DRF + React HRMIS. **Product deployment model: single organization** (English UI). Not a full hexagonal ports/adapters stack (no repository interfaces or duplicate entity DTOs).
+
+Readiness scorecard: [ENTERPRISE_READINESS.md](ENTERPRISE_READINESS.md). Security program: [SECURITY_ASSURANCE.md](SECURITY_ASSURANCE.md).
 
 ## Layers
 
@@ -54,7 +56,22 @@ Shared infrastructure stays in `api/` (`mixins`, `permissions`, `audit`, `notifi
 
 Viewsets and serializers import explicitly per domain module (no shared `_imports.py` barrels).
 
+**Service-split posture (modular monolith):** keep one deployable. Domain apps own models + `services.py`; `api/viewsets` stay thin HTTP adapters. Cross-cutting integration uses the transactional outbox (`events.DomainEvent` via `events.services.publish_event`) rather than extracting microservices.
+
 Frontend: pages compose feature components under `frontend/src/components/<domain>/`; shared formatters live in `frontend/src/utils/`. E2E smoke tests in `frontend/e2e/` (Playwright), run in CI against Django-served SPA.
+
+## Tenancy (optional)
+
+- Default production use is **one employer** with unscoped users/employees (`organization_id=null`).
+- `accounts.Organization` is optional infrastructure if you later need soft partitions.
+- When set, org-bound users see only their organization on catalogs (`OrganizationQuerysetMixin`) and employee-linked rows (`scope_to_accessible_employees`).
+- Admins with `organization_id=null` retain global visibility (normal single-org mode).
+
+## Outbox
+
+1. Use-case mutates data inside `transaction.atomic` when needed.
+2. Call `publish_event(topic, payload)` in the same request/transaction boundary.
+3. Cron/worker runs `python manage.py process_outbox` to drain pending rows (default handler logs; swap in webhook/queue fan-out).
 
 ## API contract
 

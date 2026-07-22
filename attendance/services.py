@@ -289,3 +289,166 @@ def document_expiry_reminders():
             )
             created += 1
     return {'expiring_documents': expiring.count(), 'notifications': created}
+
+
+def create_attendance_device(*, name, device_code, device_type='fingerprint', location='', organization=None):
+    """Register a terminal and return (device, raw_token). Token shown once."""
+    import hashlib
+    import secrets
+
+    from attendance.models import AttendanceDevice
+
+    raw = secrets.token_urlsafe(32)
+    prefix = raw[:8]
+    device = AttendanceDevice.objects.create(
+        name=name,
+        device_code=device_code,
+        device_type=device_type,
+        location=location or '',
+        organization=organization,
+        token_prefix=prefix,
+        token_hash=hashlib.sha256(raw.encode()).hexdigest(),
+    )
+    return device, raw
+
+
+def authenticate_attendance_device(raw_token):
+    import hashlib
+
+    from attendance.models import AttendanceDevice
+
+    if not raw_token or len(raw_token) < 12:
+        return None
+    prefix = raw_token[:8]
+    digest = hashlib.sha256(raw_token.encode()).hexdigest()
+    try:
+        device = AttendanceDevice.objects.get(
+            token_prefix=prefix, token_hash=digest, is_active=True,
+        )
+    except AttendanceDevice.DoesNotExist:
+        return None
+    AttendanceDevice.objects.filter(pk=device.pk).update(last_seen_at=timezone.now())
+    return device
+
+
+def resolve_employee_for_badge(badge_id, *, organization_id=None):
+    from employees.models import Employee
+
+    badge_id = (badge_id or '').strip()
+    if not badge_id:
+        return None
+    qs = Employee.objects.filter(is_active=True).filter(
+        Q(device_badge_id__iexact=badge_id) | Q(employee_number__iexact=badge_id),
+    )
+    if organization_id:
+        qs = qs.filter(organization_id=organization_id)
+    return qs.first()
+
+
+def apply_punch_to_attendance(employee, punched_at, *, punch_type='auto', source='device'):
+    """Upsert daily Attendance from a punch timestamp."""
+    from attendance.models import Attendance
+
+    day = timezone.localtime(punched_at).date()
+    punch_time = timezone.localtime(punched_at).time().replace(microsecond=0)
+
+    with transaction.atomic():
+        attendance, _ = Attendance.objects.select_for_update().get_or_create(
+            employee=employee,
+            date=day,
+            defaults={
+                'source': source,
+                'approval_status': 'draft',
+                'status': 'present',
+            },
+        )
+        if punch_type == 'out' or (punch_type == 'auto' and attendance.time_in and not attendance.time_out):
+            attendance.time_out = punch_time
+        else:
+            if not attendance.time_in or punch_type == 'in':
+                attendance.time_in = punch_time
+            elif punch_type == 'auto':
+                attendance.time_out = punch_time
+        attendance.source = source
+        assignment = match_shift_for_date(employee, day)
+        if assignment:
+            attendance.shift_assignment = assignment
+        attendance.status = derive_attendance_status(attendance)
+        attendance.save()
+    return attendance
+
+
+def ingest_device_punch(
+    *,
+    device=None,
+    employee=None,
+    badge_id='',
+    punched_at=None,
+    punch_type='auto',
+    source='device',
+    client_punch_id='',
+    raw_payload=None,
+):
+    """Record a device/mobile punch and apply it to Attendance when possible."""
+    from attendance.models import DevicePunch
+
+    punched_at = punched_at or timezone.now()
+    if timezone.is_naive(punched_at):
+        punched_at = timezone.make_aware(punched_at)
+
+    if client_punch_id:
+        existing = DevicePunch.objects.filter(client_punch_id=client_punch_id).first()
+        if existing:
+            return existing
+
+    if employee is None:
+        org_id = getattr(device, 'organization_id', None) if device else None
+        employee = resolve_employee_for_badge(badge_id, organization_id=org_id)
+
+    punch = DevicePunch.objects.create(
+        device=device,
+        employee=employee,
+        badge_id=(badge_id or getattr(employee, 'device_badge_id', '') or '')[:64],
+        punched_at=punched_at,
+        punch_type=punch_type,
+        source=source,
+        client_punch_id=client_punch_id or '',
+        raw_payload=raw_payload or {},
+    )
+    if not employee:
+        punch.error_message = 'No employee matched for badge/employee number.'
+        punch.save(update_fields=['error_message'])
+        return punch
+
+    attendance = apply_punch_to_attendance(
+        employee, punched_at, punch_type=punch_type, source=source,
+    )
+    punch.attendance = attendance
+    punch.applied = True
+    punch.save(update_fields=['attendance', 'applied'])
+    return punch
+
+
+def sync_offline_punches(employee, punches):
+    """Apply a list of offline mobile punches for one employee."""
+    results = []
+    for item in punches or []:
+        punched_at = item.get('punched_at')
+        if isinstance(punched_at, str):
+            punched_at = datetime.fromisoformat(punched_at.replace('Z', '+00:00'))
+        punch = ingest_device_punch(
+            employee=employee,
+            badge_id=employee.device_badge_id or employee.employee_number,
+            punched_at=punched_at,
+            punch_type=item.get('punch_type', 'auto'),
+            source='offline_sync',
+            client_punch_id=item.get('client_punch_id', ''),
+            raw_payload=item,
+        )
+        results.append({
+            'client_punch_id': punch.client_punch_id,
+            'applied': punch.applied,
+            'punch_id': punch.id,
+            'error': punch.error_message,
+        })
+    return results

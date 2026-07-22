@@ -1,0 +1,62 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: hrmis
+      POSTGRES_PASSWORD: hrmis
+      POSTGRES_DB: hrmis
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hrmis -d hrmis"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  pgbouncer:
+    image: edoburu/pgbouncer:1.22.1
+    environment:
+      DATABASE_URL: postgres://hrmis:hrmis@db:5432/hrmis
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 200
+      DEFAULT_POOL_SIZE: 20
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "6432:5432"
+
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DEBUG: "False"
+      SECRET_KEY: change-me-in-compose
+      DATABASE_URL: postgres://hrmis:hrmis@pgbouncer:5432/hrmis
+      USE_PGBOUNCER: "True"
+      REDIS_URL: redis://redis:6379/0
+      ALLOWED_HOSTS: localhost,127.0.0.1,web
+      REQUIRE_FIELD_ENCRYPTION_KEY: "False"
+      ENFORCE_MFA_FOR_ADMINS: "False"
+      ENFORCE_MFA_FOR_MANAGERS: "False"
+      ENFORCE_MFA_FOR_PAYROLL: "False"
+    depends_on:
+      pgbouncer:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             gunicorn avvento_hrmis.wsgi:application --bind 0.0.0.0:8000 --workers 2 --threads 2"
+
+volumes:
+  pgdata:

@@ -22,6 +22,7 @@ export const attendanceTabs = [{
     ]},
     { name: 'source', type: 'select', choices: [
       { value: 'manual', label: 'Manual' }, { value: 'import', label: 'Import' },
+      { value: 'device', label: 'Biometric / device' }, { value: 'mobile', label: 'Mobile' },
     ]},
     { name: 'notes', type: 'textarea', fullWidth: true },
   ],
@@ -66,6 +67,39 @@ export const attendanceTabs = [{
     { name: 'approve', label: 'Approve', variant: 'success', managerOnly: true, show: (r) => r.status === 'pending' },
     { name: 'reject', label: 'Reject', variant: 'danger', managerOnly: true, show: (r) => r.status === 'pending' },
   ],
+}, {
+  id: 'devices', label: 'Devices', endpoint: 'attendance-devices',
+  adminOnly: true,
+  columns: [
+    { key: 'name', label: 'Device' }, { key: 'device_code', label: 'Code' },
+    { key: 'device_type', label: 'Type' }, { key: 'location', label: 'Location' },
+    { key: 'is_active', label: 'Active', render: (r) => (r.is_active ? 'Yes' : 'No') },
+    { key: 'last_seen_at', label: 'Last seen' },
+  ],
+  formFields: [
+    { name: 'name', required: true },
+    { name: 'device_code', required: true, label: 'Device code' },
+    { name: 'device_type', type: 'select', choices: [
+      { value: 'fingerprint', label: 'Fingerprint' },
+      { value: 'face', label: 'Face recognition' },
+      { value: 'rfid', label: 'RFID / badge' },
+      { value: 'mobile', label: 'Mobile app' },
+      { value: 'other', label: 'Other' },
+    ]},
+    { name: 'location' },
+  ],
+  hideCreateForEmployee: true,
+}, {
+  id: 'punches', label: 'Device punches', endpoint: 'device-punches',
+  hideCreate: true,
+  columns: [
+    { key: 'employee_name', label: 'Employee' }, { key: 'badge_id', label: 'Badge' },
+    { key: 'device_name', label: 'Device' }, { key: 'punched_at', label: 'When' },
+    { key: 'punch_type', label: 'Type' }, { key: 'source', label: 'Source' },
+    { key: 'applied', label: 'Applied', render: (r) => (r.applied ? 'Yes' : 'No') },
+  ],
+  formFields: [],
+  hideCreateForEmployee: true,
 }, {
   id: 'holidays', label: 'Public Holidays', endpoint: 'public-holidays',
   columns: [
