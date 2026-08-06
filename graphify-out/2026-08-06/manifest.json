@@ -2790,8 +2790,8 @@
     "semantic_hash": ""
   },
   "render.yaml": {
-    "mtime": 1786004320.1280873,
-    "ast_hash": "c3281fc4a8fda0bf935bb73807d9d556",
+    "mtime": 1784276193.4076736,
+    "ast_hash": "067fb20b7cb4e6f530f6cad5011c9beb",
     "semantic_hash": ""
   },
   "requirements.txt": {
@@ -2812,21 +2812,6 @@
   "frontend/public/pwa-icon.svg": {
     "mtime": 1784444994.616867,
     "ast_hash": "d407d81ef6643fa528e425d006d5d781",
-    "semantic_hash": ""
-  },
-  "accounts/management/commands/seed_production.py": {
-    "mtime": 1786004307.268261,
-    "ast_hash": "fd1d593e2439f568df2e89566097758f",
-    "semantic_hash": ""
-  },
-  "api/tests/test_seed_production.py": {
-    "mtime": 1786004316.2071395,
-    "ast_hash": "772ccad1d4b9520672e4fb2ea1e54cfe",
-    "semantic_hash": ""
-  },
-  "scripts/seed-production.sh": {
-    "mtime": 1786004307.6544542,
-    "ast_hash": "760a97aa77552e415d4f9ad4c03160d0",
     "semantic_hash": ""
   }
 }

@@ -6,9 +6,7 @@ services:
     buildCommand: bash scripts/render-build.sh
     preDeployCommand: >-
       python manage.py migrate --noinput &&
-      python manage.py bootstrap_admin &&
-      python manage.py seed_workflows &&
-      python manage.py seed_document_access
+      python manage.py seed_production --confirm
     startCommand: >-
       gunicorn avvento_hrmis.wsgi:application
       --bind 0.0.0.0:$PORT
@@ -70,9 +68,7 @@ services:
     buildCommand: bash scripts/render-build.sh
     preDeployCommand: >-
       python manage.py migrate --noinput &&
-      python manage.py bootstrap_admin &&
-      python manage.py seed_workflows &&
-      python manage.py seed_document_access
+      python manage.py seed_production --confirm --with-users
     startCommand: >-
       gunicorn avvento_hrmis.wsgi:application
       --bind 0.0.0.0:$PORT
@@ -104,6 +100,10 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: SEED_ADMIN_PASSWORD
+        generateValue: true
+      - key: SEED_MANAGER_PASSWORD
+        generateValue: true
+      - key: SEED_EMPLOYEE_PASSWORD
         generateValue: true
       - key: DATABASE_URL
         fromDatabase:
