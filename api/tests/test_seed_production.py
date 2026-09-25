@@ -67,3 +67,22 @@ class SeedProductionCommandTests(TestCase):
         call_command('seed_production', confirm=True)
         called = [args[0] for args, _kwargs in mock_call_command.call_args_list]
         self.assertIn('seed_data', called)
+
+    @patch.dict(
+        'os.environ',
+        {
+            'SEED_ADMIN_PASSWORD': 'NewAdminPass123!',
+            'SEED_RESET_PASSWORDS': '1',
+            'DATABASE_URL': '',
+        },
+        clear=True,
+    )
+    def test_env_reset_updates_existing_admin_password(self):
+        call_command('seed_production')
+        admin = CustomUser.objects.get(username='admin')
+        admin.set_password('OldAdminPass123!')
+        admin.save(update_fields=['password'])
+
+        call_command('seed_production')
+        admin.refresh_from_db()
+        self.assertTrue(admin.check_password('NewAdminPass123!'))

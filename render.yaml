@@ -4,15 +4,7 @@ services:
     runtime: python
     plan: starter
     buildCommand: bash scripts/render-build.sh
-    preDeployCommand: >-
-      python manage.py migrate --noinput &&
-      python manage.py seed_production --confirm
-    startCommand: >-
-      gunicorn avvento_hrmis.wsgi:application
-      --bind 0.0.0.0:$PORT
-      --workers 2
-      --threads 2
-      --timeout 120
+    startCommand: bash scripts/render-start.sh
     healthCheckPath: /api/v1/health/
     envVars:
       - key: PYTHON_VERSION
@@ -66,15 +58,7 @@ services:
     plan: starter
     branch: main
     buildCommand: bash scripts/render-build.sh
-    preDeployCommand: >-
-      python manage.py migrate --noinput &&
-      python manage.py seed_production --confirm --with-users
-    startCommand: >-
-      gunicorn avvento_hrmis.wsgi:application
-      --bind 0.0.0.0:$PORT
-      --workers 2
-      --threads 2
-      --timeout 120
+    startCommand: bash scripts/render-start.sh
     healthCheckPath: /api/v1/health/
     envVars:
       - key: PYTHON_VERSION

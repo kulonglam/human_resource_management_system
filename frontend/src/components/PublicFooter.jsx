@@ -11,7 +11,7 @@ export default function PublicFooter({ tone = 'light', showLoginLink = true }) {
     <footer className={`public-footer public-footer--${tone}`} role="contentinfo">
       <div className="public-footer-inner">
         <p className="public-footer-copy mb-0">
-          © {YEAR} FCA HRMIS
+          © {YEAR}  HRMIS
         </p>
         <nav className="public-footer-nav" aria-label="Legal and support">
           <Link to="/privacy">Privacy</Link>

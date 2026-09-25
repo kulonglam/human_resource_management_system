@@ -5,7 +5,25 @@ import os
 from django.core.management import call_command
 from django.core.management.base import BaseCommand, CommandError
 
-from accounts.models import Role
+from accounts.models import CustomUser, Role
+
+
+def _env_flag(name):
+    return os.environ.get(name, '').lower() in ('1', 'true', 'yes')
+
+
+def reset_admin_password():
+    """Set the bootstrap admin password from SEED_ADMIN_PASSWORD."""
+    username = os.environ.get('BOOTSTRAP_ADMIN_USERNAME', 'admin')
+    password = os.environ.get('SEED_ADMIN_PASSWORD', '')
+    if not password:
+        raise CommandError('SEED_ADMIN_PASSWORD is required to reset the admin password.')
+    user = CustomUser.objects.filter(username=username).first()
+    if not user:
+        return False
+    user.set_password(password)
+    user.save(update_fields=['password'])
+    return True
 
 
 class Command(BaseCommand):
@@ -50,14 +68,15 @@ class Command(BaseCommand):
                 'if using --with-users) before running.'
             )
 
-        with_users = options['with_users'] or os.environ.get(
-            'SEED_PRODUCTION_WITH_USERS', '',
-        ).lower() in ('1', 'true', 'yes')
+        with_users = options['with_users'] or _env_flag('SEED_PRODUCTION_WITH_USERS')
+        reset_passwords = options['reset_passwords'] or _env_flag('SEED_RESET_PASSWORDS')
 
         for role_name in (Role.ADMIN, Role.MANAGER, Role.EMPLOYEE):
             Role.objects.get_or_create(name=role_name)
 
         call_command('bootstrap_admin')
+        if reset_passwords and reset_admin_password():
+            self.stdout.write(self.style.SUCCESS('Admin password reset from SEED_ADMIN_PASSWORD.'))
         call_command('seed_workflows')
         call_command('seed_document_access')
 
@@ -71,7 +90,7 @@ class Command(BaseCommand):
             call_command('seed_compliance_evidence')
 
         if with_users:
-            call_command('seed_data', reset_password=options['reset_passwords'])
+            call_command('seed_data', reset_password=reset_passwords)
 
         self.stdout.write(self.style.SUCCESS('Production seed complete.'))
         if hosted:
