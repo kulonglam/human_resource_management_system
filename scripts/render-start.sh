@@ -4,7 +4,14 @@
 set -euo pipefail
 
 python manage.py migrate --noinput
-python manage.py seed_production --confirm
+
+seed_args=(--confirm)
+# Staging previously used seed_production --confirm --with-users. Keep that
+# behavior when this is the staging service or the env flag is set.
+if [ "${RENDER_SERVICE_NAME:-}" = "staging" ] || [ "${SEED_PRODUCTION_WITH_USERS:-}" = "1" ]; then
+  seed_args+=(--with-users)
+fi
+python manage.py seed_production "${seed_args[@]}"
 
 exec gunicorn avvento_hrmis.wsgi:application \
   --bind "0.0.0.0:${PORT:-8000}" \

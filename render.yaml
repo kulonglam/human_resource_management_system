@@ -81,6 +81,8 @@ services:
         sync: false
       - key: RENDER_SERVICE_NAME
         value: staging
+      - key: SEED_PRODUCTION_WITH_USERS
+        value: "1"
       - key: SECRET_KEY
         generateValue: true
       - key: SEED_ADMIN_PASSWORD
