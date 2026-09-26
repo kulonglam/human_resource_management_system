@@ -50,7 +50,7 @@ export default function ModulePage({ title, icon, tabs, headerExtra, passUser = 
       const positionRows = asRows(positions);
       const gradeRows = asRows(grades);
 
-      setLookupOptions({
+      const nextOptions = {
         employee: employeeRows.map((e) => ({ value: e.id, label: e.full_name })),
         department: departmentRows.map((d) => ({ value: d.id, label: d.name })),
         previous_department: departmentRows.map((d) => ({ value: d.id, label: d.name })),
@@ -74,9 +74,12 @@ export default function ModulePage({ title, icon, tabs, headerExtra, passUser = 
         previous_grade: gradeRows.map((g) => ({ value: g.id, label: `${g.code} — ${g.name}` })),
         new_grade: gradeRows.map((g) => ({ value: g.id, label: `${g.code} — ${g.name}` })),
         survey: [],
-      });
+      };
+      setLookupOptions(nextOptions);
+      return nextOptions;
     } catch {
       /* lookups optional */
+      return null;
     }
   }, []);
 

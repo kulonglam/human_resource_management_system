@@ -31,6 +31,7 @@ export default function ResourceManager({
   const [selectedIds, setSelectedIds] = useState([]);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [formLookups, setFormLookups] = useState(lookupOptions);
 
   const tab = tabs.find((t) => t.id === activeTab) || tabs[0];
   const isEmployeeUser = user && !user.is_admin && !user.is_manager;
@@ -67,6 +68,18 @@ export default function ResourceManager({
     setSelectedIds([]);
   }, [load]);
 
+  useEffect(() => {
+    setFormLookups(lookupOptions);
+  }, [lookupOptions]);
+
+  const refreshLookups = async () => {
+    if (typeof onLookupsRefresh !== 'function') return;
+    const next = await onLookupsRefresh();
+    if (next && typeof next === 'object') {
+      setFormLookups(next);
+    }
+  };
+
   const toggleSelect = (id) => {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
@@ -87,7 +100,7 @@ export default function ResourceManager({
 
   const openCreate = async () => {
     try {
-      await onLookupsRefresh?.();
+      await refreshLookups();
     } catch {
       /* keep last known lookups */
     }
@@ -184,7 +197,12 @@ export default function ResourceManager({
       } else {
         await api.create(tab.endpoint, payload);
       }
-      await Promise.all([load(), onLookupsRefresh?.()].filter(Boolean));
+      await load();
+      try {
+        await refreshLookups();
+      } catch {
+        /* table already reloaded */
+      }
       setShowModal(false);
     } catch (err) {
       setError(errorMessage(err));
@@ -352,7 +370,7 @@ export default function ResourceManager({
           editing={editing}
           form={form}
           visibleFormFields={visibleFormFields}
-          lookupOptions={lookupOptions}
+          lookupOptions={formLookups}
           isEmployeeUser={isEmployeeUser}
           user={user}
           submitting={submitting}
