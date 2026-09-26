@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api/client';
 import ModulePage from './ModulePage';
@@ -30,13 +30,17 @@ export default function Leaves() {
   const [balances, setBalances] = useState([]);
   const isEmployee = user && !user.is_admin && !user.is_manager;
 
-  useEffect(() => {
-    if (!isEmployee || !user?.linked_employee_id) return;
+  const loadBalances = useCallback(() => {
+    if (!isEmployee || !user?.linked_employee_id) return Promise.resolve();
     const year = new Date().getFullYear();
-    api.list('leave-balances', `employee=${user.linked_employee_id}&year=${year}`)
+    return api.list('leave-balances', `employee=${user.linked_employee_id}&year=${year}`)
       .then(setBalances)
       .catch(() => setBalances([]));
   }, [isEmployee, user?.linked_employee_id]);
+
+  useEffect(() => {
+    loadBalances();
+  }, [loadBalances]);
 
   return (
     <>
@@ -50,7 +54,13 @@ export default function Leaves() {
           )}
         </>
       )}
-      <ModulePage title="Leaves" icon="bi-calendar-x" tabs={leaveTabs} passUser />
+      <ModulePage
+        title="Leaves"
+        icon="bi-calendar-x"
+        tabs={leaveTabs}
+        passUser
+        onRecordsChanged={isEmployee ? loadBalances : undefined}
+      />
     </>
   );
 }

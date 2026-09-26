@@ -140,10 +140,10 @@ def _finalize_leave_approval(request, leave):
 
     with transaction.atomic():
         leave = leave.__class__.objects.select_for_update().select_related('employee').get(pk=leave.pk)
-        current_year = timezone.now().year
+        balance_year = leave.start_date.year if leave.start_date else timezone.now().year
         try:
             balance = LeaveBalance.objects.select_for_update().get(
-                employee=leave.employee, leave_type=leave.leave_type, year=current_year,
+                employee=leave.employee, leave_type=leave.leave_type, year=balance_year,
             )
             balance.pending_days = max(float(balance.pending_days) - float(leave.working_days), 0.0)
             balance.used_days = float(balance.used_days) + float(leave.working_days)
@@ -171,10 +171,10 @@ def _reject_leave(request, leave, comment=''):
 
     with transaction.atomic():
         leave = leave.__class__.objects.select_for_update().select_related('employee').get(pk=leave.pk)
-        current_year = timezone.now().year
+        balance_year = leave.start_date.year if leave.start_date else timezone.now().year
         try:
             balance = LeaveBalance.objects.select_for_update().get(
-                employee=leave.employee, leave_type=leave.leave_type, year=current_year,
+                employee=leave.employee, leave_type=leave.leave_type, year=balance_year,
             )
             balance.pending_days = max(float(balance.pending_days) - float(leave.working_days), 0.0)
             balance.save(update_fields=['pending_days'])

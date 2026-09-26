@@ -9,7 +9,7 @@ function asRows(data) {
   return [];
 }
 
-export default function ModulePage({ title, icon, tabs, headerExtra, passUser = false }) {
+export default function ModulePage({ title, icon, tabs, headerExtra, passUser = false, onRecordsChanged }) {
   const { user } = useAuth();
   const [lookupOptions, setLookupOptions] = useState({});
 
@@ -94,6 +94,7 @@ export default function ModulePage({ title, icon, tabs, headerExtra, passUser = 
       tabs={tabs}
       lookupOptions={lookupOptions}
       onLookupsRefresh={loadLookups}
+      onRecordsChanged={onRecordsChanged}
       user={passUser ? user : undefined}
       headerExtra={headerExtra}
     />

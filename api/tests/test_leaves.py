@@ -64,6 +64,17 @@ class LeaveWorkflowTests(HRAPITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['status'], 'rejected')
 
+    def test_leave_cannot_be_edited_after_submit(self):
+        create_response = self._create_leave()
+        leave_id = create_response.data['id']
+        year = timezone.now().year
+        response = self.client.patch(
+            f'/api/v1/leaves/{leave_id}/',
+            {'reason': 'Changed after submit', 'end_date': f'{year}-07-10'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 405)
+
     def test_employee_cannot_approve_leave(self):
         create_response = self._create_leave()
         leave_id = create_response.data['id']

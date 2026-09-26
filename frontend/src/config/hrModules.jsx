@@ -143,6 +143,7 @@ export const leaveTabs = [
       { name: 'reject', label: 'Reject', variant: 'danger', show: (r) => r.status === 'pending' },
     ],
     canDelete: false,
+    hideEdit: true,
     hideRowActionsForEmployee: true,
   },
   {

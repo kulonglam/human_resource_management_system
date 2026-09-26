@@ -37,6 +37,15 @@ class LeaveViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
         leave = serializer.save()
         submit_leave(leave=leave, balance=balance, submitted_by=self.request.user)
 
+    def update(self, request, *args, **kwargs):
+        return Response(
+            {'detail': 'Leave requests cannot be edited after they are submitted.'},
+            status=status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
+
+    def partial_update(self, request, *args, **kwargs):
+        return self.update(request, *args, **kwargs)
+
     @action(detail=True, methods=['post'], permission_classes=[IsAdminOrManager])
     def approve(self, request, pk=None):
         leave = self.get_object()
@@ -76,6 +85,9 @@ class LeaveBalanceViewSet(EmployeeQuerysetMixin, AuditedModelViewSet):
         year = self.request.query_params.get('year')
         if year:
             qs = qs.filter(year=year)
+        employee_id = self.request.query_params.get('employee')
+        if employee_id:
+            qs = qs.filter(employee_id=employee_id)
         qs = self.scope_to_accessible_employees(qs)
         return qs
 

@@ -13,6 +13,7 @@ export default function ResourceManager({
   tabs,
   lookupOptions = {},
   onLookupsRefresh,
+  onRecordsChanged,
   user,
   headerExtra,
   embedded = false,
@@ -40,7 +41,7 @@ export default function ResourceManager({
     && !tab?.hideCreate
     && !(isEmployeeUser && tab?.hideCreateForEmployee)
     && !(tab?.adminOnly && !user?.is_admin);
-  const canUseTabEdit = !(isEmployeeUser && tab?.hideEditForEmployee);
+  const canUseTabEdit = tab?.hideEdit !== true && !(isEmployeeUser && tab?.hideEditForEmployee);
 
   const visibleFormFields = tab?.formFields?.filter((field) => {
     if (tab.selfServiceEmployee && isEmployeeUser && field.name === 'employee') {
@@ -202,6 +203,9 @@ export default function ResourceManager({
         await refreshLookups();
       } catch {
         /* table already reloaded */
+      }
+      if (typeof onRecordsChanged === 'function') {
+        await onRecordsChanged();
       }
       setShowModal(false);
     } catch (err) {
