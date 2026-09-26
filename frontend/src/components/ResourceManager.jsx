@@ -12,6 +12,7 @@ export default function ResourceManager({
   icon,
   tabs,
   lookupOptions = {},
+  onLookupsRefresh,
   user,
   headerExtra,
   embedded = false,
@@ -85,6 +86,7 @@ export default function ResourceManager({
   };
 
   const openCreate = () => {
+    onLookupsRefresh?.();
     const initial = {};
     tab.formFields?.forEach((f) => {
       initial[f.name] = f.default ?? (f.type === 'checkbox' ? false : '');
@@ -180,6 +182,7 @@ export default function ResourceManager({
       }
       setShowModal(false);
       load();
+      onLookupsRefresh?.();
     } catch (err) {
       setError(errorMessage(err));
     } finally {
