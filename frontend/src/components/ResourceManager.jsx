@@ -85,8 +85,12 @@ export default function ResourceManager({
     });
   };
 
-  const openCreate = () => {
-    onLookupsRefresh?.();
+  const openCreate = async () => {
+    try {
+      await onLookupsRefresh?.();
+    } catch {
+      /* keep last known lookups */
+    }
     const initial = {};
     tab.formFields?.forEach((f) => {
       initial[f.name] = f.default ?? (f.type === 'checkbox' ? false : '');
@@ -180,9 +184,8 @@ export default function ResourceManager({
       } else {
         await api.create(tab.endpoint, payload);
       }
+      await Promise.all([load(), onLookupsRefresh?.()].filter(Boolean));
       setShowModal(false);
-      load();
-      onLookupsRefresh?.();
     } catch (err) {
       setError(errorMessage(err));
     } finally {
