@@ -1,0 +1,6 @@
+# Playwright artifacts use mixed-case folder names (MFA/UI/API) that
+# graphify lowercases in node ids and norm_label. Keep them out of the graph.
+test-results/
+playwright-report/
+**/test-results/
+**/playwright-report/

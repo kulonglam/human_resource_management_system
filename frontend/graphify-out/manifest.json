@@ -707,12 +707,6 @@
     "ast_hash": "417694acd479e128c2ec17eba6abeca6",
     "semantic_hash": ""
   },
-  "test-results/.last-run.json": {
-    "mtime": 1784310593.9275966,
-    "seen": 1790411599.1666343,
-    "ast_hash": "9bfd873bac91d2e5b48e9f56eea988b2",
-    "semantic_hash": ""
-  },
   "vite.config.js": {
     "mtime": 1782357929.1725428,
     "seen": 1790411599.1666355,
@@ -729,48 +723,6 @@
     "mtime": 1789112669.577,
     "seen": 1790411599.166638,
     "ast_hash": "7dc0721757bd2b3b14c0937c2bc5b8b4",
-    "semantic_hash": ""
-  },
-  "test-results/approvals-approvals-queue-admin-can-open-approvals-page-chromium/error-context.md": {
-    "mtime": 1784310592.1646607,
-    "seen": 1790411599.1666389,
-    "ast_hash": "f50014b3edc33dc12309c2455198df04",
-    "semantic_hash": ""
-  },
-  "test-results/auth-authentication-admin-can-log-in-and-reach-dashboard-chromium/error-context.md": {
-    "mtime": 1784310592.1526675,
-    "seen": 1790411599.1666403,
-    "ast_hash": "0a134ae75f5ae7a49526ff8116de1d23",
-    "semantic_hash": ""
-  },
-  "test-results/auth-authentication-employee-can-log-in-and-reach-dashboard-chromium/error-context.md": {
-    "mtime": 1784310593.8500698,
-    "seen": 1790411599.1666415,
-    "ast_hash": "38a6dc4d624546776e533603bbb2d924",
-    "semantic_hash": ""
-  },
-  "test-results/leave-workflow-leave-workf-588ca-n-approves-via-approvals-UI-chromium/error-context.md": {
-    "mtime": 1784310592.1846611,
-    "seen": 1790411599.1666424,
-    "ast_hash": "33d1f45c472eb32833f88bcc972f501c",
-    "semantic_hash": ""
-  },
-  "test-results/mfa-multi-factor-authentic-f8cac--open-MFA-security-settings-chromium/error-context.md": {
-    "mtime": 1784310592.2191968,
-    "seen": 1790411599.1666434,
-    "ast_hash": "56b0545b26fbf72616cf8078370e15cb",
-    "semantic_hash": ""
-  },
-  "test-results/payroll-payroll-admin-can--035a5-e-and-see-statutory-exports-chromium/error-context.md": {
-    "mtime": 1784310593.8015552,
-    "seen": 1790411599.1666446,
-    "ast_hash": "060cdbc2012137fd126f4b8f79b6be87",
-    "semantic_hash": ""
-  },
-  "test-results/smoke-critical-smoke-login-10b74-and-health-API-is-reachable-chromium/error-context.md": {
-    "mtime": 1784310593.8250692,
-    "seen": 1790411599.1666455,
-    "ast_hash": "a25de92a66694809a87464fd3e7666be",
     "semantic_hash": ""
   },
   "public/pwa-icon.svg": {
