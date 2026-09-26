@@ -15,8 +15,16 @@ export function hasPermission(user, permission) {
   return Array.isArray(user.permissions) && user.permissions.includes(permission);
 }
 
+export function isEmployeeUser(user) {
+  return Boolean(user) && !user.is_admin && !user.is_manager;
+}
+
+export function canManageHr(user) {
+  return Boolean(user?.is_admin || user?.is_manager);
+}
+
 export function canViewPayroll(user) {
-  return hasPermission(user, 'payroll.view') || Boolean(user?.linked_employee_id);
+  return hasPermission(user, 'payroll.view');
 }
 
 export function canManagePayroll(user) {

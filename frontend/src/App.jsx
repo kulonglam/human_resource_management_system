@@ -68,12 +68,12 @@ export default function App() {
         <Route path="employees" element={<Employees />} />
         <Route path="employees/new" element={<PermissionRoute check={(u) => u.is_admin}><EmployeeForm /></PermissionRoute>} />
         <Route path="employees/:id" element={<EmployeeDetail />} />
-        <Route path="employees/:id/edit" element={<EmployeeForm />} />
+        <Route path="employees/:id/edit" element={<PermissionRoute check={(u) => u.is_admin || u.is_manager}><EmployeeForm /></PermissionRoute>} />
         <Route path="departments" element={<Departments />} />
         <Route path="attendance" element={<ModulePage title="Attendance" icon="bi-calendar-check" tabs={attendanceTabs} />} />
         <Route path="leaves" element={<Leaves />} />
-        <Route path="recruitment" element={<Recruitment />} />
-        <Route path="recruitment/applications/:id" element={<ApplicationDetail />} />
+        <Route path="recruitment" element={<PermissionRoute check={(u) => u.is_admin || u.is_manager}><Recruitment /></PermissionRoute>} />
+        <Route path="recruitment/applications/:id" element={<PermissionRoute check={(u) => u.is_admin || u.is_manager}><ApplicationDetail /></PermissionRoute>} />
         <Route path="payroll" element={<PermissionRoute check={canViewPayroll}><Payroll /></PermissionRoute>} />
         <Route path="workforce-structure" element={<PermissionRoute check={(u) => u.is_admin || u.is_manager}><ModulePage title="Workforce Structure" icon="bi-diagram-3" tabs={workforceStructureTabs} passUser /></PermissionRoute>} />
         <Route path="performance" element={<Performance />} />
@@ -81,7 +81,7 @@ export default function App() {
         <Route path="performance/appraisals/:id" element={<RecordDetail configKey="performance-appraisals" />} />
         <Route path="training/courses/:id" element={<RecordDetail configKey="training-courses" />} />
         <Route path="training/development-plans/:id" element={<RecordDetail configKey="development-plans" />} />
-        <Route path="recruitment/jobs/:id" element={<RecordDetail configKey="jobs" />} />
+        <Route path="recruitment/jobs/:id" element={<PermissionRoute check={(u) => u.is_admin || u.is_manager}><RecordDetail configKey="jobs" /></PermissionRoute>} />
         <Route path="exits/:id" element={<RecordDetail configKey="exit-processes" />} />
         <Route path="training" element={<Training />} />
         <Route path="reports" element={<PermissionRoute check={canManageReports}><Reports /></PermissionRoute>} />

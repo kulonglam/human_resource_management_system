@@ -12,7 +12,7 @@ const navItems = [
   { to: '/attendance', icon: 'bi-calendar-check', label: 'Attendance' },
   { to: '/mobile', icon: 'bi-phone', label: 'Mobile clock' },
   { to: '/leaves', icon: 'bi-calendar-x', label: 'Leaves' },
-  { to: '/recruitment', icon: 'bi-briefcase', label: 'Recruitment' },
+  { to: '/recruitment', icon: 'bi-briefcase', label: 'Recruitment', managerOnly: true },
   { to: '/payroll', icon: 'bi-cash-coin', label: 'Payroll', requiresPayroll: true },
   { to: '/performance', icon: 'bi-graph-up-arrow', label: 'Performance' },
   { to: '/training', icon: 'bi-book', label: 'Training' },
@@ -182,9 +182,11 @@ export default function Layout() {
         </div>
       </div>
 
-      <nav className="mobile-bottom-nav d-md-none" aria-label="Quick manager actions">
+      <nav className="mobile-bottom-nav d-md-none" aria-label="Quick actions">
         <NavLink to="/dashboard" onClick={closeSidebar}><i className="bi bi-house" /><span>Home</span></NavLink>
-        <NavLink to="/approvals" onClick={closeSidebar}><i className="bi bi-inbox" /><span>Approvals</span></NavLink>
+        {(user?.is_admin || user?.is_manager) && (
+          <NavLink to="/approvals" onClick={closeSidebar}><i className="bi bi-inbox" /><span>Approvals</span></NavLink>
+        )}
         <NavLink to="/leaves" onClick={closeSidebar}><i className="bi bi-calendar-x" /><span>Leave</span></NavLink>
         {canViewPayroll(user) && (
           <NavLink to="/payroll" onClick={closeSidebar}><i className="bi bi-cash-coin" /><span>Payroll</span></NavLink>

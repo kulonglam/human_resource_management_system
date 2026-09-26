@@ -2,7 +2,7 @@ import { Navigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api/client';
-import { canViewPayroll } from '../utils/permissions';
+import { canManagePayroll, canViewPayroll } from '../utils/permissions';
 import ModulePage from './ModulePage';
 import { payrollTabs } from '../config/hrModules';
 
@@ -43,8 +43,10 @@ export default function Payroll() {
     }
   };
 
+  const canExportStatutory = canManagePayroll(user);
   const toolbar = (
     <>
+      {canExportStatutory && (
       <div className="card mb-3">
         <div className="card-body">
           <h6 className="card-title mb-2">
@@ -67,6 +69,7 @@ export default function Payroll() {
           {error && <div className="alert alert-danger mt-3 mb-0 py-2">{error}</div>}
         </div>
       </div>
+      )}
       {recon && (
         <div className="card mb-4">
           <div className="card-body">

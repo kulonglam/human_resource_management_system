@@ -17,7 +17,10 @@ export default function ResourceDataTable({
   onDelete,
   onRunAction,
 }) {
-  const showActions = visibleFormFields.length || tab.rowActions?.length || tab.detailPath;
+  const showEditButtons = canUseTabEdit && visibleFormFields.length > 0;
+  const showRowActionButtons = Boolean(tab.rowActions?.length)
+    && !(isEmployeeUser && tab.hideRowActionsForEmployee);
+  const showActions = showEditButtons || showRowActionButtons || Boolean(tab.detailPath);
   const showSelection = canUseTabEdit && tab.canDelete !== false;
   const colSpan = columns.length + (showActions ? 1 : 0) + (showSelection ? 1 : 0);
 

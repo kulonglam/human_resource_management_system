@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { canManageHr } from '../utils/permissions';
 
 export default function EmployeeDetail() {
   const { id } = useParams();
@@ -78,9 +79,11 @@ export default function EmployeeDetail() {
               {exporting ? 'Exporting…' : 'GDPR Export'}
             </button>
           )}
-          <Link to={`/employees/${id}/edit`} className="btn btn-primary btn-sm">
-            Edit
-          </Link>
+          {canManageHr(user) && (
+            <Link to={`/employees/${id}/edit`} className="btn btn-primary btn-sm">
+              Edit
+            </Link>
+          )}
           <Link to="/employees" className="btn btn-outline-secondary btn-sm">
             Back
           </Link>

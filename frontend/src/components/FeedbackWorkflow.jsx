@@ -176,11 +176,13 @@ export default function FeedbackWorkflow({ lookupOptions = {}, isManager = false
             </button>
           </li>
         )}
-        <li className="nav-item">
-          <button type="button" className={`nav-link ${section === 'summary' ? 'active' : ''}`} onClick={() => setSection('summary')}>
-            Employee Summary
-          </button>
-        </li>
+        {isManager && (
+          <li className="nav-item">
+            <button type="button" className={`nav-link ${section === 'summary' ? 'active' : ''}`} onClick={() => setSection('summary')}>
+              Employee Summary
+            </button>
+          </li>
+        )}
       </ul>
 
       {error && <div className="alert alert-danger">{error}</div>}
@@ -317,7 +319,7 @@ export default function FeedbackWorkflow({ lookupOptions = {}, isManager = false
         </div>
       )}
 
-      {section === 'summary' && (
+      {isManager && section === 'summary' && (
         <>
           <div className="row g-2 mb-3 align-items-end">
             <div className="col-md-4">

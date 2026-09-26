@@ -2,10 +2,14 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import ResourceManager from '../components/ResourceManager';
+import { useAuth } from '../context/AuthContext';
 import { surveyManageTabs, surveyQuestionTab } from '../config/opsModules';
+import { canManageHr } from '../utils/permissions';
 
 export default function Surveys() {
-  const [section, setSection] = useState('manage');
+  const { user } = useAuth();
+  const canManage = canManageHr(user);
+  const [section, setSection] = useState(canManage ? 'manage' : 'take');
   const [lookupOptions, setLookupOptions] = useState({});
   const [available, setAvailable] = useState([]);
   const [questionSurveyFilter, setQuestionSurveyFilter] = useState('');
@@ -58,11 +62,11 @@ export default function Surveys() {
 
       <ul className="nav nav-tabs mb-3">
         {[
-          { id: 'manage', label: 'Manage Surveys' },
-          { id: 'questions', label: 'Questions' },
+          canManage && { id: 'manage', label: 'Manage Surveys' },
+          canManage && { id: 'questions', label: 'Questions' },
           { id: 'take', label: 'Take Survey' },
-          { id: 'results', label: 'Results' },
-        ].map((tab) => (
+          canManage && { id: 'results', label: 'Results' },
+        ].filter(Boolean).map((tab) => (
           <li className="nav-item" key={tab.id}>
             <button
               type="button"
@@ -77,11 +81,11 @@ export default function Surveys() {
 
       {error && <div className="alert alert-danger">{error}</div>}
 
-      {section === 'manage' && (
+      {canManage && section === 'manage' && (
         <ResourceManager title="" icon="" tabs={surveyManageTabs} lookupOptions={lookupOptions} />
       )}
 
-      {section === 'questions' && (
+      {canManage && section === 'questions' && (
         <>
           <div className="row mb-3">
             <div className="col-md-4">
@@ -134,7 +138,7 @@ export default function Surveys() {
         </div>
       )}
 
-      {section === 'results' && (
+      {canManage && section === 'results' && (
         <>
           <div className="row g-2 mb-3 align-items-end">
             <div className="col-md-4">

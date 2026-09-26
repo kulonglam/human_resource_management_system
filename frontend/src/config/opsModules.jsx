@@ -14,6 +14,8 @@ export const performanceTabs = [
       { name: 'start_date', type: 'date', required: true }, { name: 'end_date', type: 'date', required: true },
       { name: 'target_metric', required: true }, { name: 'progress', type: 'number', default: 0 },
     ],
+    hideCreateForEmployee: true,
+    hideEditForEmployee: true,
   },
   {
     id: 'appraisals', label: 'Appraisals', endpoint: 'performance-appraisals',
@@ -36,8 +38,10 @@ export const performanceTabs = [
     ],
     rowActions: [
       { name: 'submit', label: 'Submit', variant: 'success', show: (r) => r.status === 'draft' },
-      { name: 'approve', label: 'Approve', variant: 'primary', show: (r) => r.status === 'submitted' },
+      { name: 'approve', label: 'Approve', variant: 'primary', managerOnly: true, show: (r) => r.status === 'submitted' },
     ],
+    hideCreateForEmployee: true,
+    hideEditForEmployee: true,
   },
   {
     id: 'feedback-rounds', label: 'Feedback Rounds', endpoint: 'feedback-rounds',
@@ -49,6 +53,8 @@ export const performanceTabs = [
       { name: 'name', required: true }, { name: 'description', type: 'textarea', fullWidth: true },
       { name: 'start_date', type: 'date', required: true }, { name: 'end_date', type: 'date', required: true },
     ],
+    hideCreateForEmployee: true,
+    hideEditForEmployee: true,
   },
 ];
 
@@ -65,6 +71,8 @@ export const trainingTabs = [
       { name: 'provider', required: true }, { name: 'duration_hours', type: 'number', required: true },
       { name: 'start_date', type: 'date', required: true }, { name: 'end_date', type: 'date', required: true },
     ],
+    hideCreateForEmployee: true,
+    hideEditForEmployee: true,
   },
   {
     id: 'records', label: 'Training Records', endpoint: 'training-records',
@@ -77,6 +85,8 @@ export const trainingTabs = [
         { value: 'enrolled', label: 'Enrolled' }, { value: 'completed', label: 'Completed' },
       ]},
     ],
+    hideCreateForEmployee: true,
+    hideEditForEmployee: true,
   },
   {
     id: 'skills', label: 'Skills', endpoint: 'skills',
@@ -87,6 +97,8 @@ export const trainingTabs = [
         { value: 'technical', label: 'Technical' }, { value: 'soft_skills', label: 'Soft Skills' },
       ]},
     ],
+    hideCreateForEmployee: true,
+    hideEditForEmployee: true,
   },
   {
     id: 'employee-skills', label: 'Employee Skills', endpoint: 'employee-skills',
@@ -105,6 +117,8 @@ export const trainingTabs = [
       { name: 'acquired_date', type: 'date', required: true },
       { name: 'notes', type: 'textarea', fullWidth: true },
     ],
+    hideCreateForEmployee: true,
+    hideEditForEmployee: true,
   },
   {
     id: 'certifications', label: 'Certifications', endpoint: 'certifications',
@@ -117,6 +131,8 @@ export const trainingTabs = [
       { name: 'description', type: 'textarea', fullWidth: true },
       { name: 'validity_years', type: 'number', required: true },
     ],
+    hideCreateForEmployee: true,
+    hideEditForEmployee: true,
   },
   {
     id: 'employee-certifications', label: 'Employee Certifications', endpoint: 'employee-certifications',
@@ -130,6 +146,8 @@ export const trainingTabs = [
       { name: 'issue_date', type: 'date', required: true },
       { name: 'expiry_date', type: 'date' }, { name: 'certificate_number', label: 'Certificate #' },
     ],
+    hideCreateForEmployee: true,
+    hideEditForEmployee: true,
   },
   {
     id: 'development-plans', label: 'Development Plans', endpoint: 'development-plans',
@@ -144,6 +162,8 @@ export const trainingTabs = [
       { name: 'goals', type: 'textarea', fullWidth: true, required: true },
       { name: 'start_date', type: 'date', required: true }, { name: 'end_date', type: 'date', required: true },
     ],
+    hideCreateForEmployee: true,
+    hideEditForEmployee: true,
   },
 ];
 
@@ -163,6 +183,8 @@ export const exitTabs = [
       ]},
       { name: 'notes', type: 'textarea', fullWidth: true },
     ],
+    hideCreateForEmployee: true,
+    hideEditForEmployee: true,
   },
   {
     id: 'checklist', label: 'Checklist', endpoint: 'exit-checklist-items',
@@ -174,6 +196,8 @@ export const exitTabs = [
       { name: 'exit_process', type: 'select' }, { name: 'item_name', required: true },
       { name: 'responsible_person', label: 'Responsible Person' },
     ],
+    hideCreateForEmployee: true,
+    hideEditForEmployee: true,
   },
 ];
 
@@ -189,6 +213,8 @@ export const assetTabs = [
       { name: 'category', required: true }, { name: 'purchase_date', type: 'date', required: true },
       { name: 'purchase_price', type: 'number', step: '0.01', required: true },
     ],
+    hideCreateForEmployee: true,
+    hideEditForEmployee: true,
   },
   {
     id: 'assignments', label: 'Assignments', endpoint: 'asset-assignments',
@@ -197,6 +223,8 @@ export const assetTabs = [
       { key: 'assignment_date', label: 'Assigned' }, { key: 'status', label: 'Status', render: (r) => renderStatus(r.status) },
     ],
     formFields: [{ name: 'asset', type: 'select' }, employeeField],
+    hideCreateForEmployee: true,
+    hideEditForEmployee: true,
   },
 ];
 
@@ -211,6 +239,8 @@ export const shiftTabs = [
       { name: 'shift_name', required: true }, { name: 'start_time', type: 'time', required: true },
       { name: 'end_time', type: 'time', required: true }, { name: 'working_hours', type: 'number', required: true },
     ],
+    hideCreateForEmployee: true,
+    hideEditForEmployee: true,
   },
   {
     id: 'assignments', label: 'Assignments', endpoint: 'shift-assignments',
@@ -219,6 +249,8 @@ export const shiftTabs = [
       { key: 'start_date', label: 'Start' }, { key: 'status', label: 'Status', render: (r) => renderStatus(r.status) },
     ],
     formFields: [employeeField, { name: 'shift', type: 'select' }, { name: 'start_date', type: 'date', required: true }],
+    hideCreateForEmployee: true,
+    hideEditForEmployee: true,
   },
 ];
 
@@ -238,15 +270,18 @@ export const expenseTabs = [
       { name: 'expense_date', type: 'date', required: true },
       { name: 'receipt_file', type: 'file', accept: 'image/*,.pdf', label: 'Receipt' },
     ],
+    selfServiceEmployee: true,
     rowActions: [
-      { name: 'approve', label: 'Approve', variant: 'success', show: (r) => r.status === 'submitted' },
-      { name: 'reject', label: 'Reject', variant: 'danger', show: (r) => r.status === 'submitted' },
+      { name: 'approve', label: 'Approve', variant: 'success', managerOnly: true, show: (r) => r.status === 'submitted' },
+      { name: 'reject', label: 'Reject', variant: 'danger', managerOnly: true, show: (r) => r.status === 'submitted' },
     ],
   },
   {
     id: 'categories', label: 'Categories', endpoint: 'expense-categories',
     columns: [{ key: 'name', label: 'Name' }],
     formFields: [{ name: 'name', required: true }, { name: 'description', type: 'textarea', fullWidth: true }],
+    hideCreateForEmployee: true,
+    hideEditForEmployee: true,
   },
 ];
 
@@ -261,6 +296,8 @@ export const benefitTabs = [
       ]},
       { name: 'provider', label: 'Provider' },
     ],
+    hideCreateForEmployee: true,
+    hideEditForEmployee: true,
   },
   {
     id: 'enrollments', label: 'Enrollments', endpoint: 'employee-benefits',
@@ -269,6 +306,8 @@ export const benefitTabs = [
       { key: 'status', label: 'Status', render: (r) => renderStatus(r.status) },
     ],
     formFields: [employeeField, { name: 'benefit', type: 'select' }, { name: 'enrollment_date', type: 'date', required: true }],
+    hideCreateForEmployee: true,
+    hideEditForEmployee: true,
   },
 ];
 
@@ -316,6 +355,8 @@ export const disciplineTabs = [
       { name: 'reason', required: true }, { name: 'detailed_reason', type: 'textarea', fullWidth: true, required: true },
       { name: 'incident_date', type: 'date', required: true },
     ],
+    hideCreateForEmployee: true,
+    hideEditForEmployee: true,
   },
   {
     id: 'appeals', label: 'Appeals', endpoint: 'discipline-appeals',
@@ -332,6 +373,8 @@ export const disciplineTabs = [
         { value: 'rejected', label: 'Rejected' }, { value: 'dismissed', label: 'Dismissed' },
       ]},
     ],
+    hideCreateForEmployee: true,
+    hideEditForEmployee: true,
   },
 ];
 
@@ -352,6 +395,8 @@ export const surveyManageTabs = [{
     ]},
     { name: 'start_date', type: 'date', required: true }, { name: 'end_date', type: 'date', required: true },
   ],
+  hideCreateForEmployee: true,
+  hideEditForEmployee: true,
 }];
 
 export const surveyQuestionTab = {
@@ -372,6 +417,8 @@ export const surveyQuestionTab = {
     { name: 'order', type: 'number', default: 0 },
     { name: 'is_required', type: 'select', choices: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
   ],
+  hideCreateForEmployee: true,
+  hideEditForEmployee: true,
 };
 
 export const kinTabs = [{
@@ -385,4 +432,6 @@ export const kinTabs = [{
     { name: 'relationship', required: true }, { name: 'mobile', required: true },
     { name: 'address', required: true }, { name: 'occupation', required: true },
   ],
+  hideCreateForEmployee: true,
+  hideEditForEmployee: true,
 }];

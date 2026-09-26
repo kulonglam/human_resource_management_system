@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { canManageHr } from '../utils/permissions';
 
 function EmployeeAvatar({ employee }) {
   if (employee.photo_url) {
@@ -133,9 +134,11 @@ export default function Employees() {
                       <Link to={`/employees/${emp.id}`} className="btn btn-outline-info btn-sm me-1">
                         <i className="bi bi-eye" />
                       </Link>
-                      <Link to={`/employees/${emp.id}/edit`} className="btn btn-outline-primary btn-sm">
-                        <i className="bi bi-pencil" />
-                      </Link>
+                      {canManageHr(user) && (
+                        <Link to={`/employees/${emp.id}/edit`} className="btn btn-outline-primary btn-sm">
+                          <i className="bi bi-pencil" />
+                        </Link>
+                      )}
                     </td>
                   </tr>
                 ))}

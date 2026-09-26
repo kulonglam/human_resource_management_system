@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import ConfirmModal from '../components/ConfirmModal';
 import { api } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 import { errorMessage } from '../utils/apiErrors';
+import { canManageHr } from '../utils/permissions';
 
 function DepartmentModal({ department, departments, onClose, onSaved }) {
   const isEdit = Boolean(department);
@@ -107,6 +109,8 @@ function DepartmentModal({ department, departments, onClose, onSaved }) {
 }
 
 export default function Departments() {
+  const { user } = useAuth();
+  const canManage = canManageHr(user);
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -157,9 +161,11 @@ export default function Departments() {
         <h4 className="page-heading mb-0">
           <i className="bi bi-building" style={{ color: 'var(--fca-lime)' }} /> Departments
         </h4>
-        <button type="button" className="btn btn-primary btn-sm" onClick={openCreate}>
-          <i className="bi bi-plus-lg" /> Add Department
-        </button>
+        {canManage && (
+          <button type="button" className="btn btn-primary btn-sm" onClick={openCreate}>
+            <i className="bi bi-plus-lg" /> Add Department
+          </button>
+        )}
       </div>
 
       {error && <div className="alert alert-danger">{error}</div>}
@@ -179,7 +185,7 @@ export default function Departments() {
                   <th>Location</th>
                   <th>Manager</th>
                   <th>Employees</th>
-                  <th>Actions</th>
+                  {canManage && <th>Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -190,28 +196,30 @@ export default function Departments() {
                     <td>{dept.location}</td>
                     <td>{dept.manager_name || '—'}</td>
                     <td>{dept.employee_count}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className="btn btn-outline-primary btn-sm me-1"
-                        onClick={() => openEdit(dept)}
-                      >
-                        <i className="bi bi-pencil" />
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-outline-danger btn-sm"
-                        onClick={() => setDepartmentToDelete(dept)}
-                        aria-label={`Delete ${dept.name}`}
-                      >
-                        <i className="bi bi-trash" />
-                      </button>
-                    </td>
+                    {canManage && (
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-outline-primary btn-sm me-1"
+                          onClick={() => openEdit(dept)}
+                        >
+                          <i className="bi bi-pencil" />
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline-danger btn-sm"
+                          onClick={() => setDepartmentToDelete(dept)}
+                          aria-label={`Delete ${dept.name}`}
+                        >
+                          <i className="bi bi-trash" />
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
                 {!departments.length && (
                   <tr>
-                    <td colSpan="6" className="text-center py-4 text-muted">
+                    <td colSpan={canManage ? 6 : 5} className="text-center py-4 text-muted">
                       No departments found.
                     </td>
                   </tr>

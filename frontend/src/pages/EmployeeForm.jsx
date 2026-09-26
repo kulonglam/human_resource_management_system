@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 import { errorMessage } from '../utils/apiErrors';
+import { canManageHr } from '../utils/permissions';
 import {
   INPUT_KIND,
   inputModeForKind,
@@ -69,6 +71,7 @@ function FieldLabel({ children, kind }) {
 }
 
 export default function EmployeeForm() {
+  const { user } = useAuth();
   const { id } = useParams();
   const isEdit = Boolean(id);
   const navigate = useNavigate();
@@ -190,6 +193,10 @@ export default function EmployeeForm() {
       setSubmitting(false);
     }
   };
+
+  if (user && !canManageHr(user)) {
+    return <Navigate to="/employees" replace />;
+  }
 
   if (loading) {
     return (

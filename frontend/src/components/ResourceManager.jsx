@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 import { errorMessage } from '../utils/apiErrors';
+import { canManageHr, canManagePayroll, isEmployeeUser as roleIsEmployee } from '../utils/permissions';
 import ConfirmModal from './ConfirmModal';
 import ResourceFormModal from './resources/ResourceFormModal';
 import ResourceDataTable from './resources/ResourceDataTable';
@@ -14,10 +16,12 @@ export default function ResourceManager({
   lookupOptions = {},
   onLookupsRefresh,
   onRecordsChanged,
-  user,
+  user: userProp,
   headerExtra,
   embedded = false,
 }) {
+  const { user: authUser } = useAuth();
+  const user = userProp || authUser;
   const [activeTab, setActiveTab] = useState(tabs[0]?.id);
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -34,14 +38,27 @@ export default function ResourceManager({
   const [deleting, setDeleting] = useState(false);
   const [formLookups, setFormLookups] = useState(lookupOptions);
 
-  const tab = tabs.find((t) => t.id === activeTab) || tabs[0];
-  const isEmployeeUser = user && !user.is_admin && !user.is_manager;
+  const visibleTabs = useMemo(
+    () => (tabs || []).filter((t) => {
+      if (t.adminOnly && !user?.is_admin) return false;
+      if (t.employeeHidden && roleIsEmployee(user)) return false;
+      return true;
+    }),
+    [tabs, user],
+  );
+  const tab = visibleTabs.find((t) => t.id === activeTab) || visibleTabs[0];
+  const isEmployeeUser = !canManageHr(user);
 
   const canUseTabCreate = tab?.canCreate !== false && tab?.formFields?.length > 0
     && !tab?.hideCreate
-    && !(isEmployeeUser && tab?.hideCreateForEmployee)
-    && !(tab?.adminOnly && !user?.is_admin);
-  const canUseTabEdit = tab?.hideEdit !== true && !(isEmployeeUser && tab?.hideEditForEmployee);
+    && !(tab?.hideCreateForEmployee && !canManageHr(user))
+    && !(tab?.adminOnly && !user?.is_admin)
+    && !(tab?.adminCreateOnly && !user?.is_admin)
+    && !(tab?.requiresPayrollManage && !canManagePayroll(user));
+  const canUseTabEdit = tab?.hideEdit !== true
+    && !(tab?.hideEditForEmployee && !canManageHr(user))
+    && !(tab?.adminCreateOnly && !user?.is_admin)
+    && !(tab?.requiresPayrollManage && !canManagePayroll(user));
 
   const visibleFormFields = tab?.formFields?.filter((field) => {
     if (tab.selfServiceEmployee && isEmployeeUser && field.name === 'employee') {
@@ -72,6 +89,12 @@ export default function ResourceManager({
   useEffect(() => {
     setFormLookups(lookupOptions);
   }, [lookupOptions]);
+
+  useEffect(() => {
+    if (visibleTabs.length && !visibleTabs.some((t) => t.id === activeTab)) {
+      setActiveTab(visibleTabs[0].id);
+    }
+  }, [visibleTabs, activeTab]);
 
   const refreshLookups = async () => {
     if (typeof onLookupsRefresh !== 'function') return;
@@ -275,6 +298,10 @@ export default function ResourceManager({
     }
   };
 
+  if (!tab) {
+    return headerExtra || null;
+  }
+
   const columns = tab.columns || (rows[0] ? Object.keys(rows[0]).slice(0, 6) : []);
 
   return (
@@ -315,7 +342,7 @@ export default function ResourceManager({
       )}
 
       <ResourceTabs
-        tabs={tabs}
+        tabs={visibleTabs}
         activeTab={activeTab}
         onChange={setActiveTab}
         ariaLabel={`${title || 'Resource'} sections`}
@@ -336,7 +363,7 @@ export default function ResourceManager({
         <div
           role="tabpanel"
           id={`resource-panel-${tab?.id}`}
-          aria-labelledby={tabs.length > 1 ? `resource-tab-${tab?.id}` : undefined}
+          aria-labelledby={visibleTabs.length > 1 ? `resource-tab-${tab?.id}` : undefined}
         >
           <ResourceDataTable
             rows={rows}

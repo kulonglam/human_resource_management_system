@@ -26,6 +26,8 @@ export const attendanceTabs = [{
     ]},
     { name: 'notes', type: 'textarea', fullWidth: true },
   ],
+  hideCreateForEmployee: true,
+  hideEditForEmployee: true,
   rowActions: [
     { name: 'submit', label: 'Submit', variant: 'outline-primary', show: (r) => ['draft', 'rejected'].includes(r.approval_status) },
     { name: 'approve', label: 'Approve', variant: 'success', managerOnly: true, show: (r) => r.approval_status === 'submitted' },
@@ -139,8 +141,8 @@ export const leaveTabs = [
       { name: 'reason', type: 'textarea', fullWidth: true, required: true },
     ],
     rowActions: [
-      { name: 'approve', label: 'Approve', variant: 'success', show: (r) => r.status === 'pending' },
-      { name: 'reject', label: 'Reject', variant: 'danger', show: (r) => r.status === 'pending' },
+      { name: 'approve', label: 'Approve', variant: 'success', managerOnly: true, show: (r) => r.status === 'pending' },
+      { name: 'reject', label: 'Reject', variant: 'danger', managerOnly: true, show: (r) => r.status === 'pending' },
     ],
     canDelete: false,
     hideEdit: true,
@@ -184,6 +186,8 @@ export const recruitmentJobsTab = {
     { name: 'deadline', type: 'date', required: true },
     { name: 'is_open', type: 'checkbox', label: 'Open for applications', default: true },
   ],
+  hideCreateForEmployee: true,
+  hideEditForEmployee: true,
 };
 
 export const recruitmentApplicationsTab = {
@@ -216,15 +220,20 @@ export const recruitmentApplicationsTab = {
       name: 'approve',
       label: 'Advance',
       variant: 'outline-success',
+      managerOnly: true,
       show: (row) => ['received', 'shortlisted', 'interviewed'].includes(row.status),
     },
     {
       name: 'reject',
       label: 'Reject',
       variant: 'outline-danger',
+      managerOnly: true,
       show: (row) => !['rejected', 'hired'].includes(row.status),
     },
   ],
+  hideCreateForEmployee: true,
+  hideEditForEmployee: true,
+  hideRowActionsForEmployee: true,
 };
 
 export const recruitmentTabs = [recruitmentJobsTab, recruitmentApplicationsTab];
@@ -257,6 +266,7 @@ export const payrollTabs = [{
   hideCreateForEmployee: true,
   hideEditForEmployee: true,
   hideRowActionsForEmployee: true,
+  requiresPayrollManage: true,
 }, {
   id: 'runs', label: 'Payroll Runs', endpoint: 'payroll-runs',
   columns: [
@@ -280,6 +290,7 @@ export const payrollTabs = [{
   hideCreateForEmployee: true,
   hideEditForEmployee: true,
   hideRowActionsForEmployee: true,
+  requiresPayrollManage: true,
 }];
 
 export const workforceStructureTabs = [
@@ -297,6 +308,8 @@ export const workforceStructureTabs = [
       { name: 'description', type: 'textarea', fullWidth: true },
       { name: 'is_active', type: 'checkbox', default: true },
     ],
+    hideCreateForEmployee: true,
+    hideEditForEmployee: true,
   },
   {
     id: 'grades', label: 'Job Grades', endpoint: 'job-grades',
@@ -313,6 +326,8 @@ export const workforceStructureTabs = [
       { name: 'maximum_salary', type: 'number', step: '0.01' },
       { name: 'is_active', type: 'checkbox', default: true },
     ],
+    hideCreateForEmployee: true,
+    hideEditForEmployee: true,
   },
   {
     id: 'contracts', label: 'Contracts', endpoint: 'employment-contracts',
@@ -338,6 +353,8 @@ export const workforceStructureTabs = [
       { name: 'document', type: 'file', accept: '.pdf,.doc,.docx' },
       { name: 'notes', type: 'textarea', fullWidth: true },
     ],
+    hideCreateForEmployee: true,
+    hideEditForEmployee: true,
   },
   {
     id: 'history', label: 'Employment History', endpoint: 'employment-history',
@@ -359,5 +376,7 @@ export const workforceStructureTabs = [
       { name: 'previous_grade', type: 'select' }, { name: 'new_grade', type: 'select' },
       { name: 'notes', type: 'textarea', fullWidth: true },
     ],
+    hideCreateForEmployee: true,
+    hideEditForEmployee: true,
   },
 ];

@@ -2,15 +2,16 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import FeedbackWorkflow from '../components/FeedbackWorkflow';
 import ResourceManager from '../components/ResourceManager';
+import { useAuth } from '../context/AuthContext';
 import { performanceTabs } from '../config/opsModules';
+import { canManageHr } from '../utils/permissions';
 
 export default function Performance() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('goals');
   const [lookupOptions, setLookupOptions] = useState({});
-  const [user, setUser] = useState(null);
 
   useEffect(() => {
-    api.getMe().then(setUser).catch(() => {});
     async function loadLookups() {
       try {
         const [employees, departments] = await Promise.all([
@@ -28,12 +29,15 @@ export default function Performance() {
     loadLookups();
   }, []);
 
+  const visiblePerformanceTabs = canManageHr(user)
+    ? performanceTabs
+    : performanceTabs.filter((t) => t.id !== 'feedback-rounds');
   const navTabs = [
-    ...performanceTabs.map((t) => ({ id: t.id, label: t.label })),
+    ...visiblePerformanceTabs.map((t) => ({ id: t.id, label: t.label })),
     { id: 'feedback360', label: '360° Feedback' },
   ];
 
-  const currentTab = performanceTabs.find((t) => t.id === activeTab);
+  const currentTab = visiblePerformanceTabs.find((t) => t.id === activeTab);
 
   return (
     <>
@@ -63,11 +67,13 @@ export default function Performance() {
           isManager={Boolean(user?.is_admin || user?.is_manager)}
         />
       ) : (
+        currentTab && (
         <ResourceManager
           title=""
           tabs={[currentTab]}
           lookupOptions={lookupOptions}
         />
+        )
       )}
     </>
   );
